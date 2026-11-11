@@ -1,0 +1,725 @@
+border size|dTroops=1000 attack=1000 border=1|37.0132|0.05|1.92755
+border size|dTroops=1000 attack=1000 border=10|37.0132|0.05|0.192755
+border size|dTroops=1000 attack=1000 border=100|37.0132|0.05|0.0192755
+border size|dTroops=1000 attack=1000 border=1000|37.0132|0.05|0.00192755
+border size|dTroops=1000 attack=100000 border=1|22.2079|0.05|1.58059
+border size|dTroops=1000 attack=100000 border=10|22.2079|0.05|0.158059
+border size|dTroops=1000 attack=100000 border=100|22.2079|0.05|0.0158059
+border size|dTroops=1000 attack=100000 border=1000|22.2079|0.05|0.00158059
+border size|dTroops=1000 attack=10000000 border=1|22.2079|0.05|1.58059
+border size|dTroops=1000 attack=10000000 border=10|22.2079|0.05|0.158059
+border size|dTroops=1000 attack=10000000 border=100|22.2079|0.05|0.0158059
+border size|dTroops=1000 attack=10000000 border=1000|22.2079|0.05|0.00158059
+border size|dTroops=100000 attack=1000 border=1|77.1151|5|72.283
+border size|dTroops=100000 attack=1000 border=10|77.1151|5|7.2283
+border size|dTroops=100000 attack=1000 border=100|77.1151|5|0.72283
+border size|dTroops=100000 attack=1000 border=1000|77.1151|5|0.072283
+border size|dTroops=100000 attack=100000 border=1|38.5576|5|1.92755
+border size|dTroops=100000 attack=100000 border=10|38.5576|5|0.192755
+border size|dTroops=100000 attack=100000 border=100|38.5576|5|0.0192755
+border size|dTroops=100000 attack=100000 border=1000|38.5576|5|0.00192755
+border size|dTroops=100000 attack=10000000 border=1|23.1345|5|1.58059
+border size|dTroops=100000 attack=10000000 border=10|23.1345|5|0.158059
+border size|dTroops=100000 attack=10000000 border=100|23.1345|5|0.0158059
+border size|dTroops=100000 attack=10000000 border=1000|23.1345|5|0.00158059
+border size|dTroops=10000000 attack=1000 border=1|385.995|500|722.83
+border size|dTroops=10000000 attack=1000 border=10|385.995|500|72.283
+border size|dTroops=10000000 attack=1000 border=100|385.995|500|7.2283
+border size|dTroops=10000000 attack=1000 border=1000|385.995|500|0.72283
+border size|dTroops=10000000 attack=100000 border=1|385.995|500|72.283
+border size|dTroops=10000000 attack=100000 border=10|385.995|500|7.2283
+border size|dTroops=10000000 attack=100000 border=100|385.995|500|0.72283
+border size|dTroops=10000000 attack=100000 border=1000|385.995|500|0.072283
+border size|dTroops=10000000 attack=10000000 border=1|192.998|500|1.92755
+border size|dTroops=10000000 attack=10000000 border=10|192.998|500|0.192755
+border size|dTroops=10000000 attack=10000000 border=100|192.998|500|0.0192755
+border size|dTroops=10000000 attack=10000000 border=1000|192.998|500|0.00192755
+border size|terraNullius border=1|16|0|16.5
+border size|terraNullius border=10|16|0|1.65
+border size|terraNullius border=100|16|0|0.165
+border size|terraNullius border=1000|16|0|0.0165
+extremes: terra nullius|aTiles=100 attack=1|16|0|0.5
+extremes: terra nullius|aTiles=100 attack=10000000|16|0|0.025
+extremes: terra nullius|aTiles=5000000 attack=1|16|0|0.5
+extremes: terra nullius|aTiles=5000000 attack=10000000|16|0|0.025
+extremes: territory and troop counts|Mountain aTiles=100 dTiles=100 dTroops=0 attack=1|33.336|0|0.0239766
+extremes: territory and troop counts|Mountain aTiles=100 dTiles=100 dTroops=0 attack=1000|33.336|0|0.0239766
+extremes: territory and troop counts|Mountain aTiles=100 dTiles=100 dTroops=0 attack=1000000|33.336|0|0.0239766
+extremes: territory and troop counts|Mountain aTiles=100 dTiles=100 dTroops=0 attack=10000000|33.336|0|0.0239766
+extremes: territory and troop counts|Mountain aTiles=100 dTiles=100 dTroops=1 attack=1|55.5647|0.01|0.0292398
+extremes: territory and troop counts|Mountain aTiles=100 dTiles=100 dTroops=1 attack=1000|33.3388|0.01|0.0239766
+extremes: territory and troop counts|Mountain aTiles=100 dTiles=100 dTroops=1 attack=1000000|33.3388|0.01|0.0239766
+extremes: territory and troop counts|Mountain aTiles=100 dTiles=100 dTroops=1 attack=10000000|33.3388|0.01|0.0239766
+extremes: territory and troop counts|Mountain aTiles=100 dTiles=100 dTroops=1000 attack=1|120.48|10|10.9649
+extremes: territory and troop counts|Mountain aTiles=100 dTiles=100 dTroops=1000 attack=1000|60.24|10|0.0292398
+extremes: territory and troop counts|Mountain aTiles=100 dTiles=100 dTroops=1000 attack=1000000|36.144|10|0.0239766
+extremes: territory and troop counts|Mountain aTiles=100 dTiles=100 dTroops=1000 attack=10000000|36.144|10|0.0239766
+extremes: territory and troop counts|Mountain aTiles=100 dTiles=100 dTroops=1000000 attack=1|9471.12|10000|10.9649
+extremes: territory and troop counts|Mountain aTiles=100 dTiles=100 dTroops=1000000 attack=1000|9471.12|10000|10.9649
+extremes: territory and troop counts|Mountain aTiles=100 dTiles=100 dTroops=1000000 attack=1000000|4735.56|10000|0.0292398
+extremes: territory and troop counts|Mountain aTiles=100 dTiles=100 dTroops=1000000 attack=10000000|2841.34|10000|0.0239766
+extremes: territory and troop counts|Mountain aTiles=100 dTiles=100 dTroops=10000000 attack=1|93711.1|100000|10.9649
+extremes: territory and troop counts|Mountain aTiles=100 dTiles=100 dTroops=10000000 attack=1000|93711.1|100000|10.9649
+extremes: territory and troop counts|Mountain aTiles=100 dTiles=100 dTroops=10000000 attack=1000000|93711.1|100000|0.219298
+extremes: territory and troop counts|Mountain aTiles=100 dTiles=100 dTroops=10000000 attack=10000000|46855.6|100000|0.0292398
+extremes: territory and troop counts|Mountain aTiles=100 dTiles=1000000 dTroops=0 attack=1|23.805|0|0.0171215
+extremes: territory and troop counts|Mountain aTiles=100 dTiles=1000000 dTroops=0 attack=1000|23.805|0|0.0171215
+extremes: territory and troop counts|Mountain aTiles=100 dTiles=1000000 dTroops=0 attack=1000000|23.805|0|0.0171215
+extremes: territory and troop counts|Mountain aTiles=100 dTiles=1000000 dTroops=0 attack=10000000|23.805|0|0.0171215
+extremes: territory and troop counts|Mountain aTiles=100 dTiles=1000000 dTroops=1 attack=1|39.675|0.000001|0.0208799
+extremes: territory and troop counts|Mountain aTiles=100 dTiles=1000000 dTroops=1 attack=1000|23.805|0.000001|0.0171215
+extremes: territory and troop counts|Mountain aTiles=100 dTiles=1000000 dTroops=1 attack=1000000|23.805|0.000001|0.0171215
+extremes: territory and troop counts|Mountain aTiles=100 dTiles=1000000 dTroops=1 attack=10000000|23.805|0.000001|0.0171215
+extremes: territory and troop counts|Mountain aTiles=100 dTiles=1000000 dTroops=1000 attack=1|79.351|0.001|7.82998
+extremes: territory and troop counts|Mountain aTiles=100 dTiles=1000000 dTroops=1000 attack=1000|39.6755|0.001|0.0208799
+extremes: territory and troop counts|Mountain aTiles=100 dTiles=1000000 dTroops=1000 attack=1000000|23.8053|0.001|0.0171215
+extremes: territory and troop counts|Mountain aTiles=100 dTiles=1000000 dTroops=1000 attack=10000000|23.8053|0.001|0.0171215
+extremes: territory and troop counts|Mountain aTiles=100 dTiles=1000000 dTroops=1000000 attack=1|80.2861|1|7.82998
+extremes: territory and troop counts|Mountain aTiles=100 dTiles=1000000 dTroops=1000000 attack=1000|80.2861|1|7.82998
+extremes: territory and troop counts|Mountain aTiles=100 dTiles=1000000 dTroops=1000000 attack=1000000|40.143|1|0.0208799
+extremes: territory and troop counts|Mountain aTiles=100 dTiles=1000000 dTroops=1000000 attack=10000000|24.0858|1|0.0171215
+extremes: territory and troop counts|Mountain aTiles=100 dTiles=1000000 dTroops=10000000 attack=1|88.7101|10|7.82998
+extremes: territory and troop counts|Mountain aTiles=100 dTiles=1000000 dTroops=10000000 attack=1000|88.7101|10|7.82998
+extremes: territory and troop counts|Mountain aTiles=100 dTiles=1000000 dTroops=10000000 attack=1000000|88.7101|10|0.1566
+extremes: territory and troop counts|Mountain aTiles=100 dTiles=1000000 dTroops=10000000 attack=10000000|44.355|10|0.0208799
+extremes: territory and troop counts|Mountain aTiles=1000000 dTiles=100 dTroops=0 attack=1|11.0971|0|0.00729596
+extremes: territory and troop counts|Mountain aTiles=1000000 dTiles=100 dTroops=0 attack=1000|11.0971|0|0.00729596
+extremes: territory and troop counts|Mountain aTiles=1000000 dTiles=100 dTroops=0 attack=1000000|11.0971|0|0.00729596
+extremes: territory and troop counts|Mountain aTiles=1000000 dTiles=100 dTroops=0 attack=10000000|11.0971|0|0.00729596
+extremes: territory and troop counts|Mountain aTiles=1000000 dTiles=100 dTroops=1 attack=1|18.4998|0.01|0.00889751
+extremes: territory and troop counts|Mountain aTiles=1000000 dTiles=100 dTroops=1 attack=1000|11.0999|0.01|0.00729596
+extremes: territory and troop counts|Mountain aTiles=1000000 dTiles=100 dTroops=1 attack=1000000|11.0999|0.01|0.00729596
+extremes: territory and troop counts|Mountain aTiles=1000000 dTiles=100 dTroops=1 attack=10000000|11.0999|0.01|0.00729596
+extremes: territory and troop counts|Mountain aTiles=1000000 dTiles=100 dTroops=1000 attack=1|46.3502|10|3.33657
+extremes: territory and troop counts|Mountain aTiles=1000000 dTiles=100 dTroops=1000 attack=1000|23.1751|10|0.00889751
+extremes: territory and troop counts|Mountain aTiles=1000000 dTiles=100 dTroops=1000 attack=1000000|13.9051|10|0.00729596
+extremes: territory and troop counts|Mountain aTiles=1000000 dTiles=100 dTroops=1000 attack=10000000|13.9051|10|0.00729596
+extremes: territory and troop counts|Mountain aTiles=1000000 dTiles=100 dTroops=1000000 attack=1|9396.99|10000|3.33657
+extremes: territory and troop counts|Mountain aTiles=1000000 dTiles=100 dTroops=1000000 attack=1000|9396.99|10000|3.33657
+extremes: territory and troop counts|Mountain aTiles=1000000 dTiles=100 dTroops=1000000 attack=1000000|4698.5|10000|0.00889751
+extremes: territory and troop counts|Mountain aTiles=1000000 dTiles=100 dTroops=1000000 attack=10000000|2819.1|10000|0.00729596
+extremes: territory and troop counts|Mountain aTiles=1000000 dTiles=100 dTroops=10000000 attack=1|93637|100000|3.33657
+extremes: territory and troop counts|Mountain aTiles=1000000 dTiles=100 dTroops=10000000 attack=1000|93637|100000|3.33657
+extremes: territory and troop counts|Mountain aTiles=1000000 dTiles=100 dTroops=10000000 attack=1000000|93637|100000|0.0667313
+extremes: territory and troop counts|Mountain aTiles=1000000 dTiles=100 dTroops=10000000 attack=10000000|46818.5|100000|0.00889751
+extremes: territory and troop counts|Mountain aTiles=1000000 dTiles=1000000 dTroops=0 attack=1|7.92435|0|0.00521
+extremes: territory and troop counts|Mountain aTiles=1000000 dTiles=1000000 dTroops=0 attack=1000|7.92435|0|0.00521
+extremes: territory and troop counts|Mountain aTiles=1000000 dTiles=1000000 dTroops=0 attack=1000000|7.92435|0|0.00521
+extremes: territory and troop counts|Mountain aTiles=1000000 dTiles=1000000 dTroops=0 attack=10000000|7.92435|0|0.00521
+extremes: territory and troop counts|Mountain aTiles=1000000 dTiles=1000000 dTroops=1 attack=1|13.2072|0.000001|0.00635366
+extremes: territory and troop counts|Mountain aTiles=1000000 dTiles=1000000 dTroops=1 attack=1000|7.92435|0.000001|0.00521
+extremes: territory and troop counts|Mountain aTiles=1000000 dTiles=1000000 dTroops=1 attack=1000000|7.92435|0.000001|0.00521
+extremes: territory and troop counts|Mountain aTiles=1000000 dTiles=1000000 dTroops=1 attack=10000000|7.92435|0.000001|0.00521
+extremes: territory and troop counts|Mountain aTiles=1000000 dTiles=1000000 dTroops=1000 attack=1|26.4154|0.001|2.38262
+extremes: territory and troop counts|Mountain aTiles=1000000 dTiles=1000000 dTroops=1000 attack=1000|13.2077|0.001|0.00635366
+extremes: territory and troop counts|Mountain aTiles=1000000 dTiles=1000000 dTroops=1000 attack=1000000|7.92463|0.001|0.00521
+extremes: territory and troop counts|Mountain aTiles=1000000 dTiles=1000000 dTroops=1000 attack=10000000|7.92463|0.001|0.00521
+extremes: territory and troop counts|Mountain aTiles=1000000 dTiles=1000000 dTroops=1000000 attack=1|27.3505|1|2.38262
+extremes: territory and troop counts|Mountain aTiles=1000000 dTiles=1000000 dTroops=1000000 attack=1000|27.3505|1|2.38262
+extremes: territory and troop counts|Mountain aTiles=1000000 dTiles=1000000 dTroops=1000000 attack=1000000|13.6752|1|0.00635366
+extremes: territory and troop counts|Mountain aTiles=1000000 dTiles=1000000 dTroops=1000000 attack=10000000|8.20515|1|0.00521
+extremes: territory and troop counts|Mountain aTiles=1000000 dTiles=1000000 dTroops=10000000 attack=1|35.7745|10|2.38262
+extremes: territory and troop counts|Mountain aTiles=1000000 dTiles=1000000 dTroops=10000000 attack=1000|35.7745|10|2.38262
+extremes: territory and troop counts|Mountain aTiles=1000000 dTiles=1000000 dTroops=10000000 attack=1000000|35.7745|10|0.0476524
+extremes: territory and troop counts|Mountain aTiles=1000000 dTiles=1000000 dTroops=10000000 attack=10000000|17.8872|10|0.00635366
+extremes: territory and troop counts|Mountain aTiles=5000000 dTiles=100 dTroops=0 attack=1|10.0214|0|0.0064891
+extremes: territory and troop counts|Mountain aTiles=5000000 dTiles=100 dTroops=0 attack=1000|10.0214|0|0.0064891
+extremes: territory and troop counts|Mountain aTiles=5000000 dTiles=100 dTroops=0 attack=1000000|10.0214|0|0.0064891
+extremes: territory and troop counts|Mountain aTiles=5000000 dTiles=100 dTroops=0 attack=10000000|10.0214|0|0.0064891
+extremes: territory and troop counts|Mountain aTiles=5000000 dTiles=100 dTroops=1 attack=1|16.7069|0.01|0.00791354
+extremes: territory and troop counts|Mountain aTiles=5000000 dTiles=100 dTroops=1 attack=1000|10.0242|0.01|0.0064891
+extremes: territory and troop counts|Mountain aTiles=5000000 dTiles=100 dTroops=1 attack=1000000|10.0242|0.01|0.0064891
+extremes: territory and troop counts|Mountain aTiles=5000000 dTiles=100 dTroops=1 attack=10000000|10.0242|0.01|0.0064891
+extremes: territory and troop counts|Mountain aTiles=5000000 dTiles=100 dTroops=1000 attack=1|42.7645|10|2.96758
+extremes: territory and troop counts|Mountain aTiles=5000000 dTiles=100 dTroops=1000 attack=1000|21.3823|10|0.00791354
+extremes: territory and troop counts|Mountain aTiles=5000000 dTiles=100 dTroops=1000 attack=1000000|12.8294|10|0.0064891
+extremes: territory and troop counts|Mountain aTiles=5000000 dTiles=100 dTroops=1000 attack=10000000|12.8294|10|0.0064891
+extremes: territory and troop counts|Mountain aTiles=5000000 dTiles=100 dTroops=1000000 attack=1|9393.4|10000|2.96758
+extremes: territory and troop counts|Mountain aTiles=5000000 dTiles=100 dTroops=1000000 attack=1000|9393.4|10000|2.96758
+extremes: territory and troop counts|Mountain aTiles=5000000 dTiles=100 dTroops=1000000 attack=1000000|4696.7|10000|0.00791354
+extremes: territory and troop counts|Mountain aTiles=5000000 dTiles=100 dTroops=1000000 attack=10000000|2818.02|10000|0.0064891
+extremes: territory and troop counts|Mountain aTiles=5000000 dTiles=100 dTroops=10000000 attack=1|93633.4|100000|2.96758
+extremes: territory and troop counts|Mountain aTiles=5000000 dTiles=100 dTroops=10000000 attack=1000|93633.4|100000|2.96758
+extremes: territory and troop counts|Mountain aTiles=5000000 dTiles=100 dTroops=10000000 attack=1000000|93633.4|100000|0.0593516
+extremes: territory and troop counts|Mountain aTiles=5000000 dTiles=100 dTroops=10000000 attack=10000000|46816.7|100000|0.00791354
+extremes: territory and troop counts|Mountain aTiles=5000000 dTiles=1000000 dTroops=0 attack=1|7.15619|0|0.00463383
+extremes: territory and troop counts|Mountain aTiles=5000000 dTiles=1000000 dTroops=0 attack=1000|7.15619|0|0.00463383
+extremes: territory and troop counts|Mountain aTiles=5000000 dTiles=1000000 dTroops=0 attack=1000000|7.15619|0|0.00463383
+extremes: territory and troop counts|Mountain aTiles=5000000 dTiles=1000000 dTroops=0 attack=10000000|7.15619|0|0.00463383
+extremes: territory and troop counts|Mountain aTiles=5000000 dTiles=1000000 dTroops=1 attack=1|11.927|0.000001|0.00565101
+extremes: territory and troop counts|Mountain aTiles=5000000 dTiles=1000000 dTroops=1 attack=1000|7.15619|0.000001|0.00463383
+extremes: territory and troop counts|Mountain aTiles=5000000 dTiles=1000000 dTroops=1 attack=1000000|7.15619|0.000001|0.00463383
+extremes: territory and troop counts|Mountain aTiles=5000000 dTiles=1000000 dTroops=1 attack=10000000|7.15619|0.000001|0.00463383
+extremes: territory and troop counts|Mountain aTiles=5000000 dTiles=1000000 dTroops=1000 attack=1|23.8549|0.001|2.11913
+extremes: territory and troop counts|Mountain aTiles=5000000 dTiles=1000000 dTroops=1000 attack=1000|11.9275|0.001|0.00565101
+extremes: territory and troop counts|Mountain aTiles=5000000 dTiles=1000000 dTroops=1000 attack=1000000|7.15647|0.001|0.00463383
+extremes: territory and troop counts|Mountain aTiles=5000000 dTiles=1000000 dTroops=1000 attack=10000000|7.15647|0.001|0.00463383
+extremes: territory and troop counts|Mountain aTiles=5000000 dTiles=1000000 dTroops=1000000 attack=1|24.79|1|2.11913
+extremes: territory and troop counts|Mountain aTiles=5000000 dTiles=1000000 dTroops=1000000 attack=1000|24.79|1|2.11913
+extremes: territory and troop counts|Mountain aTiles=5000000 dTiles=1000000 dTroops=1000000 attack=1000000|12.395|1|0.00565101
+extremes: territory and troop counts|Mountain aTiles=5000000 dTiles=1000000 dTroops=1000000 attack=10000000|7.43699|1|0.00463383
+extremes: territory and troop counts|Mountain aTiles=5000000 dTiles=1000000 dTroops=10000000 attack=1|33.214|10|2.11913
+extremes: territory and troop counts|Mountain aTiles=5000000 dTiles=1000000 dTroops=10000000 attack=1000|33.214|10|2.11913
+extremes: territory and troop counts|Mountain aTiles=5000000 dTiles=1000000 dTroops=10000000 attack=1000000|33.214|10|0.0423826
+extremes: territory and troop counts|Mountain aTiles=5000000 dTiles=1000000 dTroops=10000000 attack=10000000|16.607|10|0.00565101
+extremes: territory and troop counts|Plains aTiles=100 dTiles=100 dTroops=0 attack=1|22.224|0|0.0158246
+extremes: territory and troop counts|Plains aTiles=100 dTiles=100 dTroops=0 attack=1000|22.224|0|0.0158246
+extremes: territory and troop counts|Plains aTiles=100 dTiles=100 dTroops=0 attack=1000000|22.224|0|0.0158246
+extremes: territory and troop counts|Plains aTiles=100 dTiles=100 dTroops=0 attack=10000000|22.224|0|0.0158246
+extremes: territory and troop counts|Plains aTiles=100 dTiles=100 dTroops=1 attack=1|37.0431|0.01|0.0192982
+extremes: territory and troop counts|Plains aTiles=100 dTiles=100 dTroops=1 attack=1000|22.2259|0.01|0.0158246
+extremes: territory and troop counts|Plains aTiles=100 dTiles=100 dTroops=1 attack=1000000|22.2259|0.01|0.0158246
+extremes: territory and troop counts|Plains aTiles=100 dTiles=100 dTroops=1 attack=10000000|22.2259|0.01|0.0158246
+extremes: territory and troop counts|Plains aTiles=100 dTiles=100 dTroops=1000 attack=1|80.32|10|7.23684
+extremes: territory and troop counts|Plains aTiles=100 dTiles=100 dTroops=1000 attack=1000|40.16|10|0.0192982
+extremes: territory and troop counts|Plains aTiles=100 dTiles=100 dTroops=1000 attack=1000000|24.096|10|0.0158246
+extremes: territory and troop counts|Plains aTiles=100 dTiles=100 dTroops=1000 attack=10000000|24.096|10|0.0158246
+extremes: territory and troop counts|Plains aTiles=100 dTiles=100 dTroops=1000000 attack=1|6314.08|10000|7.23684
+extremes: territory and troop counts|Plains aTiles=100 dTiles=100 dTroops=1000000 attack=1000|6314.08|10000|7.23684
+extremes: territory and troop counts|Plains aTiles=100 dTiles=100 dTroops=1000000 attack=1000000|3157.04|10000|0.0192982
+extremes: territory and troop counts|Plains aTiles=100 dTiles=100 dTroops=1000000 attack=10000000|1894.22|10000|0.0158246
+extremes: territory and troop counts|Plains aTiles=100 dTiles=100 dTroops=10000000 attack=1|62474.1|100000|7.23684
+extremes: territory and troop counts|Plains aTiles=100 dTiles=100 dTroops=10000000 attack=1000|62474.1|100000|7.23684
+extremes: territory and troop counts|Plains aTiles=100 dTiles=100 dTroops=10000000 attack=1000000|62474.1|100000|0.144737
+extremes: territory and troop counts|Plains aTiles=100 dTiles=100 dTroops=10000000 attack=10000000|31237|100000|0.0192982
+extremes: territory and troop counts|Plains aTiles=100 dTiles=1000000 dTroops=0 attack=1|15.87|0|0.0113002
+extremes: territory and troop counts|Plains aTiles=100 dTiles=1000000 dTroops=0 attack=1000|15.87|0|0.0113002
+extremes: territory and troop counts|Plains aTiles=100 dTiles=1000000 dTroops=0 attack=1000000|15.87|0|0.0113002
+extremes: territory and troop counts|Plains aTiles=100 dTiles=1000000 dTroops=0 attack=10000000|15.87|0|0.0113002
+extremes: territory and troop counts|Plains aTiles=100 dTiles=1000000 dTroops=1 attack=1|26.45|0.000001|0.0137808
+extremes: territory and troop counts|Plains aTiles=100 dTiles=1000000 dTroops=1 attack=1000|15.87|0.000001|0.0113002
+extremes: territory and troop counts|Plains aTiles=100 dTiles=1000000 dTroops=1 attack=1000000|15.87|0.000001|0.0113002
+extremes: territory and troop counts|Plains aTiles=100 dTiles=1000000 dTroops=1 attack=10000000|15.87|0.000001|0.0113002
+extremes: territory and troop counts|Plains aTiles=100 dTiles=1000000 dTroops=1000 attack=1|52.9007|0.001|5.16778
+extremes: territory and troop counts|Plains aTiles=100 dTiles=1000000 dTroops=1000 attack=1000|26.4503|0.001|0.0137808
+extremes: territory and troop counts|Plains aTiles=100 dTiles=1000000 dTroops=1000 attack=1000000|15.8702|0.001|0.0113002
+extremes: territory and troop counts|Plains aTiles=100 dTiles=1000000 dTroops=1000 attack=10000000|15.8702|0.001|0.0113002
+extremes: territory and troop counts|Plains aTiles=100 dTiles=1000000 dTroops=1000000 attack=1|53.5241|1|5.16778
+extremes: territory and troop counts|Plains aTiles=100 dTiles=1000000 dTroops=1000000 attack=1000|53.5241|1|5.16778
+extremes: territory and troop counts|Plains aTiles=100 dTiles=1000000 dTroops=1000000 attack=1000000|26.762|1|0.0137808
+extremes: territory and troop counts|Plains aTiles=100 dTiles=1000000 dTroops=1000000 attack=10000000|16.0572|1|0.0113002
+extremes: territory and troop counts|Plains aTiles=100 dTiles=1000000 dTroops=10000000 attack=1|59.1401|10|5.16778
+extremes: territory and troop counts|Plains aTiles=100 dTiles=1000000 dTroops=10000000 attack=1000|59.1401|10|5.16778
+extremes: territory and troop counts|Plains aTiles=100 dTiles=1000000 dTroops=10000000 attack=1000000|59.1401|10|0.103356
+extremes: territory and troop counts|Plains aTiles=100 dTiles=1000000 dTroops=10000000 attack=10000000|29.57|10|0.0137808
+extremes: territory and troop counts|Plains aTiles=1000000 dTiles=100 dTroops=0 attack=1|7.39805|0|0.00481533
+extremes: territory and troop counts|Plains aTiles=1000000 dTiles=100 dTroops=0 attack=1000|7.39805|0|0.00481533
+extremes: territory and troop counts|Plains aTiles=1000000 dTiles=100 dTroops=0 attack=1000000|7.39805|0|0.00481533
+extremes: territory and troop counts|Plains aTiles=1000000 dTiles=100 dTroops=0 attack=10000000|7.39805|0|0.00481533
+extremes: territory and troop counts|Plains aTiles=1000000 dTiles=100 dTroops=1 attack=1|12.3332|0.01|0.00587236
+extremes: territory and troop counts|Plains aTiles=1000000 dTiles=100 dTroops=1 attack=1000|7.39992|0.01|0.00481533
+extremes: territory and troop counts|Plains aTiles=1000000 dTiles=100 dTroops=1 attack=1000000|7.39992|0.01|0.00481533
+extremes: territory and troop counts|Plains aTiles=1000000 dTiles=100 dTroops=1 attack=10000000|7.39992|0.01|0.00481533
+extremes: territory and troop counts|Plains aTiles=1000000 dTiles=100 dTroops=1000 attack=1|30.9002|10|2.20213
+extremes: territory and troop counts|Plains aTiles=1000000 dTiles=100 dTroops=1000 attack=1000|15.4501|10|0.00587236
+extremes: territory and troop counts|Plains aTiles=1000000 dTiles=100 dTroops=1000 attack=1000000|9.27005|10|0.00481533
+extremes: territory and troop counts|Plains aTiles=1000000 dTiles=100 dTroops=1000 attack=10000000|9.27005|10|0.00481533
+extremes: territory and troop counts|Plains aTiles=1000000 dTiles=100 dTroops=1000000 attack=1|6264.66|10000|2.20213
+extremes: territory and troop counts|Plains aTiles=1000000 dTiles=100 dTroops=1000000 attack=1000|6264.66|10000|2.20213
+extremes: territory and troop counts|Plains aTiles=1000000 dTiles=100 dTroops=1000000 attack=1000000|3132.33|10000|0.00587236
+extremes: territory and troop counts|Plains aTiles=1000000 dTiles=100 dTroops=1000000 attack=10000000|1879.4|10000|0.00481533
+extremes: territory and troop counts|Plains aTiles=1000000 dTiles=100 dTroops=10000000 attack=1|62424.7|100000|2.20213
+extremes: territory and troop counts|Plains aTiles=1000000 dTiles=100 dTroops=10000000 attack=1000|62424.7|100000|2.20213
+extremes: territory and troop counts|Plains aTiles=1000000 dTiles=100 dTroops=10000000 attack=1000000|62424.7|100000|0.0440427
+extremes: territory and troop counts|Plains aTiles=1000000 dTiles=100 dTroops=10000000 attack=10000000|31212.3|100000|0.00587236
+extremes: territory and troop counts|Plains aTiles=1000000 dTiles=1000000 dTroops=0 attack=1|5.2829|0|0.0034386
+extremes: territory and troop counts|Plains aTiles=1000000 dTiles=1000000 dTroops=0 attack=1000|5.2829|0|0.0034386
+extremes: territory and troop counts|Plains aTiles=1000000 dTiles=1000000 dTroops=0 attack=1000000|5.2829|0|0.0034386
+extremes: territory and troop counts|Plains aTiles=1000000 dTiles=1000000 dTroops=0 attack=10000000|5.2829|0|0.0034386
+extremes: territory and troop counts|Plains aTiles=1000000 dTiles=1000000 dTroops=1 attack=1|8.80483|0.000001|0.00419341
+extremes: territory and troop counts|Plains aTiles=1000000 dTiles=1000000 dTroops=1 attack=1000|5.2829|0.000001|0.0034386
+extremes: territory and troop counts|Plains aTiles=1000000 dTiles=1000000 dTroops=1 attack=1000000|5.2829|0.000001|0.0034386
+extremes: territory and troop counts|Plains aTiles=1000000 dTiles=1000000 dTroops=1 attack=10000000|5.2829|0.000001|0.0034386
+extremes: territory and troop counts|Plains aTiles=1000000 dTiles=1000000 dTroops=1000 attack=1|17.6103|0.001|1.57253
+extremes: territory and troop counts|Plains aTiles=1000000 dTiles=1000000 dTroops=1000 attack=1000|8.80514|0.001|0.00419341
+extremes: territory and troop counts|Plains aTiles=1000000 dTiles=1000000 dTroops=1000 attack=1000000|5.28309|0.001|0.0034386
+extremes: territory and troop counts|Plains aTiles=1000000 dTiles=1000000 dTroops=1000 attack=10000000|5.28309|0.001|0.0034386
+extremes: territory and troop counts|Plains aTiles=1000000 dTiles=1000000 dTroops=1000000 attack=1|18.2337|1|1.57253
+extremes: territory and troop counts|Plains aTiles=1000000 dTiles=1000000 dTroops=1000000 attack=1000|18.2337|1|1.57253
+extremes: territory and troop counts|Plains aTiles=1000000 dTiles=1000000 dTroops=1000000 attack=1000000|9.11683|1|0.00419341
+extremes: territory and troop counts|Plains aTiles=1000000 dTiles=1000000 dTroops=1000000 attack=10000000|5.4701|1|0.0034386
+extremes: territory and troop counts|Plains aTiles=1000000 dTiles=1000000 dTroops=10000000 attack=1|23.8497|10|1.57253
+extremes: territory and troop counts|Plains aTiles=1000000 dTiles=1000000 dTroops=10000000 attack=1000|23.8497|10|1.57253
+extremes: territory and troop counts|Plains aTiles=1000000 dTiles=1000000 dTroops=10000000 attack=1000000|23.8497|10|0.0314506
+extremes: territory and troop counts|Plains aTiles=1000000 dTiles=1000000 dTroops=10000000 attack=10000000|11.9248|10|0.00419341
+extremes: territory and troop counts|Plains aTiles=5000000 dTiles=100 dTroops=0 attack=1|6.68091|0|0.00428281
+extremes: territory and troop counts|Plains aTiles=5000000 dTiles=100 dTroops=0 attack=1000|6.68091|0|0.00428281
+extremes: territory and troop counts|Plains aTiles=5000000 dTiles=100 dTroops=0 attack=1000000|6.68091|0|0.00428281
+extremes: territory and troop counts|Plains aTiles=5000000 dTiles=100 dTroops=0 attack=10000000|6.68091|0|0.00428281
+extremes: territory and troop counts|Plains aTiles=5000000 dTiles=100 dTroops=1 attack=1|11.138|0.01|0.00522294
+extremes: territory and troop counts|Plains aTiles=5000000 dTiles=100 dTroops=1 attack=1000|6.68278|0.01|0.00428281
+extremes: territory and troop counts|Plains aTiles=5000000 dTiles=100 dTroops=1 attack=1000000|6.68278|0.01|0.00428281
+extremes: territory and troop counts|Plains aTiles=5000000 dTiles=100 dTroops=1 attack=10000000|6.68278|0.01|0.00428281
+extremes: territory and troop counts|Plains aTiles=5000000 dTiles=100 dTroops=1000 attack=1|28.5097|10|1.9586
+extremes: territory and troop counts|Plains aTiles=5000000 dTiles=100 dTroops=1000 attack=1000|14.2548|10|0.00522294
+extremes: territory and troop counts|Plains aTiles=5000000 dTiles=100 dTroops=1000 attack=1000000|8.55291|10|0.00428281
+extremes: territory and troop counts|Plains aTiles=5000000 dTiles=100 dTroops=1000 attack=10000000|8.55291|10|0.00428281
+extremes: territory and troop counts|Plains aTiles=5000000 dTiles=100 dTroops=1000000 attack=1|6262.27|10000|1.9586
+extremes: territory and troop counts|Plains aTiles=5000000 dTiles=100 dTroops=1000000 attack=1000|6262.27|10000|1.9586
+extremes: territory and troop counts|Plains aTiles=5000000 dTiles=100 dTroops=1000000 attack=1000000|3131.13|10000|0.00522294
+extremes: territory and troop counts|Plains aTiles=5000000 dTiles=100 dTroops=1000000 attack=10000000|1878.68|10000|0.00428281
+extremes: territory and troop counts|Plains aTiles=5000000 dTiles=100 dTroops=10000000 attack=1|62422.3|100000|1.9586
+extremes: territory and troop counts|Plains aTiles=5000000 dTiles=100 dTroops=10000000 attack=1000|62422.3|100000|1.9586
+extremes: territory and troop counts|Plains aTiles=5000000 dTiles=100 dTroops=10000000 attack=1000000|62422.3|100000|0.039172
+extremes: territory and troop counts|Plains aTiles=5000000 dTiles=100 dTroops=10000000 attack=10000000|31211.1|100000|0.00522294
+extremes: territory and troop counts|Plains aTiles=5000000 dTiles=1000000 dTroops=0 attack=1|4.77079|0|0.00305833
+extremes: territory and troop counts|Plains aTiles=5000000 dTiles=1000000 dTroops=0 attack=1000|4.77079|0|0.00305833
+extremes: territory and troop counts|Plains aTiles=5000000 dTiles=1000000 dTroops=0 attack=1000000|4.77079|0|0.00305833
+extremes: territory and troop counts|Plains aTiles=5000000 dTiles=1000000 dTroops=0 attack=10000000|4.77079|0|0.00305833
+extremes: territory and troop counts|Plains aTiles=5000000 dTiles=1000000 dTroops=1 attack=1|7.95132|0.000001|0.00372967
+extremes: territory and troop counts|Plains aTiles=5000000 dTiles=1000000 dTroops=1 attack=1000|4.77079|0.000001|0.00305833
+extremes: territory and troop counts|Plains aTiles=5000000 dTiles=1000000 dTroops=1 attack=1000000|4.77079|0.000001|0.00305833
+extremes: territory and troop counts|Plains aTiles=5000000 dTiles=1000000 dTroops=1 attack=10000000|4.77079|0.000001|0.00305833
+extremes: territory and troop counts|Plains aTiles=5000000 dTiles=1000000 dTroops=1000 attack=1|15.9033|0.001|1.39863
+extremes: territory and troop counts|Plains aTiles=5000000 dTiles=1000000 dTroops=1000 attack=1000|7.95163|0.001|0.00372967
+extremes: territory and troop counts|Plains aTiles=5000000 dTiles=1000000 dTroops=1000 attack=1000000|4.77098|0.001|0.00305833
+extremes: territory and troop counts|Plains aTiles=5000000 dTiles=1000000 dTroops=1000 attack=10000000|4.77098|0.001|0.00305833
+extremes: territory and troop counts|Plains aTiles=5000000 dTiles=1000000 dTroops=1000000 attack=1|16.5266|1|1.39863
+extremes: territory and troop counts|Plains aTiles=5000000 dTiles=1000000 dTroops=1000000 attack=1000|16.5266|1|1.39863
+extremes: territory and troop counts|Plains aTiles=5000000 dTiles=1000000 dTroops=1000000 attack=1000000|8.26332|1|0.00372967
+extremes: territory and troop counts|Plains aTiles=5000000 dTiles=1000000 dTroops=1000000 attack=10000000|4.95799|1|0.00305833
+extremes: territory and troop counts|Plains aTiles=5000000 dTiles=1000000 dTroops=10000000 attack=1|22.1426|10|1.39863
+extremes: territory and troop counts|Plains aTiles=5000000 dTiles=1000000 dTroops=10000000 attack=1000|22.1426|10|1.39863
+extremes: territory and troop counts|Plains aTiles=5000000 dTiles=1000000 dTroops=10000000 attack=1000000|22.1426|10|0.0279725
+extremes: territory and troop counts|Plains aTiles=5000000 dTiles=1000000 dTroops=10000000 attack=10000000|11.0713|10|0.00372967
+player vs player: large attacker overwhelming-push speed floor|attackerTiles=20000 defenderTroops/attackTroops=0.5|23.1345|5|0.0158059
+player vs player: large attacker overwhelming-push speed floor|attackerTiles=20000 defenderTroops/attackTroops=0.8|30.846|5|0.0158059
+player vs player: large attacker overwhelming-push speed floor|attackerTiles=20000 defenderTroops/attackTroops=0.9|34.7018|5|0.0173479
+player vs player: large attacker overwhelming-push speed floor|attackerTiles=20000 defenderTroops/attackTroops=1|38.5576|5|0.0192755
+player vs player: large attacker overwhelming-push speed floor|attackerTiles=20000 defenderTroops/attackTroops=1.5|57.8363|5|0.0289132
+player vs player: large attacker overwhelming-push speed floor|attackerTiles=2000000 defenderTroops/attackTroops=0.5|7.73526|5|0.00437092
+player vs player: large attacker overwhelming-push speed floor|attackerTiles=2000000 defenderTroops/attackTroops=0.8|10.3137|5|0.00437092
+player vs player: large attacker overwhelming-push speed floor|attackerTiles=2000000 defenderTroops/attackTroops=0.9|11.6029|5|0.00479736
+player vs player: large attacker overwhelming-push speed floor|attackerTiles=2000000 defenderTroops/attackTroops=1|12.8921|5|0.0053304
+player vs player: large attacker overwhelming-push speed floor|attackerTiles=2000000 defenderTroops/attackTroops=1.5|19.3381|5|0.00799559
+player vs player: large attacker overwhelming-push speed floor|attackerTiles=300000 defenderTroops/attackTroops=0.5|15.3766|5|0.0100451
+player vs player: large attacker overwhelming-push speed floor|attackerTiles=300000 defenderTroops/attackTroops=0.8|20.5022|5|0.0100451
+player vs player: large attacker overwhelming-push speed floor|attackerTiles=300000 defenderTroops/attackTroops=0.9|23.0649|5|0.0110252
+player vs player: large attacker overwhelming-push speed floor|attackerTiles=300000 defenderTroops/attackTroops=1|25.6277|5|0.0122502
+player vs player: large attacker overwhelming-push speed floor|attackerTiles=300000 defenderTroops/attackTroops=1.5|38.4416|5|0.0183753
+player vs player: large-territory curves|attackerTiles=1000|38.5872|5|0.0192916
+player vs player: large-territory curves|attackerTiles=10000|38.582|5|0.0192888
+player vs player: large-territory curves|attackerTiles=100000|37.0248|5|0.0184427
+player vs player: large-territory curves|attackerTiles=1000000|13.8858|5|0.00587034
+player vs player: large-territory curves|attackerTiles=100001|37.0247|5|0.0184426
+player vs player: large-territory curves|attackerTiles=150000|34.6937|5|0.0171761
+player vs player: large-territory curves|attackerTiles=200000|31.686|5|0.0155419
+player vs player: large-territory curves|attackerTiles=300000|25.6277|5|0.0122502
+player vs player: large-territory curves|attackerTiles=50000|38.2966|5|0.0191337
+player vs player: large-territory curves|attackerTiles=500000|18.3198|5|0.00827951
+player vs player: large-territory curves|defenderTiles=1000|68.2103|100|0.0192821
+player vs player: large-territory curves|defenderTiles=10000|40.128|10|0.0192809
+player vs player: large-territory curves|defenderTiles=100000|36.653|1|0.0189334
+player vs player: large-territory curves|defenderTiles=1000000|26.46|0.1|0.0137692
+player vs player: large-territory curves|defenderTiles=100001|36.6529|0.99999|0.0189334
+player vs player: large-territory curves|defenderTiles=150000|35.5504|0.666667|0.0184131
+player vs player: large-territory curves|defenderTiles=200000|34.2099|0.5|0.0177419
+player vs player: large-territory curves|defenderTiles=300000|31.5627|0.333333|0.0163898
+player vs player: large-territory curves|defenderTiles=50000|37.5098|2|0.0192172
+player vs player: large-territory curves|defenderTiles=500000|28.3906|0.2|0.0147588
+player vs player: situational modifiers|baseline|38.5576|5|0.0192755
+player vs player: situational modifiers|bot attacks bot|38.5576|5|0.0192755
+player vs player: situational modifiers|bot attacks human|38.5576|5|0.0192755
+player vs player: situational modifiers|defender has defense post|192.788|5|0.0578264
+player vs player: situational modifiers|defender is traitor|19.2788|5|0.0154204
+player vs player: situational modifiers|defense post + fallout + traitor (stacking)|578.363|5|0.28037
+player vs player: situational modifiers|disconnected teammate|0|5|0.0192755
+player vs player: situational modifiers|fallout 10%|185.076|5|0.0925222
+player vs player: situational modifiers|fallout 100%|115.673|5|0.0578264
+player vs player: situational modifiers|human attacks bot|26.9903|5|0.0192755
+player vs player: situational modifiers|nation attacks bot|26.9903|5|0.0192755
+player vs player: situational modifiers|no fallout|38.5576|5|0.0192755
+player vs player: terrain × territory × troops grid|Highland aTiles=1000 dTiles=1000 dTroops=10000 attack=10000|50.2|10|0.0233918
+player vs player: terrain × territory × troops grid|Highland aTiles=1000 dTiles=1000 dTroops=10000 attack=100000|30.12|10|0.0191813
+player vs player: terrain × territory × troops grid|Highland aTiles=1000 dTiles=1000 dTroops=10000 attack=1000000|30.12|10|0.0191813
+player vs player: terrain × territory × troops grid|Highland aTiles=1000 dTiles=1000 dTroops=100000 attack=10000|170.6|100|0.175438
+player vs player: terrain × territory × troops grid|Highland aTiles=1000 dTiles=1000 dTroops=100000 attack=100000|85.3|100|0.0233918
+player vs player: terrain × territory × troops grid|Highland aTiles=1000 dTiles=1000 dTroops=100000 attack=1000000|51.18|100|0.0191813
+player vs player: terrain × territory × troops grid|Highland aTiles=1000 dTiles=1000 dTroops=1000000 attack=10000|872.6|1000|0.877192
+player vs player: terrain × territory × troops grid|Highland aTiles=1000 dTiles=1000 dTroops=1000000 attack=100000|872.6|1000|0.175438
+player vs player: terrain × territory × troops grid|Highland aTiles=1000 dTiles=1000 dTroops=1000000 attack=1000000|436.3|1000|0.0233918
+player vs player: terrain × territory × troops grid|Highland aTiles=1000 dTiles=150000 dTroops=10000 attack=10000|44.2394|0.0666667|0.0223376
+player vs player: terrain × territory × troops grid|Highland aTiles=1000 dTiles=150000 dTroops=10000 attack=100000|26.5436|0.0666667|0.0183168
+player vs player: terrain × territory × troops grid|Highland aTiles=1000 dTiles=150000 dTroops=10000 attack=1000000|26.5436|0.0666667|0.0183168
+player vs player: terrain × territory × troops grid|Highland aTiles=1000 dTiles=150000 dTroops=100000 attack=10000|88.9468|0.666667|0.167532
+player vs player: terrain × territory × troops grid|Highland aTiles=1000 dTiles=150000 dTroops=100000 attack=100000|44.4734|0.666667|0.0223376
+player vs player: terrain × territory × troops grid|Highland aTiles=1000 dTiles=150000 dTroops=100000 attack=1000000|26.684|0.666667|0.0183168
+player vs player: terrain × territory × troops grid|Highland aTiles=1000 dTiles=150000 dTroops=1000000 attack=10000|93.6268|6.66667|0.837661
+player vs player: terrain × territory × troops grid|Highland aTiles=1000 dTiles=150000 dTroops=1000000 attack=100000|93.6268|6.66667|0.167532
+player vs player: terrain × territory × troops grid|Highland aTiles=1000 dTiles=150000 dTroops=1000000 attack=1000000|46.8134|6.66667|0.0223376
+player vs player: terrain × territory × troops grid|Highland aTiles=1000 dTiles=400000 dTroops=10000 attack=10000|36.9697|0.025|0.018673
+player vs player: terrain × territory × troops grid|Highland aTiles=1000 dTiles=400000 dTroops=10000 attack=100000|22.1818|0.025|0.0153118
+player vs player: terrain × territory × troops grid|Highland aTiles=1000 dTiles=400000 dTroops=10000 attack=1000000|22.1818|0.025|0.0153118
+player vs player: terrain × territory × troops grid|Highland aTiles=1000 dTiles=400000 dTroops=100000 attack=10000|74.1148|0.25|0.140047
+player vs player: terrain × territory × troops grid|Highland aTiles=1000 dTiles=400000 dTroops=100000 attack=100000|37.0574|0.25|0.018673
+player vs player: terrain × territory × troops grid|Highland aTiles=1000 dTiles=400000 dTroops=100000 attack=1000000|22.2344|0.25|0.0153118
+player vs player: terrain × territory × troops grid|Highland aTiles=1000 dTiles=400000 dTroops=1000000 attack=10000|75.8698|2.5|0.700237
+player vs player: terrain × territory × troops grid|Highland aTiles=1000 dTiles=400000 dTroops=1000000 attack=100000|75.8698|2.5|0.140047
+player vs player: terrain × territory × troops grid|Highland aTiles=1000 dTiles=400000 dTroops=1000000 attack=1000000|37.9349|2.5|0.018673
+player vs player: terrain × territory × troops grid|Highland aTiles=1000 dTiles=50000 dTroops=10000 attack=10000|46.2222|0.2|0.0233131
+player vs player: terrain × territory × troops grid|Highland aTiles=1000 dTiles=50000 dTroops=10000 attack=100000|27.7333|0.2|0.0191168
+player vs player: terrain × territory × troops grid|Highland aTiles=1000 dTiles=50000 dTroops=10000 attack=1000000|27.7333|0.2|0.0191168
+player vs player: terrain × territory × troops grid|Highland aTiles=1000 dTiles=50000 dTroops=100000 attack=10000|93.8485|2|0.174848
+player vs player: terrain × territory × troops grid|Highland aTiles=1000 dTiles=50000 dTroops=100000 attack=100000|46.9242|2|0.0233131
+player vs player: terrain × territory × troops grid|Highland aTiles=1000 dTiles=50000 dTroops=100000 attack=1000000|28.1545|2|0.0191168
+player vs player: terrain × territory × troops grid|Highland aTiles=1000 dTiles=50000 dTroops=1000000 attack=10000|107.888|20|0.874242
+player vs player: terrain × territory × troops grid|Highland aTiles=1000 dTiles=50000 dTroops=1000000 attack=100000|107.888|20|0.174848
+player vs player: terrain × territory × troops grid|Highland aTiles=1000 dTiles=50000 dTroops=1000000 attack=1000000|53.9442|20|0.0233131
+player vs player: terrain × territory × troops grid|Highland aTiles=200000 dTiles=1000 dTroops=10000 attack=10000|41.5704|10|0.0188451
+player vs player: terrain × territory × troops grid|Highland aTiles=200000 dTiles=1000 dTroops=10000 attack=100000|24.9422|10|0.015453
+player vs player: terrain × territory × troops grid|Highland aTiles=200000 dTiles=1000 dTroops=10000 attack=1000000|24.9422|10|0.015453
+player vs player: terrain × territory × troops grid|Highland aTiles=200000 dTiles=1000 dTroops=100000 attack=10000|153.341|100|0.141338
+player vs player: terrain × territory × troops grid|Highland aTiles=200000 dTiles=1000 dTroops=100000 attack=100000|76.6704|100|0.0188451
+player vs player: terrain × territory × troops grid|Highland aTiles=200000 dTiles=1000 dTroops=100000 attack=1000000|46.0022|100|0.015453
+player vs player: terrain × territory × troops grid|Highland aTiles=200000 dTiles=1000 dTroops=1000000 attack=10000|855.341|1000|0.706691
+player vs player: terrain × territory × troops grid|Highland aTiles=200000 dTiles=1000 dTroops=1000000 attack=100000|855.341|1000|0.141338
+player vs player: terrain × territory × troops grid|Highland aTiles=200000 dTiles=1000 dTroops=1000000 attack=1000000|427.67|1000|0.0188451
+player vs player: terrain × territory × troops grid|Highland aTiles=200000 dTiles=150000 dTroops=10000 attack=10000|35.9987|0.0666667|0.0179958
+player vs player: terrain × territory × troops grid|Highland aTiles=200000 dTiles=150000 dTroops=10000 attack=100000|21.5992|0.0666667|0.0147566
+player vs player: terrain × territory × troops grid|Highland aTiles=200000 dTiles=150000 dTroops=10000 attack=1000000|21.5992|0.0666667|0.0147566
+player vs player: terrain × territory × troops grid|Highland aTiles=200000 dTiles=150000 dTroops=100000 attack=10000|72.4655|0.666667|0.134969
+player vs player: terrain × territory × troops grid|Highland aTiles=200000 dTiles=150000 dTroops=100000 attack=100000|36.2327|0.666667|0.0179958
+player vs player: terrain × territory × troops grid|Highland aTiles=200000 dTiles=150000 dTroops=100000 attack=1000000|21.7396|0.666667|0.0147566
+player vs player: terrain × territory × troops grid|Highland aTiles=200000 dTiles=150000 dTroops=1000000 attack=10000|77.1455|6.66667|0.674843
+player vs player: terrain × territory × troops grid|Highland aTiles=200000 dTiles=150000 dTroops=1000000 attack=100000|77.1455|6.66667|0.134969
+player vs player: terrain × territory × troops grid|Highland aTiles=200000 dTiles=150000 dTroops=1000000 attack=1000000|38.5727|6.66667|0.0179958
+player vs player: terrain × territory × troops grid|Highland aTiles=200000 dTiles=400000 dTroops=10000 attack=10000|30.0809|0.025|0.0150435
+player vs player: terrain × territory × troops grid|Highland aTiles=200000 dTiles=400000 dTroops=10000 attack=100000|18.0485|0.025|0.0123357
+player vs player: terrain × territory × troops grid|Highland aTiles=200000 dTiles=400000 dTroops=10000 attack=1000000|18.0485|0.025|0.0123357
+player vs player: terrain × territory × troops grid|Highland aTiles=200000 dTiles=400000 dTroops=100000 attack=10000|60.3373|0.25|0.112826
+player vs player: terrain × territory × troops grid|Highland aTiles=200000 dTiles=400000 dTroops=100000 attack=100000|30.1687|0.25|0.0150435
+player vs player: terrain × territory × troops grid|Highland aTiles=200000 dTiles=400000 dTroops=100000 attack=1000000|18.1012|0.25|0.0123357
+player vs player: terrain × territory × troops grid|Highland aTiles=200000 dTiles=400000 dTroops=1000000 attack=10000|62.0923|2.5|0.56413
+player vs player: terrain × territory × troops grid|Highland aTiles=200000 dTiles=400000 dTroops=1000000 attack=100000|62.0923|2.5|0.112826
+player vs player: terrain × territory × troops grid|Highland aTiles=200000 dTiles=400000 dTroops=1000000 attack=1000000|31.0462|2.5|0.0150435
+player vs player: terrain × territory × troops grid|Highland aTiles=200000 dTiles=50000 dTroops=10000 attack=10000|37.6217|0.2|0.0187817
+player vs player: terrain × territory × troops grid|Highland aTiles=200000 dTiles=50000 dTroops=10000 attack=100000|22.573|0.2|0.015401
+player vs player: terrain × territory × troops grid|Highland aTiles=200000 dTiles=50000 dTroops=10000 attack=1000000|22.573|0.2|0.015401
+player vs player: terrain × territory × troops grid|Highland aTiles=200000 dTiles=50000 dTroops=100000 attack=10000|76.6473|2|0.140863
+player vs player: terrain × territory × troops grid|Highland aTiles=200000 dTiles=50000 dTroops=100000 attack=100000|38.3237|2|0.0187817
+player vs player: terrain × territory × troops grid|Highland aTiles=200000 dTiles=50000 dTroops=100000 attack=1000000|22.9942|2|0.015401
+player vs player: terrain × territory × troops grid|Highland aTiles=200000 dTiles=50000 dTroops=1000000 attack=10000|90.6873|20|0.704314
+player vs player: terrain × territory × troops grid|Highland aTiles=200000 dTiles=50000 dTroops=1000000 attack=100000|90.6873|20|0.140863
+player vs player: terrain × territory × troops grid|Highland aTiles=200000 dTiles=50000 dTroops=1000000 attack=1000000|45.3437|20|0.0187817
+player vs player: terrain × territory × troops grid|Highland aTiles=50000 dTiles=1000 dTroops=10000 attack=10000|49.8366|10|0.0232003
+player vs player: terrain × territory × troops grid|Highland aTiles=50000 dTiles=1000 dTroops=10000 attack=100000|29.9019|10|0.0190243
+player vs player: terrain × territory × troops grid|Highland aTiles=50000 dTiles=1000 dTroops=10000 attack=1000000|29.9019|10|0.0190243
+player vs player: terrain × territory × troops grid|Highland aTiles=50000 dTiles=1000 dTroops=100000 attack=10000|169.873|100|0.174003
+player vs player: terrain × territory × troops grid|Highland aTiles=50000 dTiles=1000 dTroops=100000 attack=100000|84.9366|100|0.0232003
+player vs player: terrain × territory × troops grid|Highland aTiles=50000 dTiles=1000 dTroops=100000 attack=1000000|50.9619|100|0.0190243
+player vs player: terrain × territory × troops grid|Highland aTiles=50000 dTiles=1000 dTroops=1000000 attack=10000|871.873|1000|0.870013
+player vs player: terrain × territory × troops grid|Highland aTiles=50000 dTiles=1000 dTroops=1000000 attack=100000|871.873|1000|0.174003
+player vs player: terrain × territory × troops grid|Highland aTiles=50000 dTiles=1000 dTroops=1000000 attack=1000000|435.937|1000|0.0232003
+player vs player: terrain × territory × troops grid|Highland aTiles=50000 dTiles=150000 dTroops=10000 attack=10000|43.8924|0.0666667|0.0221548
+player vs player: terrain × territory × troops grid|Highland aTiles=50000 dTiles=150000 dTroops=10000 attack=100000|26.3354|0.0666667|0.0181669
+player vs player: terrain × territory × troops grid|Highland aTiles=50000 dTiles=150000 dTroops=10000 attack=1000000|26.3354|0.0666667|0.0181669
+player vs player: terrain × territory × troops grid|Highland aTiles=50000 dTiles=150000 dTroops=100000 attack=10000|88.2528|0.666667|0.166161
+player vs player: terrain × territory × troops grid|Highland aTiles=50000 dTiles=150000 dTroops=100000 attack=100000|44.1264|0.666667|0.0221548
+player vs player: terrain × territory × troops grid|Highland aTiles=50000 dTiles=150000 dTroops=100000 attack=1000000|26.4758|0.666667|0.0181669
+player vs player: terrain × territory × troops grid|Highland aTiles=50000 dTiles=150000 dTroops=1000000 attack=10000|92.9328|6.66667|0.830804
+player vs player: terrain × territory × troops grid|Highland aTiles=50000 dTiles=150000 dTroops=1000000 attack=100000|92.9328|6.66667|0.166161
+player vs player: terrain × territory × troops grid|Highland aTiles=50000 dTiles=150000 dTroops=1000000 attack=1000000|46.4664|6.66667|0.0221548
+player vs player: terrain × territory × troops grid|Highland aTiles=50000 dTiles=400000 dTroops=10000 attack=10000|36.6796|0.025|0.0185201
+player vs player: terrain × territory × troops grid|Highland aTiles=50000 dTiles=400000 dTroops=10000 attack=100000|22.0077|0.025|0.0151865
+player vs player: terrain × territory × troops grid|Highland aTiles=50000 dTiles=400000 dTroops=10000 attack=1000000|22.0077|0.025|0.0151865
+player vs player: terrain × territory × troops grid|Highland aTiles=50000 dTiles=400000 dTroops=100000 attack=10000|73.5346|0.25|0.138901
+player vs player: terrain × territory × troops grid|Highland aTiles=50000 dTiles=400000 dTroops=100000 attack=100000|36.7673|0.25|0.0185201
+player vs player: terrain × territory × troops grid|Highland aTiles=50000 dTiles=400000 dTroops=100000 attack=1000000|22.0604|0.25|0.0151865
+player vs player: terrain × territory × troops grid|Highland aTiles=50000 dTiles=400000 dTroops=1000000 attack=10000|75.2896|2.5|0.694505
+player vs player: terrain × territory × troops grid|Highland aTiles=50000 dTiles=400000 dTroops=1000000 attack=100000|75.2896|2.5|0.138901
+player vs player: terrain × territory × troops grid|Highland aTiles=50000 dTiles=400000 dTroops=1000000 attack=1000000|37.6448|2.5|0.0185201
+player vs player: terrain × territory × troops grid|Highland aTiles=50000 dTiles=50000 dTroops=10000 attack=10000|45.8601|0.2|0.0231223
+player vs player: terrain × territory × troops grid|Highland aTiles=50000 dTiles=50000 dTroops=10000 attack=100000|27.516|0.2|0.0189603
+player vs player: terrain × territory × troops grid|Highland aTiles=50000 dTiles=50000 dTroops=10000 attack=1000000|27.516|0.2|0.0189603
+player vs player: terrain × territory × troops grid|Highland aTiles=50000 dTiles=50000 dTroops=100000 attack=10000|93.1241|2|0.173417
+player vs player: terrain × territory × troops grid|Highland aTiles=50000 dTiles=50000 dTroops=100000 attack=100000|46.5621|2|0.0231223
+player vs player: terrain × territory × troops grid|Highland aTiles=50000 dTiles=50000 dTroops=100000 attack=1000000|27.9372|2|0.0189603
+player vs player: terrain × territory × troops grid|Highland aTiles=50000 dTiles=50000 dTroops=1000000 attack=10000|107.164|20|0.867086
+player vs player: terrain × territory × troops grid|Highland aTiles=50000 dTiles=50000 dTroops=1000000 attack=100000|107.164|20|0.173417
+player vs player: terrain × territory × troops grid|Highland aTiles=50000 dTiles=50000 dTroops=1000000 attack=1000000|53.5821|20|0.0231223
+player vs player: terrain × territory × troops grid|Mountain aTiles=1000 dTiles=1000 dTroops=10000 attack=10000|60.24|10|0.0292397
+player vs player: terrain × territory × troops grid|Mountain aTiles=1000 dTiles=1000 dTroops=10000 attack=100000|36.144|10|0.0239766
+player vs player: terrain × territory × troops grid|Mountain aTiles=1000 dTiles=1000 dTroops=10000 attack=1000000|36.144|10|0.0239766
+player vs player: terrain × territory × troops grid|Mountain aTiles=1000 dTiles=1000 dTroops=100000 attack=10000|204.72|100|0.219298
+player vs player: terrain × territory × troops grid|Mountain aTiles=1000 dTiles=1000 dTroops=100000 attack=100000|102.36|100|0.0292397
+player vs player: terrain × territory × troops grid|Mountain aTiles=1000 dTiles=1000 dTroops=100000 attack=1000000|61.416|100|0.0239766
+player vs player: terrain × territory × troops grid|Mountain aTiles=1000 dTiles=1000 dTroops=1000000 attack=10000|1047.12|1000|1.09649
+player vs player: terrain × territory × troops grid|Mountain aTiles=1000 dTiles=1000 dTroops=1000000 attack=100000|1047.12|1000|0.219298
+player vs player: terrain × territory × troops grid|Mountain aTiles=1000 dTiles=1000 dTroops=1000000 attack=1000000|523.56|1000|0.0292397
+player vs player: terrain × territory × troops grid|Mountain aTiles=1000 dTiles=150000 dTroops=10000 attack=10000|53.0873|0.0666667|0.027922
+player vs player: terrain × territory × troops grid|Mountain aTiles=1000 dTiles=150000 dTroops=10000 attack=100000|31.8524|0.0666667|0.0228961
+player vs player: terrain × territory × troops grid|Mountain aTiles=1000 dTiles=150000 dTroops=10000 attack=1000000|31.8524|0.0666667|0.0228961
+player vs player: terrain × territory × troops grid|Mountain aTiles=1000 dTiles=150000 dTroops=100000 attack=10000|106.736|0.666667|0.209415
+player vs player: terrain × territory × troops grid|Mountain aTiles=1000 dTiles=150000 dTroops=100000 attack=100000|53.3681|0.666667|0.027922
+player vs player: terrain × territory × troops grid|Mountain aTiles=1000 dTiles=150000 dTroops=100000 attack=1000000|32.0209|0.666667|0.0228961
+player vs player: terrain × territory × troops grid|Mountain aTiles=1000 dTiles=150000 dTroops=1000000 attack=10000|112.352|6.66667|1.04708
+player vs player: terrain × territory × troops grid|Mountain aTiles=1000 dTiles=150000 dTroops=1000000 attack=100000|112.352|6.66667|0.209415
+player vs player: terrain × territory × troops grid|Mountain aTiles=1000 dTiles=150000 dTroops=1000000 attack=1000000|56.1761|6.66667|0.027922
+player vs player: terrain × territory × troops grid|Mountain aTiles=1000 dTiles=400000 dTroops=10000 attack=10000|44.3636|0.025|0.0233412
+player vs player: terrain × territory × troops grid|Mountain aTiles=1000 dTiles=400000 dTroops=10000 attack=100000|26.6182|0.025|0.0191398
+player vs player: terrain × territory × troops grid|Mountain aTiles=1000 dTiles=400000 dTroops=10000 attack=1000000|26.6182|0.025|0.0191398
+player vs player: terrain × territory × troops grid|Mountain aTiles=1000 dTiles=400000 dTroops=100000 attack=10000|88.9378|0.25|0.175059
+player vs player: terrain × territory × troops grid|Mountain aTiles=1000 dTiles=400000 dTroops=100000 attack=100000|44.4689|0.25|0.0233412
+player vs player: terrain × territory × troops grid|Mountain aTiles=1000 dTiles=400000 dTroops=100000 attack=1000000|26.6813|0.25|0.0191398
+player vs player: terrain × territory × troops grid|Mountain aTiles=1000 dTiles=400000 dTroops=1000000 attack=10000|91.0438|2.5|0.875296
+player vs player: terrain × territory × troops grid|Mountain aTiles=1000 dTiles=400000 dTroops=1000000 attack=100000|91.0438|2.5|0.175059
+player vs player: terrain × territory × troops grid|Mountain aTiles=1000 dTiles=400000 dTroops=1000000 attack=1000000|45.5219|2.5|0.0233412
+player vs player: terrain × territory × troops grid|Mountain aTiles=1000 dTiles=50000 dTroops=10000 attack=10000|55.4667|0.2|0.0291414
+player vs player: terrain × territory × troops grid|Mountain aTiles=1000 dTiles=50000 dTroops=10000 attack=100000|33.28|0.2|0.0238959
+player vs player: terrain × territory × troops grid|Mountain aTiles=1000 dTiles=50000 dTroops=10000 attack=1000000|33.28|0.2|0.0238959
+player vs player: terrain × territory × troops grid|Mountain aTiles=1000 dTiles=50000 dTroops=100000 attack=10000|112.618|2|0.21856
+player vs player: terrain × territory × troops grid|Mountain aTiles=1000 dTiles=50000 dTroops=100000 attack=100000|56.3091|2|0.0291414
+player vs player: terrain × territory × troops grid|Mountain aTiles=1000 dTiles=50000 dTroops=100000 attack=1000000|33.7854|2|0.0238959
+player vs player: terrain × territory × troops grid|Mountain aTiles=1000 dTiles=50000 dTroops=1000000 attack=10000|129.466|20|1.0928
+player vs player: terrain × territory × troops grid|Mountain aTiles=1000 dTiles=50000 dTroops=1000000 attack=100000|129.466|20|0.21856
+player vs player: terrain × territory × troops grid|Mountain aTiles=1000 dTiles=50000 dTroops=1000000 attack=1000000|64.7331|20|0.0291414
+player vs player: terrain × territory × troops grid|Mountain aTiles=200000 dTiles=1000 dTroops=10000 attack=10000|49.8845|10|0.0235564
+player vs player: terrain × territory × troops grid|Mountain aTiles=200000 dTiles=1000 dTroops=10000 attack=100000|29.9307|10|0.0193162
+player vs player: terrain × territory × troops grid|Mountain aTiles=200000 dTiles=1000 dTroops=10000 attack=1000000|29.9307|10|0.0193162
+player vs player: terrain × territory × troops grid|Mountain aTiles=200000 dTiles=1000 dTroops=100000 attack=10000|184.009|100|0.176673
+player vs player: terrain × territory × troops grid|Mountain aTiles=200000 dTiles=1000 dTroops=100000 attack=100000|92.0045|100|0.0235564
+player vs player: terrain × territory × troops grid|Mountain aTiles=200000 dTiles=1000 dTroops=100000 attack=1000000|55.2027|100|0.0193162
+player vs player: terrain × territory × troops grid|Mountain aTiles=200000 dTiles=1000 dTroops=1000000 attack=10000|1026.41|1000|0.883363
+player vs player: terrain × territory × troops grid|Mountain aTiles=200000 dTiles=1000 dTroops=1000000 attack=100000|1026.41|1000|0.176673
+player vs player: terrain × territory × troops grid|Mountain aTiles=200000 dTiles=1000 dTroops=1000000 attack=1000000|513.204|1000|0.0235564
+player vs player: terrain × territory × troops grid|Mountain aTiles=200000 dTiles=150000 dTroops=10000 attack=10000|43.1985|0.0666667|0.0224948
+player vs player: terrain × territory × troops grid|Mountain aTiles=200000 dTiles=150000 dTroops=10000 attack=100000|25.9191|0.0666667|0.0184457
+player vs player: terrain × territory × troops grid|Mountain aTiles=200000 dTiles=150000 dTroops=10000 attack=1000000|25.9191|0.0666667|0.0184457
+player vs player: terrain × territory × troops grid|Mountain aTiles=200000 dTiles=150000 dTroops=100000 attack=10000|86.9585|0.666667|0.168711
+player vs player: terrain × territory × troops grid|Mountain aTiles=200000 dTiles=150000 dTroops=100000 attack=100000|43.4793|0.666667|0.0224948
+player vs player: terrain × territory × troops grid|Mountain aTiles=200000 dTiles=150000 dTroops=100000 attack=1000000|26.0876|0.666667|0.0184457
+player vs player: terrain × territory × troops grid|Mountain aTiles=200000 dTiles=150000 dTroops=1000000 attack=10000|92.5745|6.66667|0.843554
+player vs player: terrain × territory × troops grid|Mountain aTiles=200000 dTiles=150000 dTroops=1000000 attack=100000|92.5745|6.66667|0.168711
+player vs player: terrain × territory × troops grid|Mountain aTiles=200000 dTiles=150000 dTroops=1000000 attack=1000000|46.2873|6.66667|0.0224948
+player vs player: terrain × territory × troops grid|Mountain aTiles=200000 dTiles=400000 dTroops=10000 attack=10000|36.0971|0.025|0.0188043
+player vs player: terrain × territory × troops grid|Mountain aTiles=200000 dTiles=400000 dTroops=10000 attack=100000|21.6583|0.025|0.0154196
+player vs player: terrain × territory × troops grid|Mountain aTiles=200000 dTiles=400000 dTroops=10000 attack=1000000|21.6583|0.025|0.0154196
+player vs player: terrain × territory × troops grid|Mountain aTiles=200000 dTiles=400000 dTroops=100000 attack=10000|72.4048|0.25|0.141033
+player vs player: terrain × territory × troops grid|Mountain aTiles=200000 dTiles=400000 dTroops=100000 attack=100000|36.2024|0.25|0.0188043
+player vs player: terrain × territory × troops grid|Mountain aTiles=200000 dTiles=400000 dTroops=100000 attack=1000000|21.7214|0.25|0.0154196
+player vs player: terrain × territory × troops grid|Mountain aTiles=200000 dTiles=400000 dTroops=1000000 attack=10000|74.5108|2.5|0.705163
+player vs player: terrain × territory × troops grid|Mountain aTiles=200000 dTiles=400000 dTroops=1000000 attack=100000|74.5108|2.5|0.141033
+player vs player: terrain × territory × troops grid|Mountain aTiles=200000 dTiles=400000 dTroops=1000000 attack=1000000|37.2554|2.5|0.0188043
+player vs player: terrain × territory × troops grid|Mountain aTiles=200000 dTiles=50000 dTroops=10000 attack=10000|45.146|0.2|0.0234771
+player vs player: terrain × territory × troops grid|Mountain aTiles=200000 dTiles=50000 dTroops=10000 attack=100000|27.0876|0.2|0.0192512
+player vs player: terrain × territory × troops grid|Mountain aTiles=200000 dTiles=50000 dTroops=10000 attack=1000000|27.0876|0.2|0.0192512
+player vs player: terrain × territory × troops grid|Mountain aTiles=200000 dTiles=50000 dTroops=100000 attack=10000|91.9768|2|0.176078
+player vs player: terrain × territory × troops grid|Mountain aTiles=200000 dTiles=50000 dTroops=100000 attack=100000|45.9884|2|0.0234771
+player vs player: terrain × territory × troops grid|Mountain aTiles=200000 dTiles=50000 dTroops=100000 attack=1000000|27.593|2|0.0192512
+player vs player: terrain × territory × troops grid|Mountain aTiles=200000 dTiles=50000 dTroops=1000000 attack=10000|108.825|20|0.880392
+player vs player: terrain × territory × troops grid|Mountain aTiles=200000 dTiles=50000 dTroops=1000000 attack=100000|108.825|20|0.176078
+player vs player: terrain × territory × troops grid|Mountain aTiles=200000 dTiles=50000 dTroops=1000000 attack=1000000|54.4124|20|0.0234771
+player vs player: terrain × territory × troops grid|Mountain aTiles=50000 dTiles=1000 dTroops=10000 attack=10000|59.8039|10|0.0290004
+player vs player: terrain × territory × troops grid|Mountain aTiles=50000 dTiles=1000 dTroops=10000 attack=100000|35.8823|10|0.0237803
+player vs player: terrain × territory × troops grid|Mountain aTiles=50000 dTiles=1000 dTroops=10000 attack=1000000|35.8823|10|0.0237803
+player vs player: terrain × territory × troops grid|Mountain aTiles=50000 dTiles=1000 dTroops=100000 attack=10000|203.848|100|0.217503
+player vs player: terrain × territory × troops grid|Mountain aTiles=50000 dTiles=1000 dTroops=100000 attack=100000|101.924|100|0.0290004
+player vs player: terrain × territory × troops grid|Mountain aTiles=50000 dTiles=1000 dTroops=100000 attack=1000000|61.1543|100|0.0237803
+player vs player: terrain × territory × troops grid|Mountain aTiles=50000 dTiles=1000 dTroops=1000000 attack=10000|1046.25|1000|1.08752
+player vs player: terrain × territory × troops grid|Mountain aTiles=50000 dTiles=1000 dTroops=1000000 attack=100000|1046.25|1000|0.217503
+player vs player: terrain × territory × troops grid|Mountain aTiles=50000 dTiles=1000 dTroops=1000000 attack=1000000|523.124|1000|0.0290004
+player vs player: terrain × territory × troops grid|Mountain aTiles=50000 dTiles=150000 dTroops=10000 attack=10000|52.6709|0.0666667|0.0276935
+player vs player: terrain × territory × troops grid|Mountain aTiles=50000 dTiles=150000 dTroops=10000 attack=100000|31.6025|0.0666667|0.0227087
+player vs player: terrain × territory × troops grid|Mountain aTiles=50000 dTiles=150000 dTroops=10000 attack=1000000|31.6025|0.0666667|0.0227087
+player vs player: terrain × territory × troops grid|Mountain aTiles=50000 dTiles=150000 dTroops=100000 attack=10000|105.903|0.666667|0.207701
+player vs player: terrain × territory × troops grid|Mountain aTiles=50000 dTiles=150000 dTroops=100000 attack=100000|52.9517|0.666667|0.0276935
+player vs player: terrain × territory × troops grid|Mountain aTiles=50000 dTiles=150000 dTroops=100000 attack=1000000|31.771|0.666667|0.0227087
+player vs player: terrain × territory × troops grid|Mountain aTiles=50000 dTiles=150000 dTroops=1000000 attack=10000|111.519|6.66667|1.03851
+player vs player: terrain × territory × troops grid|Mountain aTiles=50000 dTiles=150000 dTroops=1000000 attack=100000|111.519|6.66667|0.207701
+player vs player: terrain × territory × troops grid|Mountain aTiles=50000 dTiles=150000 dTroops=1000000 attack=1000000|55.7597|6.66667|0.0276935
+player vs player: terrain × territory × troops grid|Mountain aTiles=50000 dTiles=400000 dTroops=10000 attack=10000|44.0155|0.025|0.0231502
+player vs player: terrain × territory × troops grid|Mountain aTiles=50000 dTiles=400000 dTroops=10000 attack=100000|26.4093|0.025|0.0189831
+player vs player: terrain × territory × troops grid|Mountain aTiles=50000 dTiles=400000 dTroops=10000 attack=1000000|26.4093|0.025|0.0189831
+player vs player: terrain × territory × troops grid|Mountain aTiles=50000 dTiles=400000 dTroops=100000 attack=10000|88.2416|0.25|0.173626
+player vs player: terrain × territory × troops grid|Mountain aTiles=50000 dTiles=400000 dTroops=100000 attack=100000|44.1208|0.25|0.0231502
+player vs player: terrain × territory × troops grid|Mountain aTiles=50000 dTiles=400000 dTroops=100000 attack=1000000|26.4725|0.25|0.0189831
+player vs player: terrain × territory × troops grid|Mountain aTiles=50000 dTiles=400000 dTroops=1000000 attack=10000|90.3476|2.5|0.868132
+player vs player: terrain × territory × troops grid|Mountain aTiles=50000 dTiles=400000 dTroops=1000000 attack=100000|90.3476|2.5|0.173626
+player vs player: terrain × territory × troops grid|Mountain aTiles=50000 dTiles=400000 dTroops=1000000 attack=1000000|45.1738|2.5|0.0231502
+player vs player: terrain × territory × troops grid|Mountain aTiles=50000 dTiles=50000 dTroops=10000 attack=10000|55.0321|0.2|0.0289029
+player vs player: terrain × territory × troops grid|Mountain aTiles=50000 dTiles=50000 dTroops=10000 attack=100000|33.0192|0.2|0.0237004
+player vs player: terrain × territory × troops grid|Mountain aTiles=50000 dTiles=50000 dTroops=10000 attack=1000000|33.0192|0.2|0.0237004
+player vs player: terrain × territory × troops grid|Mountain aTiles=50000 dTiles=50000 dTroops=100000 attack=10000|111.749|2|0.216772
+player vs player: terrain × territory × troops grid|Mountain aTiles=50000 dTiles=50000 dTroops=100000 attack=100000|55.8745|2|0.0289029
+player vs player: terrain × territory × troops grid|Mountain aTiles=50000 dTiles=50000 dTroops=100000 attack=1000000|33.5247|2|0.0237004
+player vs player: terrain × territory × troops grid|Mountain aTiles=50000 dTiles=50000 dTroops=1000000 attack=10000|128.597|20|1.08386
+player vs player: terrain × territory × troops grid|Mountain aTiles=50000 dTiles=50000 dTroops=1000000 attack=100000|128.597|20|0.216772
+player vs player: terrain × territory × troops grid|Mountain aTiles=50000 dTiles=50000 dTroops=1000000 attack=1000000|64.2985|20|0.0289029
+player vs player: terrain × territory × troops grid|Plains aTiles=1000 dTiles=1000 dTroops=10000 attack=10000|40.16|10|0.0192982
+player vs player: terrain × territory × troops grid|Plains aTiles=1000 dTiles=1000 dTroops=10000 attack=100000|24.096|10|0.0158246
+player vs player: terrain × territory × troops grid|Plains aTiles=1000 dTiles=1000 dTroops=10000 attack=1000000|24.096|10|0.0158246
+player vs player: terrain × territory × troops grid|Plains aTiles=1000 dTiles=1000 dTroops=100000 attack=10000|136.48|100|0.144737
+player vs player: terrain × territory × troops grid|Plains aTiles=1000 dTiles=1000 dTroops=100000 attack=100000|68.24|100|0.0192982
+player vs player: terrain × territory × troops grid|Plains aTiles=1000 dTiles=1000 dTroops=100000 attack=1000000|40.944|100|0.0158246
+player vs player: terrain × territory × troops grid|Plains aTiles=1000 dTiles=1000 dTroops=1000000 attack=10000|698.08|1000|0.723684
+player vs player: terrain × territory × troops grid|Plains aTiles=1000 dTiles=1000 dTroops=1000000 attack=100000|698.08|1000|0.144737
+player vs player: terrain × territory × troops grid|Plains aTiles=1000 dTiles=1000 dTroops=1000000 attack=1000000|349.04|1000|0.0192982
+player vs player: terrain × territory × troops grid|Plains aTiles=1000 dTiles=150000 dTroops=10000 attack=10000|35.3915|0.0666667|0.0184285
+player vs player: terrain × territory × troops grid|Plains aTiles=1000 dTiles=150000 dTroops=10000 attack=100000|21.2349|0.0666667|0.0151114
+player vs player: terrain × territory × troops grid|Plains aTiles=1000 dTiles=150000 dTroops=10000 attack=1000000|21.2349|0.0666667|0.0151114
+player vs player: terrain × territory × troops grid|Plains aTiles=1000 dTiles=150000 dTroops=100000 attack=10000|71.1575|0.666667|0.138214
+player vs player: terrain × territory × troops grid|Plains aTiles=1000 dTiles=150000 dTroops=100000 attack=100000|35.5787|0.666667|0.0184285
+player vs player: terrain × territory × troops grid|Plains aTiles=1000 dTiles=150000 dTroops=100000 attack=1000000|21.3472|0.666667|0.0151114
+player vs player: terrain × territory × troops grid|Plains aTiles=1000 dTiles=150000 dTroops=1000000 attack=10000|74.9015|6.66667|0.69107
+player vs player: terrain × territory × troops grid|Plains aTiles=1000 dTiles=150000 dTroops=1000000 attack=100000|74.9015|6.66667|0.138214
+player vs player: terrain × territory × troops grid|Plains aTiles=1000 dTiles=150000 dTroops=1000000 attack=1000000|37.4507|6.66667|0.0184285
+player vs player: terrain × territory × troops grid|Plains aTiles=1000 dTiles=400000 dTroops=10000 attack=10000|29.5757|0.025|0.0154052
+player vs player: terrain × territory × troops grid|Plains aTiles=1000 dTiles=400000 dTroops=10000 attack=100000|17.7454|0.025|0.0126323
+player vs player: terrain × territory × troops grid|Plains aTiles=1000 dTiles=400000 dTroops=10000 attack=1000000|17.7454|0.025|0.0126323
+player vs player: terrain × territory × troops grid|Plains aTiles=1000 dTiles=400000 dTroops=100000 attack=10000|59.2918|0.25|0.115539
+player vs player: terrain × territory × troops grid|Plains aTiles=1000 dTiles=400000 dTroops=100000 attack=100000|29.6459|0.25|0.0154052
+player vs player: terrain × territory × troops grid|Plains aTiles=1000 dTiles=400000 dTroops=100000 attack=1000000|17.7876|0.25|0.0126323
+player vs player: terrain × territory × troops grid|Plains aTiles=1000 dTiles=400000 dTroops=1000000 attack=10000|60.6958|2.5|0.577695
+player vs player: terrain × territory × troops grid|Plains aTiles=1000 dTiles=400000 dTroops=1000000 attack=100000|60.6958|2.5|0.115539
+player vs player: terrain × territory × troops grid|Plains aTiles=1000 dTiles=400000 dTroops=1000000 attack=1000000|30.3479|2.5|0.0154052
+player vs player: terrain × territory × troops grid|Plains aTiles=1000 dTiles=50000 dTroops=10000 attack=10000|36.9778|0.2|0.0192333
+player vs player: terrain × territory × troops grid|Plains aTiles=1000 dTiles=50000 dTroops=10000 attack=100000|22.1867|0.2|0.0157713
+player vs player: terrain × territory × troops grid|Plains aTiles=1000 dTiles=50000 dTroops=10000 attack=1000000|22.1867|0.2|0.0157713
+player vs player: terrain × territory × troops grid|Plains aTiles=1000 dTiles=50000 dTroops=100000 attack=10000|75.0788|2|0.14425
+player vs player: terrain × territory × troops grid|Plains aTiles=1000 dTiles=50000 dTroops=100000 attack=100000|37.5394|2|0.0192333
+player vs player: terrain × territory × troops grid|Plains aTiles=1000 dTiles=50000 dTroops=100000 attack=1000000|22.5236|2|0.0157713
+player vs player: terrain × territory × troops grid|Plains aTiles=1000 dTiles=50000 dTroops=1000000 attack=10000|86.3108|20|0.721249
+player vs player: terrain × territory × troops grid|Plains aTiles=1000 dTiles=50000 dTroops=1000000 attack=100000|86.3108|20|0.14425
+player vs player: terrain × territory × troops grid|Plains aTiles=1000 dTiles=50000 dTroops=1000000 attack=1000000|43.1554|20|0.0192333
+player vs player: terrain × territory × troops grid|Plains aTiles=200000 dTiles=1000 dTroops=10000 attack=10000|33.2563|10|0.0155472
+player vs player: terrain × territory × troops grid|Plains aTiles=200000 dTiles=1000 dTroops=10000 attack=100000|19.9538|10|0.0127487
+player vs player: terrain × territory × troops grid|Plains aTiles=200000 dTiles=1000 dTroops=10000 attack=1000000|19.9538|10|0.0127487
+player vs player: terrain × territory × troops grid|Plains aTiles=200000 dTiles=1000 dTroops=100000 attack=10000|122.673|100|0.116604
+player vs player: terrain × territory × troops grid|Plains aTiles=200000 dTiles=1000 dTroops=100000 attack=100000|61.3363|100|0.0155472
+player vs player: terrain × territory × troops grid|Plains aTiles=200000 dTiles=1000 dTroops=100000 attack=1000000|36.8018|100|0.0127487
+player vs player: terrain × territory × troops grid|Plains aTiles=200000 dTiles=1000 dTroops=1000000 attack=10000|684.273|1000|0.58302
+player vs player: terrain × territory × troops grid|Plains aTiles=200000 dTiles=1000 dTroops=1000000 attack=100000|684.273|1000|0.116604
+player vs player: terrain × territory × troops grid|Plains aTiles=200000 dTiles=1000 dTroops=1000000 attack=1000000|342.136|1000|0.0155472
+player vs player: terrain × territory × troops grid|Plains aTiles=200000 dTiles=150000 dTroops=10000 attack=10000|28.799|0.0666667|0.0148465
+player vs player: terrain × territory × troops grid|Plains aTiles=200000 dTiles=150000 dTroops=10000 attack=100000|17.2794|0.0666667|0.0121742
+player vs player: terrain × territory × troops grid|Plains aTiles=200000 dTiles=150000 dTroops=10000 attack=1000000|17.2794|0.0666667|0.0121742
+player vs player: terrain × territory × troops grid|Plains aTiles=200000 dTiles=150000 dTroops=100000 attack=10000|57.9724|0.666667|0.111349
+player vs player: terrain × territory × troops grid|Plains aTiles=200000 dTiles=150000 dTroops=100000 attack=100000|28.9862|0.666667|0.0148465
+player vs player: terrain × territory × troops grid|Plains aTiles=200000 dTiles=150000 dTroops=100000 attack=1000000|17.3917|0.666667|0.0121742
+player vs player: terrain × territory × troops grid|Plains aTiles=200000 dTiles=150000 dTroops=1000000 attack=10000|61.7164|6.66667|0.556745
+player vs player: terrain × territory × troops grid|Plains aTiles=200000 dTiles=150000 dTroops=1000000 attack=100000|61.7164|6.66667|0.111349
+player vs player: terrain × territory × troops grid|Plains aTiles=200000 dTiles=150000 dTroops=1000000 attack=1000000|30.8582|6.66667|0.0148465
+player vs player: terrain × territory × troops grid|Plains aTiles=200000 dTiles=400000 dTroops=10000 attack=10000|24.0647|0.025|0.0124109
+player vs player: terrain × territory × troops grid|Plains aTiles=200000 dTiles=400000 dTroops=10000 attack=100000|14.4388|0.025|0.0101769
+player vs player: terrain × territory × troops grid|Plains aTiles=200000 dTiles=400000 dTroops=10000 attack=1000000|14.4388|0.025|0.0101769
+player vs player: terrain × territory × troops grid|Plains aTiles=200000 dTiles=400000 dTroops=100000 attack=10000|48.2699|0.25|0.0930815
+player vs player: terrain × territory × troops grid|Plains aTiles=200000 dTiles=400000 dTroops=100000 attack=100000|24.1349|0.25|0.0124109
+player vs player: terrain × territory × troops grid|Plains aTiles=200000 dTiles=400000 dTroops=100000 attack=1000000|14.481|0.25|0.0101769
+player vs player: terrain × territory × troops grid|Plains aTiles=200000 dTiles=400000 dTroops=1000000 attack=10000|49.6739|2.5|0.465408
+player vs player: terrain × territory × troops grid|Plains aTiles=200000 dTiles=400000 dTroops=1000000 attack=100000|49.6739|2.5|0.0930815
+player vs player: terrain × territory × troops grid|Plains aTiles=200000 dTiles=400000 dTroops=1000000 attack=1000000|24.8369|2.5|0.0124109
+player vs player: terrain × territory × troops grid|Plains aTiles=200000 dTiles=50000 dTroops=10000 attack=10000|30.0973|0.2|0.0154949
+player vs player: terrain × territory × troops grid|Plains aTiles=200000 dTiles=50000 dTroops=10000 attack=100000|18.0584|0.2|0.0127058
+player vs player: terrain × territory × troops grid|Plains aTiles=200000 dTiles=50000 dTroops=10000 attack=1000000|18.0584|0.2|0.0127058
+player vs player: terrain × territory × troops grid|Plains aTiles=200000 dTiles=50000 dTroops=100000 attack=10000|61.3179|2|0.116212
+player vs player: terrain × territory × troops grid|Plains aTiles=200000 dTiles=50000 dTroops=100000 attack=100000|30.6589|2|0.0154949
+player vs player: terrain × territory × troops grid|Plains aTiles=200000 dTiles=50000 dTroops=100000 attack=1000000|18.3954|2|0.0127058
+player vs player: terrain × territory × troops grid|Plains aTiles=200000 dTiles=50000 dTroops=1000000 attack=10000|72.5499|20|0.581059
+player vs player: terrain × territory × troops grid|Plains aTiles=200000 dTiles=50000 dTroops=1000000 attack=100000|72.5499|20|0.116212
+player vs player: terrain × territory × troops grid|Plains aTiles=200000 dTiles=50000 dTroops=1000000 attack=1000000|36.2749|20|0.0154949
+player vs player: terrain × territory × troops grid|Plains aTiles=50000 dTiles=1000 dTroops=10000 attack=10000|39.8693|10|0.0191403
+player vs player: terrain × territory × troops grid|Plains aTiles=50000 dTiles=1000 dTroops=10000 attack=100000|23.9216|10|0.015695
+player vs player: terrain × territory × troops grid|Plains aTiles=50000 dTiles=1000 dTroops=10000 attack=1000000|23.9216|10|0.015695
+player vs player: terrain × territory × troops grid|Plains aTiles=50000 dTiles=1000 dTroops=100000 attack=10000|135.899|100|0.143552
+player vs player: terrain × territory × troops grid|Plains aTiles=50000 dTiles=1000 dTroops=100000 attack=100000|67.9493|100|0.0191403
+player vs player: terrain × territory × troops grid|Plains aTiles=50000 dTiles=1000 dTroops=100000 attack=1000000|40.7696|100|0.015695
+player vs player: terrain × territory × troops grid|Plains aTiles=50000 dTiles=1000 dTroops=1000000 attack=10000|697.499|1000|0.71776
+player vs player: terrain × territory × troops grid|Plains aTiles=50000 dTiles=1000 dTroops=1000000 attack=100000|697.499|1000|0.143552
+player vs player: terrain × territory × troops grid|Plains aTiles=50000 dTiles=1000 dTroops=1000000 attack=1000000|348.749|1000|0.0191403
+player vs player: terrain × territory × troops grid|Plains aTiles=50000 dTiles=150000 dTroops=10000 attack=10000|35.1139|0.0666667|0.0182777
+player vs player: terrain × territory × troops grid|Plains aTiles=50000 dTiles=150000 dTroops=10000 attack=100000|21.0683|0.0666667|0.0149877
+player vs player: terrain × territory × troops grid|Plains aTiles=50000 dTiles=150000 dTroops=10000 attack=1000000|21.0683|0.0666667|0.0149877
+player vs player: terrain × territory × troops grid|Plains aTiles=50000 dTiles=150000 dTroops=100000 attack=10000|70.6022|0.666667|0.137083
+player vs player: terrain × territory × troops grid|Plains aTiles=50000 dTiles=150000 dTroops=100000 attack=100000|35.3011|0.666667|0.0182777
+player vs player: terrain × territory × troops grid|Plains aTiles=50000 dTiles=150000 dTroops=100000 attack=1000000|21.1807|0.666667|0.0149877
+player vs player: terrain × territory × troops grid|Plains aTiles=50000 dTiles=150000 dTroops=1000000 attack=10000|74.3462|6.66667|0.685414
+player vs player: terrain × territory × troops grid|Plains aTiles=50000 dTiles=150000 dTroops=1000000 attack=100000|74.3462|6.66667|0.137083
+player vs player: terrain × territory × troops grid|Plains aTiles=50000 dTiles=150000 dTroops=1000000 attack=1000000|37.1731|6.66667|0.0182777
+player vs player: terrain × territory × troops grid|Plains aTiles=50000 dTiles=400000 dTroops=10000 attack=10000|29.3437|0.025|0.0152791
+player vs player: terrain × territory × troops grid|Plains aTiles=50000 dTiles=400000 dTroops=10000 attack=100000|17.6062|0.025|0.0125289
+player vs player: terrain × territory × troops grid|Plains aTiles=50000 dTiles=400000 dTroops=10000 attack=1000000|17.6062|0.025|0.0125289
+player vs player: terrain × territory × troops grid|Plains aTiles=50000 dTiles=400000 dTroops=100000 attack=10000|58.8277|0.25|0.114593
+player vs player: terrain × territory × troops grid|Plains aTiles=50000 dTiles=400000 dTroops=100000 attack=100000|29.4139|0.25|0.0152791
+player vs player: terrain × territory × troops grid|Plains aTiles=50000 dTiles=400000 dTroops=100000 attack=1000000|17.6483|0.25|0.0125289
+player vs player: terrain × territory × troops grid|Plains aTiles=50000 dTiles=400000 dTroops=1000000 attack=10000|60.2317|2.5|0.572967
+player vs player: terrain × territory × troops grid|Plains aTiles=50000 dTiles=400000 dTroops=1000000 attack=100000|60.2317|2.5|0.114593
+player vs player: terrain × territory × troops grid|Plains aTiles=50000 dTiles=400000 dTroops=1000000 attack=1000000|30.1159|2.5|0.0152791
+player vs player: terrain × territory × troops grid|Plains aTiles=50000 dTiles=50000 dTroops=10000 attack=10000|36.688|0.2|0.0190759
+player vs player: terrain × territory × troops grid|Plains aTiles=50000 dTiles=50000 dTroops=10000 attack=100000|22.0128|0.2|0.0156422
+player vs player: terrain × territory × troops grid|Plains aTiles=50000 dTiles=50000 dTroops=10000 attack=1000000|22.0128|0.2|0.0156422
+player vs player: terrain × territory × troops grid|Plains aTiles=50000 dTiles=50000 dTroops=100000 attack=10000|74.4993|2|0.143069
+player vs player: terrain × territory × troops grid|Plains aTiles=50000 dTiles=50000 dTroops=100000 attack=100000|37.2496|2|0.0190759
+player vs player: terrain × territory × troops grid|Plains aTiles=50000 dTiles=50000 dTroops=100000 attack=1000000|22.3498|2|0.0156422
+player vs player: terrain × territory × troops grid|Plains aTiles=50000 dTiles=50000 dTroops=1000000 attack=10000|85.7313|20|0.715346
+player vs player: terrain × territory × troops grid|Plains aTiles=50000 dTiles=50000 dTroops=1000000 attack=100000|85.7313|20|0.143069
+player vs player: terrain × territory × troops grid|Plains aTiles=50000 dTiles=50000 dTroops=1000000 attack=1000000|42.8656|20|0.0190759
+player vs player: troop ratio clamps|defenderTroops/attackTroops=0.01|23.1345|5|0.0158059
+player vs player: troop ratio clamps|defenderTroops/attackTroops=0.1|23.1345|5|0.0158059
+player vs player: troop ratio clamps|defenderTroops/attackTroops=0.5|23.1345|5|0.0158059
+player vs player: troop ratio clamps|defenderTroops/attackTroops=0.6|23.1345|5|0.0158059
+player vs player: troop ratio clamps|defenderTroops/attackTroops=1|38.5576|5|0.0192755
+player vs player: troop ratio clamps|defenderTroops/attackTroops=10|77.1151|5|0.144566
+player vs player: troop ratio clamps|defenderTroops/attackTroops=100|77.1151|5|0.72283
+player vs player: troop ratio clamps|defenderTroops/attackTroops=2|77.1151|5|0.0385509
+player vs player: troop ratio clamps|defenderTroops/attackTroops=5|77.1151|5|0.0963773
+player vs player: troop ratio clamps|defenderTroops/attackTroops=7.5|77.1151|5|0.144566
+player vs terra nullius|Highland BOT attack=100 fallout=0|10|0|0.5
+player vs terra nullius|Highland BOT attack=100 fallout=0.5|40|0|0.5
+player vs terra nullius|Highland BOT attack=1000 fallout=0|10|0|0.2
+player vs terra nullius|Highland BOT attack=1000 fallout=0.5|40|0|0.5
+player vs terra nullius|Highland BOT attack=10000 fallout=0|10|0|0.025
+player vs terra nullius|Highland BOT attack=10000 fallout=0.5|40|0|0.08
+player vs terra nullius|Highland BOT attack=100000 fallout=0|10|0|0.025
+player vs terra nullius|Highland BOT attack=100000 fallout=0.5|40|0|0.025
+player vs terra nullius|Highland BOT attack=1000000 fallout=0|10|0|0.025
+player vs terra nullius|Highland BOT attack=1000000 fallout=0.5|40|0|0.025
+player vs terra nullius|Highland HUMAN attack=100 fallout=0|20|0|0.5
+player vs terra nullius|Highland HUMAN attack=100 fallout=0.5|80|0|0.5
+player vs terra nullius|Highland HUMAN attack=1000 fallout=0|20|0|0.2
+player vs terra nullius|Highland HUMAN attack=1000 fallout=0.5|80|0|0.5
+player vs terra nullius|Highland HUMAN attack=10000 fallout=0|20|0|0.025
+player vs terra nullius|Highland HUMAN attack=10000 fallout=0.5|80|0|0.08
+player vs terra nullius|Highland HUMAN attack=100000 fallout=0|20|0|0.025
+player vs terra nullius|Highland HUMAN attack=100000 fallout=0.5|80|0|0.025
+player vs terra nullius|Highland HUMAN attack=1000000 fallout=0|20|0|0.025
+player vs terra nullius|Highland HUMAN attack=1000000 fallout=0.5|80|0|0.025
+player vs terra nullius|Mountain BOT attack=100 fallout=0|12|0|0.5
+player vs terra nullius|Mountain BOT attack=100 fallout=0.5|48|0|0.5
+player vs terra nullius|Mountain BOT attack=1000 fallout=0|12|0|0.25
+player vs terra nullius|Mountain BOT attack=1000 fallout=0.5|48|0|0.5
+player vs terra nullius|Mountain BOT attack=10000 fallout=0|12|0|0.025
+player vs terra nullius|Mountain BOT attack=10000 fallout=0.5|48|0|0.1
+player vs terra nullius|Mountain BOT attack=100000 fallout=0|12|0|0.025
+player vs terra nullius|Mountain BOT attack=100000 fallout=0.5|48|0|0.025
+player vs terra nullius|Mountain BOT attack=1000000 fallout=0|12|0|0.025
+player vs terra nullius|Mountain BOT attack=1000000 fallout=0.5|48|0|0.025
+player vs terra nullius|Mountain HUMAN attack=100 fallout=0|24|0|0.5
+player vs terra nullius|Mountain HUMAN attack=100 fallout=0.5|96|0|0.5
+player vs terra nullius|Mountain HUMAN attack=1000 fallout=0|24|0|0.25
+player vs terra nullius|Mountain HUMAN attack=1000 fallout=0.5|96|0|0.5
+player vs terra nullius|Mountain HUMAN attack=10000 fallout=0|24|0|0.025
+player vs terra nullius|Mountain HUMAN attack=10000 fallout=0.5|96|0|0.1
+player vs terra nullius|Mountain HUMAN attack=100000 fallout=0|24|0|0.025
+player vs terra nullius|Mountain HUMAN attack=100000 fallout=0.5|96|0|0.025
+player vs terra nullius|Mountain HUMAN attack=1000000 fallout=0|24|0|0.025
+player vs terra nullius|Mountain HUMAN attack=1000000 fallout=0.5|96|0|0.025
+player vs terra nullius|Plains BOT attack=100 fallout=0|8|0|0.5
+player vs terra nullius|Plains BOT attack=100 fallout=0.5|32|0|0.5
+player vs terra nullius|Plains BOT attack=1000 fallout=0|8|0|0.165
+player vs terra nullius|Plains BOT attack=1000 fallout=0.5|32|0|0.5
+player vs terra nullius|Plains BOT attack=10000 fallout=0|8|0|0.025
+player vs terra nullius|Plains BOT attack=10000 fallout=0.5|32|0|0.066
+player vs terra nullius|Plains BOT attack=100000 fallout=0|8|0|0.025
+player vs terra nullius|Plains BOT attack=100000 fallout=0.5|32|0|0.025
+player vs terra nullius|Plains BOT attack=1000000 fallout=0|8|0|0.025
+player vs terra nullius|Plains BOT attack=1000000 fallout=0.5|32|0|0.025
+player vs terra nullius|Plains HUMAN attack=100 fallout=0|16|0|0.5
+player vs terra nullius|Plains HUMAN attack=100 fallout=0.5|64|0|0.5
+player vs terra nullius|Plains HUMAN attack=1000 fallout=0|16|0|0.165
+player vs terra nullius|Plains HUMAN attack=1000 fallout=0.5|64|0|0.5
+player vs terra nullius|Plains HUMAN attack=10000 fallout=0|16|0|0.025
+player vs terra nullius|Plains HUMAN attack=10000 fallout=0.5|64|0|0.066
+player vs terra nullius|Plains HUMAN attack=100000 fallout=0|16|0|0.025
+player vs terra nullius|Plains HUMAN attack=100000 fallout=0.5|64|0|0.025
+player vs terra nullius|Plains HUMAN attack=1000000 fallout=0|16|0|0.025
+player vs terra nullius|Plains HUMAN attack=1000000 fallout=0.5|64|0|0.025

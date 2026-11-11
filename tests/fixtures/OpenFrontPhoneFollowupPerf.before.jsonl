@@ -1,0 +1,2 @@
+{"baseline":"cba537a","case":"nonadjacent","coldRasterMs":2219.4687000010163,"cpuBufferBytes":16825232,"dirtyPixels":1920000,"dispatchMs":20.87569999275729,"height":1000,"pendingBlocks":1920,"width":2000}
+{"baseline":"cba537a","case":"touching","coldRasterMs":2219.4687000010163,"cpuBufferBytes":16825232,"dirtyPixels":2000000,"dispatchMs":23.70419999351725,"height":1000,"pendingBlocks":2016,"width":2000}

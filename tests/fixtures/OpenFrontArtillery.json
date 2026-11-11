@@ -1,0 +1,13 @@
+{
+  "width": 64,
+  "height": 64,
+  "range": 45,
+  "legacyAtlasHash": 204395204,
+  "units": [
+    {"id":1,"type":"Artillery","owner":1,"tile":2080,"active":true,"level":1,"underConstruction":true,"constructionStartTick":0},
+    {"id":2,"type":"Artillery","owner":2,"tile":2064,"active":true,"level":1},
+    {"id":3,"type":"City","owner":2,"tile":2090,"active":true,"level":3,"health":850,"maxHealth":1000},
+    {"id":4,"type":"SAM Launcher","owner":1,"tile":2208,"active":true,"level":1,"health":450,"maxHealth":1000,"missileTimerQueue":[0]}
+  ],
+  "shell":{"id":100,"type":"Artillery Shell","owner":1,"sourceTile":2080,"lastTile":2080,"tile":2085,"targetTile":2090,"active":true}
+}

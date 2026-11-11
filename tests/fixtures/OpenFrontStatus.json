@@ -1,0 +1,935 @@
+{
+  "reference": "OpenFront v0.35.2",
+  "source": "src/client/render/frame/derive/PlayerStatus.ts",
+  "sha256": "ba4a4f8461847397d302986bf2cec45caac544585d5394f7ffb14d9d82d9b692",
+  "cases": [
+    {
+      "name": "leader ties keep first arrival; dead and zero tiles",
+      "you": 1,
+      "expected": [
+        {
+          "id": 4,
+          "flags": {
+            "crown": true,
+            "traitor": false,
+            "disconnected": false,
+            "alliance": false,
+            "allianceReq": false,
+            "target": false,
+            "embargo": false,
+            "nukeActive": false,
+            "nukeTargetsMe": false,
+            "traitorRemainingTicks": 0,
+            "allianceFraction": 0,
+            "allianceRemainingTicks": 0
+          }
+        },
+        {
+          "id": 2,
+          "flags": {
+            "crown": false,
+            "traitor": false,
+            "disconnected": false,
+            "alliance": false,
+            "allianceReq": false,
+            "target": false,
+            "embargo": false,
+            "nukeActive": false,
+            "nukeTargetsMe": false,
+            "traitorRemainingTicks": 0,
+            "allianceFraction": 0,
+            "allianceRemainingTicks": 0
+          }
+        },
+        {
+          "id": 1,
+          "flags": {
+            "crown": false,
+            "traitor": false,
+            "disconnected": false,
+            "alliance": false,
+            "allianceReq": false,
+            "target": false,
+            "embargo": false,
+            "nukeActive": false,
+            "nukeTargetsMe": false,
+            "traitorRemainingTicks": 0,
+            "allianceFraction": 0,
+            "allianceRemainingTicks": 0
+          }
+        }
+      ],
+      "roster": [
+        {
+          "smallID": 4,
+          "id": "p4",
+          "alive": true,
+          "tiles": 30,
+          "traitor": false,
+          "disconnected": false,
+          "allies": [],
+          "embargoes": []
+        },
+        {
+          "smallID": 2,
+          "id": "p2",
+          "alive": true,
+          "tiles": 30,
+          "traitor": false,
+          "disconnected": false,
+          "allies": [],
+          "embargoes": []
+        },
+        {
+          "smallID": 9,
+          "id": "p9",
+          "alive": false,
+          "tiles": 99,
+          "traitor": false,
+          "disconnected": false,
+          "allies": [],
+          "embargoes": []
+        },
+        {
+          "smallID": 1,
+          "id": "p1",
+          "alive": true,
+          "tiles": 0,
+          "traitor": false,
+          "disconnected": false,
+          "allies": [],
+          "embargoes": []
+        }
+      ],
+      "events": [],
+      "diplomacy": {
+        "alliances": [],
+        "incoming": [],
+        "outgoing": []
+      },
+      "tick": 500
+    },
+    {
+      "name": "no crown for unspawned zero tiles",
+      "you": 1,
+      "expected": [
+        {
+          "id": 1,
+          "flags": {
+            "crown": false,
+            "traitor": false,
+            "disconnected": false,
+            "alliance": false,
+            "allianceReq": false,
+            "target": false,
+            "embargo": false,
+            "nukeActive": false,
+            "nukeTargetsMe": false,
+            "traitorRemainingTicks": 0,
+            "allianceFraction": 0,
+            "allianceRemainingTicks": 0
+          }
+        },
+        {
+          "id": 2,
+          "flags": {
+            "crown": false,
+            "traitor": false,
+            "disconnected": false,
+            "alliance": false,
+            "allianceReq": false,
+            "target": false,
+            "embargo": false,
+            "nukeActive": false,
+            "nukeTargetsMe": false,
+            "traitorRemainingTicks": 0,
+            "allianceFraction": 0,
+            "allianceRemainingTicks": 0
+          }
+        }
+      ],
+      "roster": [
+        {
+          "smallID": 1,
+          "id": "p1",
+          "alive": true,
+          "tiles": 0,
+          "traitor": false,
+          "disconnected": false,
+          "allies": [],
+          "embargoes": []
+        },
+        {
+          "smallID": 2,
+          "id": "p2",
+          "alive": true,
+          "tiles": 0,
+          "traitor": false,
+          "disconnected": false,
+          "allies": [],
+          "embargoes": []
+        }
+      ],
+      "events": [],
+      "diplomacy": {
+        "alliances": [],
+        "incoming": [],
+        "outgoing": []
+      },
+      "tick": 500
+    },
+    {
+      "name": "relative flags bilateral embargo and incoming request",
+      "you": 1,
+      "expected": [
+        {
+          "id": 1,
+          "flags": {
+            "crown": false,
+            "traitor": false,
+            "disconnected": false,
+            "alliance": false,
+            "allianceReq": false,
+            "target": false,
+            "embargo": false,
+            "nukeActive": false,
+            "nukeTargetsMe": false,
+            "traitorRemainingTicks": 0,
+            "allianceFraction": 0,
+            "allianceRemainingTicks": 0
+          }
+        },
+        {
+          "id": 2,
+          "flags": {
+            "crown": false,
+            "traitor": false,
+            "disconnected": false,
+            "alliance": true,
+            "allianceReq": true,
+            "target": false,
+            "embargo": false,
+            "nukeActive": false,
+            "nukeTargetsMe": false,
+            "traitorRemainingTicks": 0,
+            "allianceFraction": 0.6,
+            "allianceRemainingTicks": 1800
+          }
+        },
+        {
+          "id": 3,
+          "flags": {
+            "crown": true,
+            "traitor": false,
+            "disconnected": false,
+            "alliance": false,
+            "allianceReq": false,
+            "target": false,
+            "embargo": true,
+            "nukeActive": false,
+            "nukeTargetsMe": false,
+            "traitorRemainingTicks": 0,
+            "allianceFraction": 0,
+            "allianceRemainingTicks": 0
+          }
+        }
+      ],
+      "roster": [
+        {
+          "smallID": 1,
+          "id": "p1",
+          "alive": true,
+          "tiles": 10,
+          "traitor": false,
+          "disconnected": false,
+          "allies": [
+            2
+          ],
+          "embargoes": [
+            3
+          ]
+        },
+        {
+          "smallID": 2,
+          "id": "p2",
+          "alive": true,
+          "tiles": 20,
+          "traitor": false,
+          "disconnected": false,
+          "allies": [],
+          "embargoes": []
+        },
+        {
+          "smallID": 3,
+          "id": "p3",
+          "alive": true,
+          "tiles": 30,
+          "traitor": false,
+          "disconnected": false,
+          "allies": [],
+          "embargoes": [
+            1
+          ]
+        }
+      ],
+      "events": [],
+      "diplomacy": {
+        "alliances": [
+          {
+            "other": 2,
+            "expiresAt": 2300
+          }
+        ],
+        "incoming": [
+          {
+            "requestor": 2
+          }
+        ],
+        "outgoing": []
+      },
+      "tick": 500
+    },
+    {
+      "name": "traitor and disconnected",
+      "you": 1,
+      "expected": [
+        {
+          "id": 1,
+          "flags": {
+            "crown": false,
+            "traitor": false,
+            "disconnected": false,
+            "alliance": false,
+            "allianceReq": false,
+            "target": false,
+            "embargo": false,
+            "nukeActive": false,
+            "nukeTargetsMe": false,
+            "traitorRemainingTicks": 0,
+            "allianceFraction": 0,
+            "allianceRemainingTicks": 0
+          }
+        },
+        {
+          "id": 2,
+          "flags": {
+            "crown": false,
+            "traitor": true,
+            "disconnected": true,
+            "alliance": false,
+            "allianceReq": false,
+            "target": false,
+            "embargo": false,
+            "nukeActive": false,
+            "nukeTargetsMe": false,
+            "traitorRemainingTicks": 100,
+            "allianceFraction": 0,
+            "allianceRemainingTicks": 0
+          }
+        },
+        {
+          "id": 3,
+          "flags": {
+            "crown": true,
+            "traitor": true,
+            "disconnected": false,
+            "alliance": false,
+            "allianceReq": false,
+            "target": false,
+            "embargo": false,
+            "nukeActive": false,
+            "nukeTargetsMe": false,
+            "traitorRemainingTicks": 0,
+            "allianceFraction": 0,
+            "allianceRemainingTicks": 0
+          }
+        }
+      ],
+      "roster": [
+        {
+          "smallID": 1,
+          "id": "p1",
+          "alive": true,
+          "tiles": 10,
+          "traitor": false,
+          "disconnected": false,
+          "allies": [],
+          "embargoes": []
+        },
+        {
+          "smallID": 2,
+          "id": "p2",
+          "alive": true,
+          "tiles": 20,
+          "traitor": true,
+          "disconnected": true,
+          "traitorUntil": 600,
+          "allies": [],
+          "embargoes": []
+        },
+        {
+          "smallID": 3,
+          "id": "p3",
+          "alive": true,
+          "tiles": 30,
+          "traitor": true,
+          "disconnected": false,
+          "allies": [],
+          "embargoes": []
+        }
+      ],
+      "events": [],
+      "diplomacy": {
+        "alliances": [],
+        "incoming": [],
+        "outgoing": []
+      },
+      "tick": 500
+    },
+    {
+      "name": "spectator has global flags only",
+      "you": 0,
+      "expected": [
+        {
+          "id": 1,
+          "flags": {
+            "crown": false,
+            "traitor": false,
+            "disconnected": false,
+            "alliance": false,
+            "allianceReq": false,
+            "target": false,
+            "embargo": false,
+            "nukeActive": false,
+            "nukeTargetsMe": false,
+            "traitorRemainingTicks": 0,
+            "allianceFraction": 0,
+            "allianceRemainingTicks": 0
+          }
+        },
+        {
+          "id": 2,
+          "flags": {
+            "crown": true,
+            "traitor": true,
+            "disconnected": true,
+            "alliance": false,
+            "allianceReq": false,
+            "target": false,
+            "embargo": false,
+            "nukeActive": false,
+            "nukeTargetsMe": false,
+            "traitorRemainingTicks": 0,
+            "allianceFraction": 0,
+            "allianceRemainingTicks": 0
+          }
+        }
+      ],
+      "roster": [
+        {
+          "smallID": 1,
+          "id": "p1",
+          "alive": true,
+          "tiles": 10,
+          "traitor": false,
+          "disconnected": false,
+          "allies": [
+            2
+          ],
+          "embargoes": [
+            2
+          ]
+        },
+        {
+          "smallID": 2,
+          "id": "p2",
+          "alive": true,
+          "tiles": 20,
+          "traitor": true,
+          "disconnected": true,
+          "allies": [],
+          "embargoes": []
+        }
+      ],
+      "events": [],
+      "diplomacy": {
+        "alliances": [],
+        "incoming": [],
+        "outgoing": []
+      },
+      "tick": 500
+    },
+    {
+      "name": "own direct allies and teammates targets; no allies of allies",
+      "you": 1,
+      "expected": [
+        {
+          "id": 1,
+          "flags": {
+            "crown": false,
+            "traitor": false,
+            "disconnected": false,
+            "alliance": false,
+            "allianceReq": false,
+            "target": false,
+            "embargo": false,
+            "nukeActive": false,
+            "nukeTargetsMe": false,
+            "traitorRemainingTicks": 0,
+            "allianceFraction": 0,
+            "allianceRemainingTicks": 0
+          }
+        },
+        {
+          "id": 2,
+          "flags": {
+            "crown": false,
+            "traitor": false,
+            "disconnected": false,
+            "alliance": true,
+            "allianceReq": false,
+            "target": false,
+            "embargo": false,
+            "nukeActive": false,
+            "nukeTargetsMe": false,
+            "traitorRemainingTicks": 0,
+            "allianceFraction": 0,
+            "allianceRemainingTicks": 0
+          }
+        },
+        {
+          "id": 3,
+          "flags": {
+            "crown": false,
+            "traitor": false,
+            "disconnected": false,
+            "alliance": false,
+            "allianceReq": false,
+            "target": true,
+            "embargo": false,
+            "nukeActive": false,
+            "nukeTargetsMe": false,
+            "traitorRemainingTicks": 0,
+            "allianceFraction": 0,
+            "allianceRemainingTicks": 0
+          }
+        },
+        {
+          "id": 4,
+          "flags": {
+            "crown": false,
+            "traitor": false,
+            "disconnected": false,
+            "alliance": false,
+            "allianceReq": false,
+            "target": true,
+            "embargo": false,
+            "nukeActive": false,
+            "nukeTargetsMe": false,
+            "traitorRemainingTicks": 0,
+            "allianceFraction": 0,
+            "allianceRemainingTicks": 0
+          }
+        },
+        {
+          "id": 5,
+          "flags": {
+            "crown": false,
+            "traitor": false,
+            "disconnected": false,
+            "alliance": false,
+            "allianceReq": false,
+            "target": true,
+            "embargo": false,
+            "nukeActive": false,
+            "nukeTargetsMe": false,
+            "traitorRemainingTicks": 0,
+            "allianceFraction": 0,
+            "allianceRemainingTicks": 0
+          }
+        },
+        {
+          "id": 6,
+          "flags": {
+            "crown": false,
+            "traitor": false,
+            "disconnected": false,
+            "alliance": false,
+            "allianceReq": false,
+            "target": false,
+            "embargo": false,
+            "nukeActive": false,
+            "nukeTargetsMe": false,
+            "traitorRemainingTicks": 0,
+            "allianceFraction": 0,
+            "allianceRemainingTicks": 0
+          }
+        },
+        {
+          "id": 7,
+          "flags": {
+            "crown": true,
+            "traitor": false,
+            "disconnected": false,
+            "alliance": false,
+            "allianceReq": false,
+            "target": false,
+            "embargo": false,
+            "nukeActive": false,
+            "nukeTargetsMe": false,
+            "traitorRemainingTicks": 0,
+            "allianceFraction": 0,
+            "allianceRemainingTicks": 0
+          }
+        }
+      ],
+      "roster": [
+        {
+          "smallID": 1,
+          "id": "p1",
+          "alive": true,
+          "tiles": 10,
+          "traitor": false,
+          "disconnected": false,
+          "allies": [
+            2
+          ],
+          "embargoes": [],
+          "team": "Blue"
+        },
+        {
+          "smallID": 2,
+          "id": "p2",
+          "alive": true,
+          "tiles": 20,
+          "traitor": false,
+          "disconnected": false,
+          "allies": [
+            1,
+            4
+          ],
+          "embargoes": []
+        },
+        {
+          "smallID": 3,
+          "id": "p3",
+          "alive": true,
+          "tiles": 30,
+          "traitor": false,
+          "disconnected": false,
+          "allies": [],
+          "embargoes": []
+        },
+        {
+          "smallID": 4,
+          "id": "p4",
+          "alive": true,
+          "tiles": 40,
+          "traitor": false,
+          "disconnected": false,
+          "allies": [],
+          "embargoes": []
+        },
+        {
+          "smallID": 5,
+          "id": "p5",
+          "alive": true,
+          "tiles": 50,
+          "traitor": false,
+          "disconnected": false,
+          "allies": [],
+          "embargoes": []
+        },
+        {
+          "smallID": 6,
+          "id": "p6",
+          "alive": true,
+          "tiles": 60,
+          "traitor": false,
+          "disconnected": false,
+          "allies": [],
+          "embargoes": []
+        },
+        {
+          "smallID": 7,
+          "id": "p7",
+          "alive": true,
+          "tiles": 70,
+          "traitor": false,
+          "disconnected": false,
+          "allies": [],
+          "embargoes": [],
+          "team": "Blue"
+        }
+      ],
+      "events": [
+        {
+          "type": "TargetPlayer",
+          "playerID": 1,
+          "targetID": 3
+        },
+        {
+          "type": "TargetPlayer",
+          "playerID": 2,
+          "targetID": 5
+        },
+        {
+          "type": "TargetPlayer",
+          "playerID": 4,
+          "targetID": 6
+        },
+        {
+          "type": "TargetPlayer",
+          "playerID": 7,
+          "targetID": 4
+        }
+      ],
+      "diplomacy": {
+        "alliances": [],
+        "incoming": [],
+        "outgoing": []
+      },
+      "tick": 500
+    },
+    {
+      "name": "active nukes include tile zero and exclude inactive missiles",
+      "you": 1,
+      "owners": [
+        [
+          0,
+          1
+        ]
+      ],
+      "units": [
+        {
+          "id": 1,
+          "unitType": "Atom Bomb",
+          "ownerID": 2,
+          "isActive": true,
+          "targetTile": 0
+        },
+        {
+          "id": 2,
+          "unitType": "MIRV Warhead",
+          "ownerID": 3,
+          "isActive": true,
+          "targetTile": 4
+        },
+        {
+          "id": 3,
+          "unitType": "Hydrogen Bomb",
+          "ownerID": 1,
+          "isActive": false,
+          "targetTile": 0
+        },
+        {
+          "id": 4,
+          "unitType": "SAMMissile",
+          "ownerID": 1,
+          "isActive": true,
+          "targetTile": 0
+        }
+      ],
+      "expected": [
+        {
+          "id": 1,
+          "flags": {
+            "crown": false,
+            "traitor": false,
+            "disconnected": false,
+            "alliance": false,
+            "allianceReq": false,
+            "target": false,
+            "embargo": false,
+            "nukeActive": false,
+            "nukeTargetsMe": false,
+            "traitorRemainingTicks": 0,
+            "allianceFraction": 0,
+            "allianceRemainingTicks": 0
+          }
+        },
+        {
+          "id": 2,
+          "flags": {
+            "crown": false,
+            "traitor": false,
+            "disconnected": false,
+            "alliance": false,
+            "allianceReq": false,
+            "target": false,
+            "embargo": false,
+            "nukeActive": true,
+            "nukeTargetsMe": true,
+            "traitorRemainingTicks": 0,
+            "allianceFraction": 0,
+            "allianceRemainingTicks": 0
+          }
+        },
+        {
+          "id": 3,
+          "flags": {
+            "crown": true,
+            "traitor": false,
+            "disconnected": false,
+            "alliance": false,
+            "allianceReq": false,
+            "target": false,
+            "embargo": false,
+            "nukeActive": true,
+            "nukeTargetsMe": false,
+            "traitorRemainingTicks": 0,
+            "allianceFraction": 0,
+            "allianceRemainingTicks": 0
+          }
+        }
+      ],
+      "roster": [
+        {
+          "smallID": 1,
+          "id": "p1",
+          "alive": true,
+          "tiles": 10,
+          "traitor": false,
+          "disconnected": false,
+          "allies": [],
+          "embargoes": []
+        },
+        {
+          "smallID": 2,
+          "id": "p2",
+          "alive": true,
+          "tiles": 20,
+          "traitor": false,
+          "disconnected": false,
+          "allies": [],
+          "embargoes": []
+        },
+        {
+          "smallID": 3,
+          "id": "p3",
+          "alive": true,
+          "tiles": 30,
+          "traitor": false,
+          "disconnected": false,
+          "allies": [],
+          "embargoes": []
+        }
+      ],
+      "events": [],
+      "diplomacy": {
+        "alliances": [],
+        "incoming": [],
+        "outgoing": []
+      },
+      "tick": 500
+    },
+    {
+      "name": "alliance drain below zero and above duration clamp",
+      "you": 1,
+      "expected": [
+        {
+          "id": 1,
+          "flags": {
+            "crown": false,
+            "traitor": false,
+            "disconnected": false,
+            "alliance": false,
+            "allianceReq": false,
+            "target": false,
+            "embargo": false,
+            "nukeActive": false,
+            "nukeTargetsMe": false,
+            "traitorRemainingTicks": 0,
+            "allianceFraction": 0,
+            "allianceRemainingTicks": 0
+          }
+        },
+        {
+          "id": 2,
+          "flags": {
+            "crown": false,
+            "traitor": false,
+            "disconnected": false,
+            "alliance": true,
+            "allianceReq": false,
+            "target": false,
+            "embargo": false,
+            "nukeActive": false,
+            "nukeTargetsMe": false,
+            "traitorRemainingTicks": 0,
+            "allianceFraction": 0,
+            "allianceRemainingTicks": 0
+          }
+        },
+        {
+          "id": 3,
+          "flags": {
+            "crown": true,
+            "traitor": false,
+            "disconnected": false,
+            "alliance": true,
+            "allianceReq": false,
+            "target": false,
+            "embargo": false,
+            "nukeActive": false,
+            "nukeTargetsMe": false,
+            "traitorRemainingTicks": 0,
+            "allianceFraction": 1,
+            "allianceRemainingTicks": 8500
+          }
+        }
+      ],
+      "roster": [
+        {
+          "smallID": 1,
+          "id": "p1",
+          "alive": true,
+          "tiles": 10,
+          "traitor": false,
+          "disconnected": false,
+          "allies": [
+            2,
+            3
+          ],
+          "embargoes": []
+        },
+        {
+          "smallID": 2,
+          "id": "p2",
+          "alive": true,
+          "tiles": 20,
+          "traitor": false,
+          "disconnected": false,
+          "allies": [],
+          "embargoes": []
+        },
+        {
+          "smallID": 3,
+          "id": "p3",
+          "alive": true,
+          "tiles": 30,
+          "traitor": false,
+          "disconnected": false,
+          "allies": [],
+          "embargoes": []
+        }
+      ],
+      "events": [],
+      "diplomacy": {
+        "alliances": [
+          {
+            "other": 2,
+            "expiresAt": 400
+          },
+          {
+            "other": 3,
+            "expiresAt": 9000
+          }
+        ],
+        "incoming": [],
+        "outgoing": []
+      },
+      "tick": 500
+    }
+  ]
+}

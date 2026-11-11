@@ -1,0 +1,210 @@
+{
+  "date": "2026-10-22",
+  "baseline": "8682cfe plus standalone renderer working tree",
+  "reference": "OpenFrontIO v0.35.2",
+  "runtime": "Lune on Windows; CPU only, buffer-copy sink",
+  "budgetMs": 2,
+  "pixelBudget": 65536,
+  "scenario": "400 ordered roster entries (one human, 399 tribes); synthetic owner grid on passable land; 1200 changed TileRefs at 10 Hz over 360 simulated 60 Hz steps; hover at 121/241",
+  "measurementLimits": "No native EditableImage allocation/upload, GPU, real phone, Lua table heap or actual display presentation cost. Single final run, no other Lune process observed immediately before start. Native pixel bytes are a lower-bound accounting estimate, not measured device memory.",
+  "results": [
+    {
+      "callerBufferBytes": 7048576,
+      "churnPaintedPixels": 219482,
+      "churnUploadBytes": 877928,
+      "constructMs": 6.365599998389371,
+      "dispatchAndRender": {
+        "cpuMs": 428.63799970655236,
+        "frames": 360,
+        "max": 4.99969998782035,
+        "p50": 0.7681999995838851,
+        "p95": 3.6983000027248636
+      },
+      "drainAfter360": {},
+      "frame": {
+        "cpuMs": 321.62279965996277,
+        "frames": 360,
+        "max": 3.2192999933613464,
+        "p50": 0.6598000036319718,
+        "p95": 2.0425000111572444
+      },
+      "height": 1000,
+      "map": "world",
+      "maxBacklogBlocks": 65,
+      "memory": {
+        "cpuBufferBytes": 7118024,
+        "imagePixelBytes": 8000000,
+        "indexEntries": 3463,
+        "maxUploadAgeFrames": 19,
+        "pages": 2,
+        "paintBytes": 3072,
+        "paintedPixels": 4219482,
+        "pendingBlocks": 0,
+        "steps": 1181,
+        "stride": 1,
+        "uploadedBytes": 16877928,
+        "uploads": 5761
+      },
+      "mockNativePixelBytes": 8000000,
+      "politicalFullRepaint": {
+        "cpuMs": 1247.9875996796181,
+        "frames": 618,
+        "max": 3.127100004348904,
+        "p50": 2.0155999955022708,
+        "p95": 2.0557000098051503
+      },
+      "rosterMs": 9.433800005353987,
+      "size": "map",
+      "snapshotMs": 3.339999995660037,
+      "terrainBuild": {
+        "cpuMs": 405.9115999698406,
+        "frames": 203,
+        "max": 2.0908000005874783,
+        "p50": 2.003900008276105,
+        "p95": 2.023399996687658
+      },
+      "update1200": {
+        "cpuMs": 106.90180001256522,
+        "frames": 60,
+        "max": 2.670899993972853,
+        "p50": 1.7484999989392236,
+        "p95": 2.124899998307228
+      },
+      "width": 2000
+    },
+    {
+      "callerBufferBytes": 2548576,
+      "churnPaintedPixels": 202879,
+      "churnUploadBytes": 811516,
+      "constructMs": 2.9907999996794388,
+      "dispatchAndRender": {
+        "cpuMs": 390.8393997553503,
+        "frames": 360,
+        "max": 4.24399999610614,
+        "p50": 0.001200009137392044,
+        "p95": 3.6872000055154786
+      },
+      "drainAfter360": {},
+      "frame": {
+        "cpuMs": 291.7666998691857,
+        "frames": 360,
+        "max": 2.1419999975478277,
+        "p50": 0.0010999938240274787,
+        "p95": 2.0456999918678775
+      },
+      "height": 500,
+      "map": "world",
+      "maxBacklogBlocks": 56,
+      "memory": {
+        "cpuBufferBytes": 2609800,
+        "imagePixelBytes": 2000000,
+        "indexEntries": 1947,
+        "maxUploadAgeFrames": 19,
+        "pages": 1,
+        "paintBytes": 3072,
+        "paintedPixels": 1202879,
+        "pendingBlocks": 0,
+        "steps": 560,
+        "stride": 1,
+        "uploadedBytes": 4811516,
+        "uploads": 2550
+      },
+      "mockNativePixelBytes": 2000000,
+      "politicalFullRepaint": {
+        "cpuMs": 303.5100999259157,
+        "frames": 151,
+        "max": 2.195300010498613,
+        "p50": 2.013700010138564,
+        "p95": 2.0451000018510967
+      },
+      "rosterMs": 8.78740000189282,
+      "size": "map4x",
+      "snapshotMs": 0.8219000010285527,
+      "terrainBuild": {
+        "cpuMs": 97.09829997154884,
+        "frames": 49,
+        "max": 2.3612000077264383,
+        "p50": 2.0041999960085377,
+        "p95": 2.09500000346452
+      },
+      "update1200": {
+        "cpuMs": 98.97479995561298,
+        "frames": 60,
+        "max": 2.224500000011176,
+        "p50": 1.6093000012915581,
+        "p95": 1.972900005057454
+      },
+      "width": 1000
+    },
+    {
+      "callerBufferBytes": 25055728,
+      "churnPaintedPixels": 241043,
+      "churnUploadBytes": 964172,
+      "constructMs": 27.131399998324923,
+      "dispatchAndRender": {
+        "cpuMs": 483.5278001410188,
+        "frames": 360,
+        "max": 4.420500001288019,
+        "p50": 1.6422000044258311,
+        "p95": 2.883899986045435
+      },
+      "drainAfter360": {},
+      "frame": {
+        "cpuMs": 376.15810008719563,
+        "frames": 360,
+        "max": 2.122300007613376,
+        "p50": 0.9912999958032742,
+        "p95": 2.051600007689558
+      },
+      "height": 1948,
+      "map": "giantworldmap",
+      "maxBacklogBlocks": 78,
+      "memory": {
+        "cpuBufferBytes": 25197265,
+        "imagePixelBytes": 32009536,
+        "indexEntries": 7987,
+        "maxUploadAgeFrames": 28,
+        "pages": 10,
+        "paintBytes": 3072,
+        "paintedPixels": 16245811,
+        "pendingBlocks": 0,
+        "steps": 3615,
+        "stride": 1,
+        "uploadedBytes": 64983244,
+        "uploads": 17684
+      },
+      "mockNativePixelBytes": 32009536,
+      "politicalFullRepaint": {
+        "cpuMs": 4898.992700094823,
+        "frames": 2425,
+        "max": 5.12259999231901,
+        "p50": 2.0152999932179227,
+        "p95": 2.0625999895855784
+      },
+      "rosterMs": 18.74320000933949,
+      "size": "map",
+      "snapshotMs": 12.728699992294423,
+      "terrainBuild": {
+        "cpuMs": 1663.6319999961415,
+        "frames": 830,
+        "max": 5.154300000867806,
+        "p50": 2.0041999960085377,
+        "p95": 2.0367999968584627
+      },
+      "update1200": {
+        "cpuMs": 107.22730007546488,
+        "frames": 60,
+        "max": 2.526600001147017,
+        "p50": 1.6886999947018921,
+        "p95": 2.4090000079013407
+      },
+      "width": 4108
+    }
+  ],
+  "sourceHashes": {
+    "src/client/Map/OpenFront/TerrainColors.luau": "64394d85b8111c39a2322c4770238703fbe6c0f7e6d58c1ccb28c40445c1d236",
+    "src/client/Map/OpenFront/RasterCore.luau": "d92c6bc6020f89960c3d686e3552590987e199c1a6c0646f9304b4dee5da68b4",
+    "src/client/Map/OpenFront/EditableRenderer.luau": "9b166df0e11a882fb8a403ef166b9468b596f64c9ce6a5a8d0c18e1e8a9f7b94"
+  },
+  "ageCounterReset": "maxUploadAgeFrames is reset after full repaint, immediately before the churn trace"
+}

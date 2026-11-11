@@ -1,0 +1,4 @@
+﻿{"buildableMeanMs":8.91323833517769,"count":120,"enemySams":100,"ghostRailMeanMs":0.011654165670430908,"kind":"City","maxMs":36.55400002025999,"meanMs":8.928865832664693,"p95Ms":11.003399995388463,"railStations":0}
+{"buildableMeanMs":8.464270001422847,"count":120,"enemySams":100,"ghostRailMeanMs":0.016222500319903094,"kind":"Factory","maxMs":12.504099984653294,"meanMs":8.475066666627148,"p95Ms":10.222000011708587,"railStations":0}
+{"buildableMeanMs":8.536975000121553,"count":120,"enemySams":100,"ghostRailMeanMs":0.001217500539496541,"kind":"SAM Launcher","maxMs":11.623500002315268,"meanMs":8.551589999357626,"p95Ms":10.589600016828626,"railStations":0}
+{"buildableMeanMs":0.016618332301732153,"count":120,"enemySams":100,"ghostRailMeanMs":0.0004758335611162086,"kind":"Atom Bomb","maxMs":0.5738000036217272,"meanMs":0.15987333244993351,"p95Ms":0.2865999995265156,"railStations":0}

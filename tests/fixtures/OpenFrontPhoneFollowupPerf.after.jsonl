@@ -1,0 +1,2 @@
+{"baseline":"working-tree","case":"nonadjacent","coldRasterMs":2413.192000007257,"cpuBufferBytes":17083280,"dirtyPixels":0,"dispatchMs":4.95889998273924,"height":1000,"pendingBlocks":0,"width":2000}
+{"baseline":"working-tree","case":"touching","coldRasterMs":2413.192000007257,"cpuBufferBytes":17083280,"dirtyPixels":2000,"dispatchMs":9.218799998052418,"height":1000,"pendingBlocks":32,"width":2000}

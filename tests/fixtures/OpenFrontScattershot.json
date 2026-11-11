@@ -1,0 +1,12 @@
+{
+  "width":128,"height":128,"source":4128,"aim":8256,
+  "carrier":{"id":100,"type":"Scattershot","owner":1,"tile":4128,"lastTile":4128,"targetTile":8256,"active":true,"targetable":true},
+  "warheads":[
+    {"id":101,"targetTile":8292,"delay":2},
+    {"id":102,"targetTile":12242,"delay":4},
+    {"id":103,"targetTile":12206,"delay":6},
+    {"id":104,"targetTile":8220,"delay":8},
+    {"id":105,"targetTile":4270,"delay":10},
+    {"id":106,"targetTile":4306,"delay":12}
+  ]
+}

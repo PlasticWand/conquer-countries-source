@@ -1,0 +1,164 @@
+[
+ {
+  "map": "world",
+  "width": 1000,
+  "height": 500,
+  "components": 1789742035,
+  "nodeCount": 882,
+  "edgeCount": 2420,
+  "nodes": 2506166332,
+  "edges": 3577315176,
+  "clusters": 966244568,
+  "firstEdges": [
+   {
+    "id": 0,
+    "nodeA": 0,
+    "nodeB": 1,
+    "cost": 30,
+    "clusterX": 0,
+    "clusterY": 0
+   },
+   {
+    "id": 1,
+    "nodeA": 0,
+    "nodeB": 2,
+    "cost": 32,
+    "clusterX": 1,
+    "clusterY": 0
+   },
+   {
+    "id": 2,
+    "nodeA": 0,
+    "nodeB": 3,
+    "cost": 32,
+    "clusterX": 1,
+    "clusterY": 0
+   },
+   {
+    "id": 3,
+    "nodeA": 1,
+    "nodeB": 86,
+    "cost": 18,
+    "clusterX": 0,
+    "clusterY": 1
+   },
+   {
+    "id": 4,
+    "nodeA": 1,
+    "nodeB": 87,
+    "cost": 49,
+    "clusterX": 0,
+    "clusterY": 1
+   }
+  ],
+  "maxComponent": 255
+ },
+ {
+  "map": "blacksea",
+  "width": 750,
+  "height": 550,
+  "components": 654236454,
+  "nodeCount": 557,
+  "edgeCount": 1152,
+  "nodes": 24781266,
+  "edges": 3677148724,
+  "clusters": 2018000109,
+  "firstEdges": [
+   {
+    "id": 0,
+    "nodeA": 0,
+    "nodeB": 1,
+    "cost": 4,
+    "clusterX": 1,
+    "clusterY": 0
+   },
+   {
+    "id": 1,
+    "nodeA": 0,
+    "nodeB": 2,
+    "cost": 8,
+    "clusterX": 1,
+    "clusterY": 0
+   },
+   {
+    "id": 2,
+    "nodeA": 1,
+    "nodeB": 2,
+    "cost": 4,
+    "clusterX": 1,
+    "clusterY": 0
+   },
+   {
+    "id": 3,
+    "nodeA": 2,
+    "nodeB": 3,
+    "cost": 9,
+    "clusterX": 1,
+    "clusterY": 1
+   },
+   {
+    "id": 4,
+    "nodeA": 2,
+    "nodeB": 29,
+    "cost": 32,
+    "clusterX": 1,
+    "clusterY": 1
+   }
+  ],
+  "maxComponent": 255
+ },
+ {
+  "map": "britannia",
+  "width": 800,
+  "height": 1044,
+  "components": 2419953041,
+  "nodeCount": 1307,
+  "edgeCount": 3481,
+  "nodes": 3446033650,
+  "edges": 2476902339,
+  "clusters": 3420036005,
+  "firstEdges": [
+   {
+    "id": 0,
+    "nodeA": 0,
+    "nodeB": 1,
+    "cost": 30,
+    "clusterX": 0,
+    "clusterY": 0
+   },
+   {
+    "id": 1,
+    "nodeA": 0,
+    "nodeB": 2,
+    "cost": 32,
+    "clusterX": 1,
+    "clusterY": 0
+   },
+   {
+    "id": 2,
+    "nodeA": 0,
+    "nodeB": 3,
+    "cost": 32,
+    "clusterX": 1,
+    "clusterY": 0
+   },
+   {
+    "id": 3,
+    "nodeA": 1,
+    "nodeB": 51,
+    "cost": 32,
+    "clusterX": 0,
+    "clusterY": 1
+   },
+   {
+    "id": 4,
+    "nodeA": 1,
+    "nodeB": 52,
+    "cost": 32,
+    "clusterX": 0,
+    "clusterY": 1
+   }
+  ],
+  "maxComponent": 255
+ }
+]
