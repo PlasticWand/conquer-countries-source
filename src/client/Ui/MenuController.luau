@@ -130,12 +130,15 @@ function MenuController.new(root: any, remotes: Instance, hooks: Hooks)
 		end,
 		openArsenal = function()
 			self:_shop("arsenal")
+			self:_funnel({ op = "shopOpened", where = "arsenal" })
 		end,
 		openLocker = function()
 			self:_shop("locker")
+			self:_funnel({ op = "shopOpened", where = "locker" })
 		end,
 		openFlagShop = function()
 			self:_shop("flags")
+			self:_funnel({ op = "shopOpened", where = "flags" })
 		end,
 		openStarter = function()
 			self:openStarter()
@@ -242,18 +245,9 @@ function MenuController.new(root: any, remotes: Instance, hooks: Hooks)
 					end
 				end)
 			end
-			-- The starter pack opens by itself once a session while it's
-			-- for them (its first time starts its clock). Never on its way into
-			-- the tutorial, nor over a match on a solo or match server (no
-			-- offers during guided play, after RoWorld).
-			local onHub = role == nil or role == WaitingRoomModel.ROLE_HUB
-			if view.starter ~= nil and onHub and not Tutorial.isNew(view) then
-				task.delay(1.5, function()
-					if self.modal == nil and self.visible and self.soloCover == nil then
-						self:openStarter()
-					end
-				end)
-			end
+			-- The starter pack never opens by itself (Bruno, 2026-11-12: it
+			-- annoyed players). Its red menu tag says NEW until the player
+			-- opens it, and that first opening starts its 48-hour clock.
 		end
 		if self.starterOffer and view.starter == nil then
 			self.starterOffer.close() -- bought (or over)
@@ -361,8 +355,11 @@ end
 -- are on" for a General).
 function MenuController.openGeneral(self: any)
 	local view = self.view
+	self:_funnel({ op = "shopOpened", where = "general" })
 	self.openModal(function()
-		return GeneralOffer.open(self.root.modal, view ~= nil and view.general == true) :: any
+		return GeneralOffer.open(self.root.modal, view ~= nil and view.general == true, function()
+			self:_funnel({ op = "shopPrompted", product = "general" })
+		end) :: any
 	end)
 end
 
@@ -377,10 +374,12 @@ function MenuController.openStarter(self: any)
 			self.shopRemote:InvokeServer({ op = "starterSeen" })
 		end)
 	end
+	self:_funnel({ op = "shopOpened", where = "starter" })
 	self.openModal(function()
 		local offer = StarterOffer.open(self.root.modal, if view.starter == "active" then view.starterLeft else nil, function()
 			local id = Products[Catalog.STARTER.product]
 			if id then
+				self:_funnel({ op = "shopPrompted", product = Catalog.STARTER.product })
 				MarketplaceService:PromptProductPurchase(Players.LocalPlayer, id)
 			end
 		end)
@@ -391,6 +390,16 @@ function MenuController.openStarter(self: any)
 			end
 		end)
 		return offer :: any
+	end)
+end
+
+-- Tells the server's Store funnel (Analytics) what happened in a shop;
+-- never waits for the answer.
+function MenuController._funnel(self: any, req: { [string]: any })
+	task.spawn(function()
+		pcall(function()
+			self.shopRemote:InvokeServer(req)
+		end)
 	end)
 end
 
@@ -409,6 +418,7 @@ function MenuController._shop(self: any, which: string)
 			return if ok then result else nil
 		end,
 		prompt = function(key: string)
+			self:_funnel({ op = "shopPrompted", product = key })
 			if key == "general" and Catalog.SUBSCRIPTION.id ~= "" then
 				MarketplaceService:PromptSubscriptionPurchase(Players.LocalPlayer, Catalog.SUBSCRIPTION.id)
 				return

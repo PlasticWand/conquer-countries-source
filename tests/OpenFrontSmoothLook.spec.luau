@@ -77,6 +77,44 @@ return function(t)
 		local ships=r.scene.shipArt; r:destroy(); t.eq(ships.content,nil); t.eq(ships.pixels,nil)
 		for _,img in e.images do t.ok(img.destroyed) end
 	end)
+	t.test('warship health caps follow zoom and simultaneous movement without changing structures or full-health hiding',function()
+		local structureSizes,colors={},{}
+		for _,enabled in {true,false} do
+			local e,s,r=setup(); e.policy.capWarshipHealthBars=enabled; finish(e,r)
+			s.units[4]={id=4,type='City',owner=1,tile=134,active=true,level=1,health=50,maxHealth=100}
+			s.UnitsChanged:Fire({s.units[4]},{}); r:step(1e9,1e9)
+			for _,zoom in {.5,1,2,4,10,20,8} do
+				local poseDraws=r.scene.unitPoseDraws or 0
+				local u=s.units[3]; u.lastTile,u.tile=u.tile,u.tile+1
+				s.tick+=1; s.UnitsMoved:Fire({3}); s.TickApplied:Fire(s.tick)
+				local c=table.clone(r.camera); c.scale=zoom
+				c.offsetX=u.tile%64+.5-32-(c.viewportWidth/2-32)/zoom
+				c.offsetY=math.floor(u.tile/64)+.5-32-(c.viewportHeight/2-32)/zoom
+				r:setCamera(c); r:step(1e9,1e9)
+				t.ok((r.scene.unitPoseDraws or 0)>poseDraws,'zooming moving ships retain the pose fast path')
+				local view=r.scene.unitViews[3]; local bar=view.health; local factor=r.scene.worldScale.Scale
+				local width=if enabled then math.min(11*zoom,48) else 11*zoom
+				local height=if enabled then math.min(3*zoom,5) else 3*zoom
+				local border=if enabled then math.min(zoom,1) else zoom
+				local tolerance=2*factor -- UDim offsets round in the 64-units-per-tile canvas.
+				t.ok(bar.background.Visible); t.near(bar.background.Size.X.Offset*factor,width,tolerance)
+				t.near(bar.background.Size.Y.Offset*factor,height,tolerance)
+				t.near(bar.fill.Position.X.Offset*factor,border,tolerance); t.near(bar.fill.Position.Y.Offset*factor,border,tolerance)
+				t.near(bar.fill.Size.X.Offset*factor,.5*(width-2*border),tolerance)
+				t.near((bar.background.Position.X.Offset+bar.background.Size.X.Offset/2)*factor,view.root.Size.X.Offset*factor/2,tolerance,'centred on hull')
+				t.near(bar.background.Position.Y.Offset*factor,(view.root.Size.Y.Offset/2-6*64)*factor,tolerance,'source vertical placement')
+				local city=r.scene.unitViews[4].health.background
+				if enabled then structureSizes[zoom]=city.Size; colors[zoom]=bar.fill.BackgroundColor3
+				else t.eq(city.Size,structureSizes[zoom],'structures unchanged'); t.eq(bar.fill.BackgroundColor3,colors[zoom],'source health colours') end
+			end
+			for _,health in {100,0} do
+				s.units[3].health=health; s.UnitsChanged:Fire({s.units[3]},{}); r:step(1e9,1e9)
+				t.eq(r.scene.unitViews[3].health.background.Visible,false)
+			end
+			s.units[3].health=50; s.UnitsChanged:Fire({s.units[3]},{}); r:step(1e9,1e9)
+			r:destroy()
+		end
+	end)
 	t.test('confirmed movement changes heading in the pose path; stopped ships retain heading without rotating health',function()
 		local e,s,r=setup(); finish(e,r)
 		local v=r.scene.unitViews[3]; local part=v.parts[1]

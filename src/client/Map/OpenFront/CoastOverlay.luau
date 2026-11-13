@@ -59,7 +59,8 @@ function Coast.prepare(self: any,loading: boolean): boolean
 	local r=self.raster
 	local work=Raster.prepare(r,self.renderer.core,if loading then Policy.coastLoadMs else Policy.coastComposeMs,
 		if loading then 4096 elseif self.touch then Policy.coastTouchCellsPerFrame else Policy.coastDesktopCellsPerFrame,
-		if self.touch then 65536 else 131072,if self.touch then 32 else 64)
+		if self.touch then 65536 else 131072,if self.touch then 32 else 64,
+		loading and self.renderer.firstPaintBaseReady==true)
 	if not work then return false end
 	local started=os.clock()
 	local ok=pcall(upload,self,work)

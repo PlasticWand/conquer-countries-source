@@ -132,7 +132,8 @@ Tutorial.STEPS = {
 Tutorial.CONTACT_WAIT_LINE = "Keep growing until you meet a neighbour"
 
 -- The "Tutorial" funnel's steps (Creator Dashboard): 1 is the match starting,
--- then one a step, then finishing. A step passed over is not logged.
+-- then one a step, then finishing. A step passed over (stuck, or nobody to
+-- attack) is logged too, with a TutorialPassedOver event (2026-11-12).
 Tutorial.FUNNEL = { "Started", "Spawned", "First Tap", "Grew", "Attacked", "Used Slider", "Built City", "Completed" }
 
 -- Saved tutorial states (Profile.tutorial).
@@ -339,9 +340,11 @@ function Tutorial.newRun()
 
 	local function advance(passed: boolean?, touch: boolean)
 		local step = Tutorial.STEPS[self.i]
+		-- A step passed over is still logged, marked `passed`, so the funnel's
+		-- drops are players leaving, not steps nobody could do (2026-11-12).
+		local n = Tutorial.funnelStep(step.id) :: number
+		emit({ kind = "step", n = n, name = Tutorial.FUNNEL[n], passed = if passed then true else nil })
 		if not passed then
-			local n = Tutorial.funnelStep(step.id) :: number
-			emit({ kind = "step", n = n, name = Tutorial.FUNNEL[n] })
 			emit({ kind = "sound", key = "ui.confirm" })
 			if self.card.visible then
 				self.card = { visible = true, count = self.card.count, text = "Nice!", bar = nil, tint = "green", skip = "Skip" }

@@ -687,7 +687,7 @@ function TutorialController._runEvents(self: any, events: { { [string]: any } })
 	local deps = self.deps
 	for _, e in events do
 		if e.kind == "step" then
-			deps.report({ op = "step", n = e.n })
+			deps.report({ op = "step", n = e.n, passed = e.passed })
 		elseif e.kind == "spawn" and self.spot then
 			deps.send({ type = "tile_action", tile = self.spot, ratio = Tutorial.DEFAULT_RATIO })
 		elseif e.kind == "cityGold" then

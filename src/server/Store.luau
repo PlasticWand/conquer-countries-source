@@ -24,6 +24,7 @@ local Catalog = require(Shared.Store.Catalog)
 local Profile = require(Shared.Store.Profile)
 local ProfileStore = require(Shared.ProfileStore)
 local Products = require(Shared.Store.Products) :: { [string]: number }
+local Analytics = require(script.Parent.Analytics)
 
 local Store = {}
 
@@ -166,6 +167,17 @@ local function onShop(player: Player, request: any): any
 		return { ok = false, reason = "busy" }
 	end
 	local result: { [string]: any } = { ok = false }
+	-- The Store funnel (Analytics): a window opened, a Robux prompt shown.
+	-- Nothing to save.
+	if request.op == "shopOpened" and type(request.where) == "string" then
+		Analytics.shopOpened(player, request.where)
+		return { ok = true }
+	elseif request.op == "shopPrompted" and type(request.product) == "string" then
+		if request.product == "general" or Catalog.product(request.product) ~= nil then
+			Analytics.shopPrompted(player, request.product)
+		end
+		return { ok = true }
+	end
 	if request.op == "view" then
 		return { ok = true, view = Profile.view(e.record, e.saved, e.doubleStars, e.general) }
 	elseif request.op == "unlock" and type(request.id) == "string" then
@@ -213,6 +225,7 @@ local function processReceipt(receipt: any): Enum.ProductPurchaseDecision
 		e.dirty = true
 		push(player)
 		grantedRemote:FireClient(player, { items = grant.items, stars = grant.stars, product = key })
+		Analytics.shopPurchased(player, key)
 	end
 	return if confirm then Enum.ProductPurchaseDecision.PurchaseGranted else Enum.ProductPurchaseDecision.NotProcessedYet
 end
@@ -353,10 +366,15 @@ local function checkGeneral(player: Player)
 	if on == nil or entries[player.UserId] ~= e then
 		return
 	end
+	local wasKnown = e.generalKnown
 	e.generalKnown = true
 	if on ~= e.general then
 		e.general = on
 		push(player)
+		-- (A new subscription mid-session, not one found when they joined.)
+		if on and wasKnown then
+			Analytics.shopPurchased(player, "general")
+		end
 	end
 	generalCrate(player)
 end
@@ -415,6 +433,7 @@ function Store.start(remotes: Folder)
 		if bought and e and passId == Products.doubleStars then
 			e.doubleStars = true
 			push(player)
+			Analytics.shopPurchased(player, "doubleStars")
 		end
 	end)
 	if RunService:IsStudio() then

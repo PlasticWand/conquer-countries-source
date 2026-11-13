@@ -16,17 +16,49 @@
 --   4 First attack     their first order on land, a neighbour or a coast
 --   5 Played 3 min     alive 3 minutes of it
 --   6 Played 10 min    alive 10 minutes of it
---   7 Match finished   it pays its stars (won, lost or left)
+--   7 Match finished   it ends for them with a result (won, lost or
+--                      eliminated; leaving alive is LeftMatchAlive instead)
 --   8 Second match     their second match starts
 -- The tutorial's own funnel ("Tutorial", Shared/Tutorial.FUNNEL) is logged
 -- per match from the client's reports, after RoWorld's.
+--
+-- Recurring funnels (Bruno, 2026-11-11: "make sure we have the appropriate
+-- funnels"), one session each:
+--   "Match"  every player's every match (session: the match id): Match
+--            started, Spawned, First attack, Played 3 min, Played 10 min,
+--            Match finished. Returning players' matches, not only the first.
+--   "Store"  a shop visit (session: one per window opened): Opened (field 1:
+--            the window), Prompted (field 1: the product), Purchased (a
+--            developer product or the 2x Stars pass granted in that visit).
+-- Custom events: SecondsToFirstAttack (first match), LeftBeforeFirstAttack
+-- (seconds into a match a player left without ever attacking in it; only for
+-- match members, never a hub's teleports), MatchMinutes, Placement,
+-- TutorialSkippedAtStep, TutorialPassedOver (a step passed over, not done),
+-- LeftMatchAlive (minutes alive in a match left before its result).
 
 local AnalyticsService = game:GetService("AnalyticsService")
+local HttpService = game:GetService("HttpService")
 local RunService = game:GetService("RunService")
 
 local Analytics = {}
 
 local ENABLED = not RunService:IsStudio()
+
+-- Studio sends nothing; instead the last 40 events it would send are kept in
+-- ServerStorage's "AnalyticsRecent" attribute (one per line) for MCP checks.
+local recent: { string } = {}
+local function trace(text: string)
+	if ENABLED then
+		return
+	end
+	table.insert(recent, text)
+	if #recent > 40 then
+		table.remove(recent, 1)
+	end
+	pcall(function()
+		game:GetService("ServerStorage"):SetAttribute("AnalyticsRecent", table.concat(recent, "\n"))
+	end)
+end
 
 Analytics.STEPS = {
 	joined = { number = 1, name = "Joined" },
@@ -39,11 +71,41 @@ Analytics.STEPS = {
 	second = { number = 8, name = "Second match started" },
 }
 
-type Session = { joinedAt: number, attacked: boolean }
+Analytics.MATCH_FUNNEL = { "Match started", "Spawned", "First attack", "Played 3 min", "Played 10 min", "Match finished" }
+Analytics.STORE_FUNNEL = { "Opened", "Prompted", "Purchased" }
+-- The windows and in-match spots a Store visit can start from.
+Analytics.STORE_PLACES = { locker = true, arsenal = true, flags = true, general = true, starter = true }
+
+-- `matchStartedAt`: the os.clock() its current match started; nil outside one.
+type Session = { joinedAt: number, attacked: boolean, matchStartedAt: number? }
 local sessions: { [Player]: Session } = {}
+local shopVisits: { [Player]: string } = {}
+
+local function funnel(player: Player, name: string, session: string, n: number, stepName: string, field: string?)
+	trace(`{name} {n} {stepName}{if field then ` ({field})` else ""} [{string.sub(session, 1, 8)}]`)
+	if not ENABLED then
+		return
+	end
+	pcall(function()
+		if field then
+			AnalyticsService:LogFunnelStepEvent(player, name, session, n, stepName, {
+				[Enum.AnalyticsCustomFieldKeys.CustomField01.Name] = field,
+			})
+		else
+			AnalyticsService:LogFunnelStepEvent(player, name, session, n, stepName)
+		end
+	end)
+end
+
+local function matchStep(player: Player, matchId: string, n: number)
+	funnel(player, "Match", matchId, n, Analytics.MATCH_FUNNEL[n])
+end
 
 local function step(player: Player, id: string)
 	local s = Analytics.STEPS[id]
+	if s then
+		trace(`onboarding {s.number} {s.name}`)
+	end
 	if not ENABLED or s == nil then
 		return
 	end
@@ -53,6 +115,7 @@ local function step(player: Player, id: string)
 end
 
 local function custom(player: Player, name: string, value: number)
+	trace(`custom {name} = {value}`)
 	if not ENABLED then
 		return
 	end
@@ -69,31 +132,43 @@ function Analytics.joined(player: Player, matches: number?, tutorial: string?)
 	end
 end
 
+-- Left this server. Only a match member who never attacked in their match
+-- counts (a hub's players leave it for their match's server all the time).
 function Analytics.left(player: Player)
 	local s = sessions[player]
-	if s and not s.attacked then
-		custom(player, "LeftBeforeFirstAttack", math.floor(os.clock() - s.joinedAt))
+	if s and s.matchStartedAt and not s.attacked then
+		custom(player, "LeftBeforeFirstAttack", math.floor(os.clock() - s.matchStartedAt))
 	end
 	sessions[player] = nil
+	shopVisits[player] = nil
 end
 
--- A match started with `before` matches already played.
-function Analytics.matchStarted(player: Player, before: number)
+-- A match `matchId` started with `before` matches already played.
+function Analytics.matchStarted(player: Player, before: number, matchId: string)
+	local s = sessions[player]
+	if s == nil then
+		s = { joinedAt = os.clock(), attacked = false }
+		sessions[player] = s
+	end
+	s.matchStartedAt = os.clock()
+	s.attacked = false
 	if before == 0 then
 		step(player, "started")
 	elseif before == 1 then
 		step(player, "second")
 	end
+	matchStep(player, matchId, 1)
 end
 
 -- The rest are once per match; the caller remembers what it logged.
-function Analytics.spawned(player: Player, before: number)
+function Analytics.spawned(player: Player, before: number, matchId: string)
 	if before == 0 then
 		step(player, "spawned")
 	end
+	matchStep(player, matchId, 2)
 end
 
-function Analytics.attacked(player: Player, before: number, secondsIntoMatch: number)
+function Analytics.attacked(player: Player, before: number, secondsIntoMatch: number, matchId: string)
 	local s = sessions[player]
 	if s then
 		s.attacked = true
@@ -102,32 +177,74 @@ function Analytics.attacked(player: Player, before: number, secondsIntoMatch: nu
 		custom(player, "SecondsToFirstAttack", math.floor(secondsIntoMatch))
 		step(player, "attack")
 	end
+	matchStep(player, matchId, 3)
 end
 
 -- Alive `minutes` (3 or 10) in a match.
-function Analytics.played(player: Player, before: number, minutes: number)
+function Analytics.played(player: Player, before: number, minutes: number, matchId: string)
 	if before == 0 then
 		step(player, if minutes >= 10 then "played10" else "played3")
 	end
+	matchStep(player, matchId, if minutes >= 10 then 5 else 4)
 end
 
-function Analytics.matchFinished(player: Player, before: number, minutes: number, placement: number)
-	if before == 0 then
-		step(player, "finished")
+-- Their stars were paid: the match ended for them. `sawResult`: it had a
+-- winner, or they were eliminated, so they saw a result card ("Match
+-- finished"). Otherwise they left while still in it: LeftMatchAlive (value:
+-- minutes alive) and no "Match finished" (2026-11-12: leaving counted as
+-- finishing, so the funnels overstated it).
+function Analytics.matchFinished(player: Player, before: number, minutes: number, placement: number, matchId: string, sawResult: boolean)
+	if sawResult then
+		if before == 0 then
+			step(player, "finished")
+		end
+		matchStep(player, matchId, 6)
+	else
+		custom(player, "LeftMatchAlive", math.floor(minutes * 10) / 10)
 	end
 	custom(player, "MatchMinutes", math.floor(minutes * 10) / 10)
 	custom(player, "Placement", placement)
+	local s = sessions[player]
+	if s then
+		s.matchStartedAt = nil
+	end
+end
+
+-- The Store funnel. A visit starts when a shop window opens; `where` is one
+-- of STORE_PLACES (unknown ones are dropped).
+function Analytics.shopOpened(player: Player, where: string)
+	if not Analytics.STORE_PLACES[where] then
+		return
+	end
+	local visit = HttpService:GenerateGUID(false)
+	shopVisits[player] = visit
+	funnel(player, "Store", visit, 1, "Opened", where)
+end
+
+-- A Robux purchase prompt for product `key`, in the current visit.
+function Analytics.shopPrompted(player: Player, key: string)
+	local visit = shopVisits[player]
+	if visit then
+		funnel(player, "Store", visit, 2, "Prompted", key)
+	end
+end
+
+-- Product `key` granted (receipt processed or pass bought) during a visit.
+function Analytics.shopPurchased(player: Player, key: string)
+	local visit = shopVisits[player]
+	if visit then
+		funnel(player, "Store", visit, 3, "Purchased", key)
+	end
 end
 
 -- The tutorial's funnel: step `n` (Shared/Tutorial.FUNNEL) in the match
--- `matchId` (its funnel session).
-function Analytics.tutorialStep(player: Player, matchId: string, n: number, name: string)
-	if not ENABLED then
-		return
+-- `matchId` (its funnel session). `passed`: passed over, not done (stuck, or
+-- nobody to attack), also counted as TutorialPassedOver (value: the step).
+function Analytics.tutorialStep(player: Player, matchId: string, n: number, name: string, passed: boolean?)
+	funnel(player, "Tutorial", matchId, n, name)
+	if passed then
+		custom(player, "TutorialPassedOver", n)
 	end
-	pcall(function()
-		AnalyticsService:LogFunnelStepEvent(player, "Tutorial", matchId, n, name)
-	end)
 end
 
 -- Skip pressed on the tutorial's step `n` (its index in Shared/Tutorial.STEPS).

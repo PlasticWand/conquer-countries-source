@@ -155,13 +155,18 @@ return function(t)
 		t.eq(#kinds(f.events, "spawn"), 0)
 	end)
 
-	t.test("a stuck step is passed over without a funnel step", function()
+	t.test("a stuck step is passed over, logged as passed", function()
 		local run = Tutorial.newRun()
 		run.begin()
 		run.update(obs(), 0.1) -- spawned
 		run.update(obs(), 0.1) -- expand shown
 		local f = run.update(obs(), Tutorial.STEP_MAX_S + 1)
-		t.eq(#kinds(f.events, "step"), 1) -- only "Started"
+		local steps = kinds(f.events, "step")
+		t.eq(#steps, 2) -- "Started", then the passed-over step
+		t.eq(steps[1].passed, nil)
+		t.eq(steps[2].name, "First Tap")
+		t.eq(steps[2].passed, true)
+		t.eq(#kinds(f.events, "sound"), 0) -- no "done" chime for it
 		f = run.update(obs({ troops = 2000 }), 0.1)
 		t.eq(f.card.count, "3 / 6")
 	end)

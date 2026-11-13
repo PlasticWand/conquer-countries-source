@@ -71,6 +71,9 @@ local OpenFrontServer = {}
 local TICK = 0.1 -- Config.msPerTick
 local MAX_STEPS_PER_FRAME = 3
 local RESULTS_SECONDS = 15
+-- PLAY AGAIN from a public match: how long after arriving at a hub its
+-- queue for the next one starts (the party re-forms and the menu loads first).
+local QUEUE_ON_ARRIVAL_S = 2
 -- A won match with players still in it stops after this long (a server
 -- resource guard; OpenFront's own servers keep a finished game until its
 -- clients leave).
@@ -126,6 +129,8 @@ type Match = {
 	members: { [Player]: true },
 	spectators: { [Player]: true },
 	accum: number,
+	-- Studio filming (Server/Filming): the match is frozen while true.
+	filmHold: boolean?,
 	-- A winner was decided (stars paid). The match keeps running, as in
 	-- OpenFront ("Keep playing"), until its players leave.
 	wonAt: number?,
@@ -359,7 +364,8 @@ local function payStars(match: Match, player: Player)
 	local won = if type(winner) == "table" then winner:id() == me:id() elseif type(winner) == "string" then me:team() == winner else false
 	local minutes = (match.aliveTicks[player] or 0) / 600
 	local placement = table.find(ranked, me) or #ranked
-	Analytics.matchFinished(player, match.matchesBefore[player] or 1, minutes, placement)
+	local sawResult = winner ~= nil or not me:isAlive()
+	Analytics.matchFinished(player, match.matchesBefore[player] or 1, minutes, placement, match.id, sawResult)
 	Store.matchEnded(player, {
 		won = won,
 		placement = table.find(ranked, me) or #ranked,
@@ -423,7 +429,7 @@ local function startMatch(match: Match)
 		local before = Store.matchesOf(player) or 0
 		match.matchesBefore[player] = before
 		match.logged[player] = {}
-		Analytics.matchStarted(player, before)
+		Analytics.matchStarted(player, before, match.id)
 	end
 	for player in match.members do
 		remotes.Snapshot:FireClient(player, match.replicator:snapshot(keyOf(player)))
@@ -856,7 +862,8 @@ local function publicWatch(player: Player, kind: string)
 end
 
 -- Back to a hub (a match server's players after the match, or on LEAVE).
-local function sendToHub(list: { Player })
+-- `queue`: a public kind the hub joins them to on arrival (PLAY AGAIN).
+local function sendToHub(list: { Player }, queue: string?)
 	if #list == 0 then
 		return
 	end
@@ -876,7 +883,12 @@ local function sendToHub(list: { Player })
 			table.insert(groups, table.clone(members))
 		end
 	end
-	local data = if #groups > 0 then { parties = groups } else nil
+	local data: { [string]: any }? = if #groups > 0 then { parties = groups } else nil
+	if queue ~= nil then
+		local d: { [string]: any } = data or {}
+		d.queue = queue
+		data = d
+	end
 	task.spawn(function()
 		local ok, err = teleports.toHub(list, data)
 		if not ok then
@@ -899,7 +911,7 @@ local function stepMatch(match: Match)
 				match.aliveTicks[player] = ticks
 				-- (analytics: alive 3 and 10 minutes; 10 ticks a second)
 				if ticks == 1800 or ticks == 6000 then
-					Analytics.played(player, match.matchesBefore[player] or 1, ticks // 600)
+					Analytics.played(player, match.matchesBefore[player] or 1, ticks // 600, match.id)
 				end
 			end
 		end
@@ -911,7 +923,7 @@ local function stepMatch(match: Match)
 			local p = game:playerByClientID(keyOf(player))
 			if p ~= nil and p:numTilesOwned() > 0 then
 				logged.spawned = true
-				Analytics.spawned(player, match.matchesBefore[player] or 1)
+				Analytics.spawned(player, match.matchesBefore[player] or 1, match.id)
 			end
 		end
 	end
@@ -1115,7 +1127,9 @@ local function onHeartbeat(dt: number)
 				match.endedAt = os.clock()
 			end
 		end
-		if match.endedAt == nil and match.runner:isPaused() then
+		if match.filmHold then
+			match.accum = 0 -- (Studio filming: frozen between shots)
+		elseif match.endedAt == nil and match.runner:isPaused() then
 			match.accum = 0
 			-- Turns stop while paused; the unpause intent restarts them.
 		elseif match.endedAt == nil then
@@ -1234,6 +1248,21 @@ local function onStart(player: Player, request: any)
 			sendToHub({ player })
 		end
 		sendMenu()
+	elseif request.mode == "again" then
+		-- PLAY AGAIN on a public match's result card (Bruno, 2026-11-12):
+		-- leave it as with EXIT, then join the next public match of its kind,
+		-- from here (Studio) or on arriving at a hub. (A solo match's PLAY
+		-- AGAIN is a "solo" request: a new match on its own server.)
+		local m = matchOf[player]
+		local kind = if m ~= nil and m.public then m.kind else nil
+		leaveMatch(player)
+		remotes.Status:FireClient(player, { phase = "menu" })
+		if host or serverRole == WaitingRoom.ROLE_SOLO then
+			sendToHub({ player }, kind)
+		elseif kind then
+			publicJoin(player, kind)
+		end
+		sendMenu()
 	end
 end
 
@@ -1289,6 +1318,16 @@ local function onArrival(player: Player)
 	end
 	if serverRole == WaitingRoom.ROLE_SOLO and type(data.solo) == "table" then
 		soloWanted[player] = { map = data.solo.map, difficulty = data.solo.difficulty, tutorial = data.solo.tutorial == true }
+	end
+	-- PLAY AGAIN from a public match: join the next one of its kind, once
+	-- their party (below) has re-formed and the menu has loaded.
+	if serverRole == WaitingRoom.ROLE_HUB and type(data.queue) == "string" and PublicLobbies.isKind(data.queue) then
+		local kind = data.queue
+		task.delay(QUEUE_ON_ARRIVAL_S, function()
+			if player.Parent ~= nil and matchOf[player] == nil then
+				publicJoin(player, kind)
+			end
+		end)
 	end
 	local key = keyOf(player)
 	local group: { string }? = nil
@@ -1544,7 +1583,7 @@ function OpenFrontServer.start()
 			local game = match.runner.game
 			if logged and not logged.attack and game and not game:inSpawnPhase() then
 				logged.attack = true
-				Analytics.attacked(player, match.matchesBefore[player] or 1, os.clock() - (match.startedAt or os.clock()))
+				Analytics.attacked(player, match.matchesBefore[player] or 1, os.clock() - (match.startedAt or os.clock()), match.id)
 			end
 		end
 	end)
@@ -1565,7 +1604,7 @@ function OpenFrontServer.start()
 			if name == nil then
 				return
 			end
-			Analytics.tutorialStep(player, (match :: Match).id, n, name)
+			Analytics.tutorialStep(player, (match :: Match).id, n, name, msg.passed == true)
 			if n == #Tutorial.FUNNEL then
 				Store.payTutorial(player, Tutorial.STARS)
 				Store.setTutorial(player, "done")
@@ -1821,6 +1860,29 @@ function OpenFrontServer.start()
 					return { conquered = math.min(amount, #nations), tiles = taken, humanTiles = human:numTilesOwned() }
 				end
 			end
+			-- Invoke("lose"): the first match's first member surrenders to the
+			-- biggest living nation and gets one saved Takeover (checks the
+			-- TAKE OVER plate and the in-place takeover).
+			if code == "lose" then
+				local match = everyMatch()[1]
+				if match then
+					local g = match.runner.game
+					for player in match.members do
+						local me = g:playerByClientID(keyOf(player))
+						local best = nil
+						for _, p in g:allPlayers() do
+							if p:type() == "NATION" and p:isAlive() and (best == nil or p:numTilesOwned() > best:numTilesOwned()) then
+								best = p
+							end
+						end
+						if me and best then
+							HumanProtection.surrender(g, me, best)
+							Store.refundTakeover(player)
+						end
+						break
+					end
+				end
+			end
 			-- Invoke("win"): the first human of each running match wins now
 			-- (checks the result card and "Keep playing").
 			if code == "win" then
@@ -1862,6 +1924,21 @@ function OpenFrontServer.start()
 			return out
 		end
 		probe.Parent = ServerStorage
+		-- Filming the page video (Server/Filming): its first match's first
+		-- member is the one on camera.
+		require(script.Parent.Filming).start({
+			focus = function(): (any?, Player?, any?, string?)
+				local match = everyMatch()[1]
+				if match == nil or match.replicator == nil then
+					return nil, nil, nil, nil
+				end
+				for player in match.members do
+					local id = keyOf(player)
+					return match, player, match.runner.game:playerByClientID(id), id
+				end
+				return nil, nil, nil, nil
+			end,
+		})
 	end
 	RunService.Heartbeat:Connect(onHeartbeat)
 end

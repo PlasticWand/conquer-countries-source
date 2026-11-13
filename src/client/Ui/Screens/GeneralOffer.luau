@@ -36,7 +36,8 @@ export type Handle = { root: Frame, close: () -> () }
 -- `subscribed`: the player is a General already. Three perk folders in a
 -- row (as the Arsenal's), the price and SUBSCRIBE in a strip under them
 -- (Bruno, 2026-11-09).
-function GeneralOffer.open(host: Instance, subscribed: boolean): Handle
+-- `onPrompt` runs when SUBSCRIBE shows Roblox's prompt (the Store funnel).
+function GeneralOffer.open(host: Instance, subscribed: boolean, onPrompt: (() -> ())?): Handle
 	local w: Dossier.Window
 	if Dossier.phone() then
 		local p = Dossier.phoneWindow(host, "GENERAL")
@@ -117,6 +118,9 @@ function GeneralOffer.open(host: Instance, subscribed: boolean): Handle
 		end
 		plate.Activated:Connect(function()
 			if Catalog.SUBSCRIPTION.id ~= "" then
+				if onPrompt then
+					onPrompt()
+				end
 				MarketplaceService:PromptSubscriptionPurchase(Players.LocalPlayer, Catalog.SUBSCRIPTION.id)
 			end
 		end)

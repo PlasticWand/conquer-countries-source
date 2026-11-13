@@ -104,6 +104,32 @@ return function(t)
 		r:setRoster({{id='me',smallID=1,playerType='HUMAN'},{id='other',smallID=2,playerType='HUMAN'}})
 		return e,s,r
 	end
+	t.test('singleton rails survive snapshot attachment, split signals and later destruction',function()
+		local _,s,r=setup(); s.startTick=0
+		s.railroads={[1]={0}}
+		r:attachState(s)
+		t.eq(r.scene.railTypes[0],1,'snapshot singleton at valid tile zero')
+		s:applyDelta({tick=1,tiles=buffer.create(0),events={
+			{type='RailroadConstructionEvent',id=2,tiles={130,131,132}},
+		}})
+		for _,tile in {130,131,132} do t.eq(r.scene.railTypes[tile],2,'horizontal before split') end
+		-- RailNetwork._connectToExistingRails can split immediately before the
+		-- last tile, leaving a confirmed one-tile tail and no orientation neighbour.
+		s:applyDelta({tick=2,tiles=buffer.create(0),events={
+			{type='RailroadSnapEvent',originalId=2,newId1=3,newId2=4,tiles1={130,131},tiles2={132}},
+		}})
+		t.eq(s.railroads[2],nil); t.eq(r.scene.railTypes[130],2); t.eq(r.scene.railTypes[131],2)
+		t.eq(r.scene.railTypes[132],1,'singleton tail follows source vertical fallback')
+		local camera=table.clone(r.camera); camera.scale=8; r:setCamera(camera)
+		r:step(1e9,1e9); t.eq(r.scene.visibleRails,4,'all confirmed rail tiles draw')
+		s:applyDelta({tick=3,tiles=buffer.create(0),events={
+			{type='RailroadDestructionEvent',id=1},{type='RailroadDestructionEvent',id=4},
+		}})
+		t.eq(r.scene.railTypes[0],nil); t.eq(r.scene.railTypes[132],nil)
+		r:step(1e9,1e9); t.eq(r.scene.visibleRails,2,'later signals still update the overlay')
+		t.eq(next(s.units),nil,'reproduction needs no unit record or patch')
+		r:destroy()
+	end)
 	t.test('name and troop fills use source dark shades, 48-unit ems and opaque territory outlines',function()
 		-- Test source projection independently of Bruno's optional height cap.
 		local e,s,r=setup()

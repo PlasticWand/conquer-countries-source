@@ -15,8 +15,8 @@ return function(t)
 		for _=1,200 do e.now+=1/60; r:step(1e9,1e9); if r:isReady() then break end end
 		assert(r:isReady()); return e,s,r
 	end
-	t.test('moving decorated warships keep their pose path through zoom without changing hull or bar geometry',function()
-		local e,s,r=setup(1);local unit=s.units[1]
+	t.test('source-sized moving decorated warships keep their pose path through zoom without changing hull or bar geometry',function()
+		local e,s,r=setup(1);e.policy.capWarshipHealthBars=false;local unit=s.units[1]
 		unit.health=50;unit.warship.veterancy=3;s.UnitsChanged:Fire({unit},{})
 		for _=1,40 do e.now+=1/60;r:step(1e9,1e9) end
 		local v=r.scene.unitViews[1];local hull=v.parts[1];local content=hull.ImageContent

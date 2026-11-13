@@ -89,10 +89,12 @@ function C.cell(s: any,core: any,id: number): (number,number,number,number,numbe
 	page.dirty=true; s.composed+=1
 	return slot.page,x0-(if left then 1 else 0),y0-(if top then 1 else 0),r+(if left or right then 1 else 0),r+(if top or bottom then 1 else 0)
 end
-function C.prepare(s: any,core: any,budgetMs: number,maxCells: number,maxUploadPixels: number?,maxWrites: number?): any
+function C.prepare(s: any,core: any,budgetMs: number,maxCells: number,maxUploadPixels: number?,maxWrites: number?,baseReady: boolean?): any
 	local started=os.clock()
 	if s.initial then
-		if core.pending>0 then return nil end
+		-- A full first paint may hold an already-complete RGBA base while new
+		-- confirmed deltas queue. Sample that base; no partial rows are exposed.
+		if core.pending>0 and not baseReady then return nil end
 		local count=0
 		while s.initialCursor<s.geometry.count do
 			C.cell(s,core,s.initialCursor); s.initialCursor+=1; count+=1

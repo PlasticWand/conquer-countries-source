@@ -94,6 +94,7 @@ export type ClientState = typeof(setmetatable(
 		costs: { [string]: number },
 		arsenal: { weapons: { [string]: boolean }, reinforceReadyAt: number, takeover: { smallID: number, name: string }? }?,
 		Snapshot: Signal.Signal<>,
+		Rebound: Signal.Signal<>,
 		TilesChanged: Signal.Signal<{ number }>,
 		RosterChanged: Signal.Signal<{ number }>,
 		StatsChanged: Signal.Signal<>,
@@ -145,6 +146,7 @@ function ClientState.new(): ClientState
 		costs = {},
 		arsenal = nil,
 		Snapshot = Signal.new(),
+		Rebound = Signal.new(),
 		TilesChanged = Signal.new(),
 		RosterChanged = Signal.new(),
 		StatsChanged = Signal.new(),
@@ -167,10 +169,23 @@ end
 local function addRoster(self: ClientState, entries: { any }): { number }
 	local added = {}
 	for _, e in entries do
-		if self.players[e.smallID] == nil then
-			table.insert(self.rosterOrder, e.smallID)
+		local known = self.players[e.smallID]
+		if known ~= nil then
+			-- A changed entry (a Takeover): what it shows, every field set
+			-- (nil clears); stats, relations and the capital stay.
+			known.id = e.id
+			known.name = e.name
+			known.displayName = e.displayName or e.name
+			known.type = e.type
+			known.team = e.team
+			known.flag = e.flag
+			known.skin = e.skin
+			known.userId = e.userId
 			table.insert(added, e.smallID)
+			continue
 		end
+		table.insert(self.rosterOrder, e.smallID)
+		table.insert(added, e.smallID)
 		self.players[e.smallID] = {
 			smallID = e.smallID,
 			id = e.id,
@@ -276,8 +291,43 @@ local function applyStats(self: ClientState, packed: buffer)
 	end
 end
 
-function ClientState.applySnapshot(self: ClientState, snap: { [string]: any })
+-- A snapshot of the match already on screen: the viewer now commands another
+-- nation (the Arsenal's Takeover). Only who "you" are and what the viewer may
+-- see changes; the map, units, plans and railroads are the same match's and
+-- carry on from the deltas, so nothing is rebuilt (Bruno, 2026-11-12: the
+-- takeover's full reload was slow, and once never finished). Fires the
+-- signals for what changed, then Rebound.
+local function rebind(self: ClientState, snap: { [string]: any })
+	self.winner = snap.winner
+	self.you = snap.you
+	self.gold = snap.gold or 0
+	self.players = {}
+	self.rosterOrder = {}
+	local roster = addRoster(self, snap.roster)
+	applyStats(self, snap.stats)
+	local related = applyRelations(self, snap.relations or {})
+	applyNames(self, snap.names, nil, true)
+	self.attacks = snap.attacks or {}
+	self.diplomacy = snap.diplomacy or { alliances = {}, incoming = {}, outgoing = {} }
+	self.costs = snap.costs or {}
+	self.arsenal = snap.arsenal
+	self.RosterChanged:Fire(roster)
+	self.StatsChanged:Fire()
+	self.RelationsChanged:Fire(related)
+	self.NamesChanged:Fire()
+	self.AttacksChanged:Fire()
+	self.DiplomacyChanged:Fire()
+	self.Rebound:Fire()
+end
+
+-- `inPlace`: the caller still shows this match (its map is up), so a
+-- snapshot of the same match rebinds rather than starting over.
+function ClientState.applySnapshot(self: ClientState, snap: { [string]: any }, inPlace: boolean?)
 	assert(snap.v == Replication.VERSION, "unsupported snapshot version")
+	if inPlace and self.ready and snap.gameID ~= nil and snap.gameID == self.gameID then
+		rebind(self, snap)
+		return
+	end
 	self.gameID = snap.gameID
 	self.tick = snap.tick
 	self.mapName = snap.mapName

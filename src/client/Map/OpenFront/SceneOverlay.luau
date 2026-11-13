@@ -329,6 +329,12 @@ local function smoothShip(self: any, view: any, kind: string, color: Color3, ret
 	view.smoothShip,view.composed=true,true
 	return true
 end
+local function cappedWarshipBarSize(zoom: number): (number,number,number)
+	local factor=zoom/64
+	return math.min(11*zoom,Policy.warshipHealthBarMaxWidth)/factor,
+		math.min(3*zoom,Policy.warshipHealthBarMaxHeight)/factor,
+		math.min(zoom,Policy.warshipHealthBarMaxBorder)/factor
+end
 local function drawUnit(self: any, id: number, unit: any, fraction: number, poseOnly: boolean?)
 	local renderer = self.renderer
 	local actual = renderer.camera
@@ -347,9 +353,15 @@ local function drawUnit(self: any, id: number, unit: any, fraction: number, pose
 		local position=UDim2.fromScale((x+.5-ox)/w,(y+.5-oy)/h)
 		if view.root.Position~=position then view.root.Position=position end
 		if ShipArt.column(unit.type)~=nil then shipPose(view,unit,renderer.core.width) end
-		-- Mobile hulls and health bars inherit the world transform. Only the
-		-- screen-minimum veterancy text needs a zoom refresh on a pose-only move;
+		-- Hulls inherit the world transform. Refresh only capped health geometry
+		-- and screen-minimum veterancy text on a pose-only zoom;
 		-- rebuilding its hull/style/record here used to bunch work on each tick.
+		if Policy.capWarshipHealthBars and unit.type=='Warship' and view.health and view.health.background.Visible and view.zoom~=actual.scale then
+			local bw,bh,border=cappedWarshipBarSize(actual.scale)
+			local hp=math.clamp(unit.health/unit.maxHealth,0,1)
+			putRect(view.health.background,view.size/2-bw/2,view.size/2-6*64,bw,bh)
+			putRect(view.health.fill,border,border,hp*(bw-2*border),bh-2*border)
+		end
 		if view.pips and view.pipZoom~=actual.scale then
 			textSize(view.pips,math.max(8/factor,3*camera.scale))
 			putRect(view.pips,view.size*.6,view.size*.7,view.size*.7,view.size*.3)
@@ -521,6 +533,8 @@ local function drawUnit(self: any, id: number, unit: any, fraction: number, pose
 				bw,bh,border=math.max(14/factor,size*.85),3/factor,1/factor
 				local progress=unit.underConstruction or #(unit.missileTimerQueue or {})>0
 				y=(if progress then math.max(size,size/2+9*camera.scale) else size)+2/factor
+			elseif Policy.capWarshipHealthBars then
+				bw,bh,border=cappedWarshipBarSize(actual.scale)
 			end
 			putRect(bar.background,size/2-bw/2,y,bw,bh)
 			local color=barColor(hp); if bar.fill.BackgroundColor3~=color then bar.fill.BackgroundColor3=color end

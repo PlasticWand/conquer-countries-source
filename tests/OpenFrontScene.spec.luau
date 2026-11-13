@@ -51,6 +51,11 @@ return function(t)
 		t.eq(ring.x, .5); t.eq(ring.y, 5.5); t.eq(ring.inner, 80); t.eq(ring.outer, 100)
 		t.eq(Visual.telegraph({type = "MIRV", active = true, targetTile = 50}, 10), nil)
 	end)
+	t.test("singleton rail paths use OpenFront's vertical orientation with neither neighbour", function()
+		-- RailroadPass.computePathOrientations explicitly handles length 1.
+		-- Tile zero is valid; neither missing neighbour is a unit patch field.
+		for _, tile in {0, 11, 63} do t.eq(Visual.railType(nil, tile, nil, 10), 1) end
+	end)
 	t.test("source rail turn and zoom gates", function()
 		t.eq(Visual.railType(nil, 11, 21, 10), 1)
 		t.eq(Visual.railType(10, 11, 12, 10), 2)

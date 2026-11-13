@@ -16,6 +16,10 @@ return {
 	structureAtlasPages = 2, -- bounded 2 * 990^2 * 4 native pixel bytes
 	structureComposeMs = 1,
 	smoothShips = true, -- original 256px masks; optional allocation has source fallback
+	capWarshipHealthBars = true, -- Bruno, 2026-11-13: deliberate difference from OpenFront.
+	warshipHealthBarMaxWidth = 48,
+	warshipHealthBarMaxHeight = 5,
+	warshipHealthBarMaxBorder = 1,
 	transportScale = 0.7, -- Bruno, 2026-10-29: boats and trade ships at 70%; warships unchanged
 	shipArtMs = 1,
 	shipArtPixelsPerFrame = 4096,

@@ -110,6 +110,8 @@ end
 
 -- Original: RailroadPass.railExtremity / railDirection (1..6 encoding).
 function Visual.railType(prev: number?, tile: number, next: number?, width: number): number
+	-- Original RailroadPass.computePathOrientations: a one-tile path is vertical.
+	if prev == nil and next == nil then return 1 end
 	if prev == nil or next == nil then
 		local other = (prev or next) :: number
 		return if other % width == tile % width then 1 else 2

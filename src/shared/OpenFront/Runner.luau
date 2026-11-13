@@ -759,6 +759,9 @@ function Runner.takeOver(self: Runner, clientID: string): boolean
 	info.displayName = mine.displayName
 	info.friends = mine.friends
 	info.flag = mine.flag
+	-- (rosterEntry shows a nation's flag before `flag`: theirs goes, so the
+	-- human's equipped flag shows; Codex, 2026-11-12)
+	info.nationFlag = nil
 	info.skin = mine.skin
 	info.weapons = mine.weapons
 	target.playerInfo = info

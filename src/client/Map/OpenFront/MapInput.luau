@@ -51,6 +51,7 @@ function Input.new(renderer: any, playerGui: PlayerGui, mapGui: ScreenGui, onTap
 			or blocked(Vector2.new(camera.left+camera.viewportWidth/2,camera.top+camera.viewportHeight/2))
 	end
 	local function interrupted(pos: Vector2?): boolean
+		if renderer.filmCamera and renderer.filmCamera.playing then return true end
 		if s.isModal() or (pos and blocked(pos)) then return true end
 		-- A sheet may cover either finger after a pinch has acquired the map.
 		for _, touch in s.touches do if blocked(touch) then return true end end

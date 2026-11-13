@@ -47,6 +47,7 @@ local MenuModel = require(ReplicatedStorage.Shared.MenuModel)
 local Dossier = require(script.Parent.Parent.Dossier)
 local Kit = require(script.Parent.Parent.Kit)
 local Theme = require(script.Parent.Parent.Theme)
+local UiAssets = require(script.Parent.Parent.UiAssets)
 
 local C = Theme.color
 local F = Theme.font
@@ -81,6 +82,7 @@ export type Actions = {
 	goToPlayer: ((smallID: number) -> ())?,
 	togglePause: (paused: boolean) -> (),
 	restartSolo: (() -> ())?,
+	playAgain: (() -> ())?, -- a public match's PLAY AGAIN (the next of its kind)
 	fitMap: (() -> ())?,
 	openHowToPlay: (() -> ())?,
 	openSettings: (() -> ())?,
@@ -461,8 +463,9 @@ function OfHud.new(state: any, host: Frame, root: any, actions: Actions)
 	-- dimmed map: the kicker and verdict on a torn strip with the rubber stamp
 	-- thumping on, the line under it, four paper tags (peak land, max troops,
 	-- nations eliminated, match time), the Stars this match paid counting up
-	-- beside EXIT, the next Arsenal unlock and 2x Stars, then Keep playing.
-	local CARD_W, CARD_H = 760, 680
+	-- beside PLAY AGAIN, the next Arsenal unlock and 2x Stars, then EXIT and a
+	-- Keep playing link.
+	local CARD_W, CARD_H = 760, 700
 	local win = Kit.new("Frame", { Name = "Result", BackgroundTransparency = 1, Size = UDim2.fromScale(1, 1), Visible = false, ZIndex = 20, Parent = match })
 	Kit.new("TextButton", { Name = "Dim", Text = "", AutoButtonColor = false, BackgroundColor3 = C.desk, BackgroundTransparency = 0.45, BorderSizePixel = 0, Size = UDim2.fromScale(1, 1), Parent = win })
 	local card = Kit.new("Frame", { Name = "Card", BackgroundTransparency = 1, AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromScale(0.5, 0.5), Size = UDim2.fromOffset(CARD_W, CARD_H), Parent = win })
@@ -514,16 +517,28 @@ function OfHud.new(state: any, host: Frame, root: any, actions: Actions)
 		end
 	end)
 	self.starsPlate = starsPlate
-	local back = Dossier.plate(card, string.upper(Lang.t("win_modal.exit")), { Name = "Exit", AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromOffset(520, 418), Size = UDim2.fromOffset(420, 80), Parent = card }, 36)
-	Dossier.clicky(back, 1.03)
+	-- PLAY AGAIN, the card's main action (Bruno, 2026-11-12: 86% of new
+	-- players never started a second match): the same kind of match as this
+	-- one. Solo: a new one on this server (the pause menu's Restart); public:
+	-- the next public match of this kind (the server queues it from the hub).
+	local again = Dossier.plate(card, string.upper(Lang.t("win_modal.requeue")), { Name = "PlayAgain", AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromOffset(520, 418), Size = UDim2.fromOffset(420, 80), Parent = card }, 36)
+	Dossier.clicky(again, 1.03)
 	-- Taped to the plate itself, so the tape grows and squashes with it.
 	for _, t in { { 44, -1 }, { 376, 1 } } do
-		Dossier.art("red_tape", { AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromOffset(t[1], 14), Size = UDim2.fromOffset(96, 26), Rotation = -40 * t[2], ScaleType = Enum.ScaleType.Stretch, ZIndex = 3, Parent = back })
+		Dossier.art("red_tape", { AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromOffset(t[1], 14), Size = UDim2.fromOffset(96, 26), Rotation = -40 * t[2], ScaleType = Enum.ScaleType.Stretch, ZIndex = 3, Parent = again })
 	end
-	back.Activated:Connect(function()
-		actions.backToMenu()
+	again.Activated:Connect(function()
+		local solo = self.state.gameConfig.gameType == "Singleplayer"
+		if solo and actions.restartSolo then
+			self.win.Visible = false
+			actions.restartSolo()
+		elseif actions.playAgain then
+			actions.playAgain()
+		else
+			actions.backToMenu()
+		end
 	end)
-	self.winExit = back
+	self.winAgain = again
 	-- Under them, once the Stars are in: the next unlock and 2x Stars. They
 	-- say what is true; a press opens the Arsenal.
 	local function infoPlate(name: string, glyph: string): (ImageButton, TextLabel)
@@ -541,8 +556,28 @@ function OfHud.new(state: any, host: Frame, root: any, actions: Actions)
 	end
 	-- Eliminated by an AI nation: take it over (the Arsenal's Takeover, 25 R$
 	-- a use; the server says whom, ClientState.arsenal.takeover).
-	local takeover = Dossier.plate(card, "TAKE OVER", { Name = "Takeover", AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromOffset(CARD_W / 2, 506), Size = UDim2.fromOffset(560, 66), Visible = false, Parent = card }, 28)
+	-- Robux green with cream words and the Robux mark, like the menu's
+	-- Robux badges, under a gold edge that breathes: it stands apart from
+	-- the yellow PLAY AGAIN by colour, not size (Bruno, 2026-11-12).
+	local takeover = Kit.new("ImageButton", { Name = "Takeover", AutoButtonColor = false, BackgroundColor3 = Color3.fromHex("#3F9B4F"), BorderSizePixel = 0, AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromOffset(CARD_W / 2, 506), Size = UDim2.fromOffset(560, 66), Visible = false, Parent = card })
+	Kit.corner(6).Parent = takeover
+	local takeoverEdge = Kit.stroke(Color3.fromHex("#F2C84B"), 4, 0)
+	takeoverEdge.Parent = takeover
+	Kit.new("UIGradient", { Rotation = 90, Color = ColorSequence.new(Color3.fromHex("#FFFFFF"), Color3.fromHex("#B9C9B5")), Parent = takeover })
+	local takeoverRow = Kit.new("Frame", { BackgroundTransparency = 1, Size = UDim2.fromScale(1, 1), Parent = takeover })
+	Kit.list(Enum.FillDirection.Horizontal, 10, Enum.HorizontalAlignment.Center, Enum.VerticalAlignment.Center).Parent = takeoverRow
+	stencil({ Name = "Label", Text = "TAKE OVER", TextSize = 28, TextColor3 = C.sheet, LayoutOrder = 1, Parent = takeoverRow })
+	Kit.new("ImageLabel", { BackgroundTransparency = 1, Image = UiAssets.robux, Size = UDim2.fromOffset(28, 28), LayoutOrder = 2, Parent = takeoverRow })
+	local takeoverProduct = Catalog.product("takeover")
+	stencil({ Name = "Price", Text = tostring(if takeoverProduct then takeoverProduct.price else 25), TextSize = 28, TextColor3 = C.sheet, LayoutOrder = 3, Parent = takeoverRow })
 	Dossier.clicky(takeover, 1.03)
+	takeover.Activated:Connect(Dossier.click)
+	local takeoverT0 = os.clock()
+	hold(RunService.Heartbeat:Connect(function()
+		if takeover.Visible then
+			takeoverEdge.Transparency = 0.2 + 0.2 * math.sin((os.clock() - takeoverT0) * 2.4)
+		end
+	end))
 	takeover.Activated:Connect(function()
 		if actions.takeover then
 			actions.takeover()
@@ -551,15 +586,23 @@ function OfHud.new(state: any, host: Frame, root: any, actions: Actions)
 	self.takeoverPlate = takeover
 	self.goalPlate, self.unlockText = infoPlate("NextUnlock", "lock")
 	self.doublePlate, self.doubleText = infoPlate("DoubleStars", "star")
-	local keep = Dossier.rivetPlate(card, string.upper(Lang.t("win_modal.keep")), 26, false, { Name = "Keep", Position = UDim2.fromOffset(CARD_W / 2, 588), Size = UDim2.fromOffset(560, 64), Parent = card })
+	local exit = Dossier.rivetPlate(card, string.upper(Lang.t("win_modal.exit")), 26, false, { Name = "Exit", Position = UDim2.fromOffset(CARD_W / 2, 590), Size = UDim2.fromOffset(420, 64), Parent = card })
+	exit.Activated:Connect(function()
+		actions.backToMenu()
+	end)
+	-- Keep playing (or spectate): a small underlined link under EXIT, its tap
+	-- area taller than its words (the card is about half size on a phone).
+	local keep = Kit.new("TextButton", { Name = "Keep", Text = "", AutoButtonColor = false, BackgroundTransparency = 1, AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromOffset(CARD_W / 2, 648), Size = UDim2.fromOffset(360, 48), Parent = card })
+	local keepText = typed({ Name = "Label", Text = "", RichText = true, TextColor3 = INK, TextSize = 22, AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromScale(0.5, 0.5), Parent = keep })
+	Dossier.clicky(keep, 1.06)
 	keep.Activated:Connect(function()
 		win.Visible = false
 	end)
 	-- A public match, once won: when the next one of its kind starts (the
 	-- server tells every few seconds; it counts down here between).
-	self.nextText = typed({ Text = "", TextColor3 = INK, TextSize = 18, AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromOffset(CARD_W / 2, 636), Visible = false, Parent = card })
+	self.nextText = typed({ Text = "", TextColor3 = INK, TextSize = 16, AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromOffset(CARD_W / 2, 548), Visible = false, Parent = card })
 	self.nextAt = nil :: number?
-	self.win, self.winKeep = win, keep:FindFirstChild("Label") :: TextLabel
+	self.win, self.winKeep = win, keepText
 	self.winCard = card
 	self.shownDeath, self.shownWin = false, false
 	-- Your peaks and conquests this match, for the stat tags.
@@ -955,14 +998,14 @@ function OfHud._refreshNext(self: any)
 	end
 end
 
--- Places the result card's rows for what is shown: EXIT centred until the
--- Stars arrive, then beside them; one info plate centred, two side by side.
+-- Places the result card's rows for what is shown: PLAY AGAIN centred until
+-- the Stars arrive, then beside them; one info plate centred, two side by side.
 function OfHud._layoutResult(self: any)
 	local W = 760
 	if self.starsPlate.Visible then
-		self.winExit.Position = UDim2.fromOffset(520, 418)
+		self.winAgain.Position = UDim2.fromOffset(520, 418)
 	else
-		self.winExit.Position = UDim2.fromOffset(W / 2, 418)
+		self.winAgain.Position = UDim2.fromOffset(W / 2, 418)
 	end
 	local both = self.goalPlate.Visible and self.doublePlate.Visible
 	self.goalPlate.Position = UDim2.fromOffset(if both then 210 else W / 2, 506)
@@ -1594,9 +1637,9 @@ function OfHud._checkDeath(self: any)
 	local plate = self.takeoverPlate
 	plate.Visible = offer ~= nil and me ~= nil and not me.alive and state.winner == nil
 	if plate.Visible then
-		local label = plate:FindFirstChild("Label") :: TextLabel?
+		local label = plate:FindFirstChild("Label", true) :: TextLabel?
 		if label then
-			label.Text = `TAKE OVER {string.upper(offer.name)}  ·  R$25`
+			label.Text = `TAKE OVER {string.upper(offer.name)}`
 		end
 		self.goalPlate.Visible, self.doublePlate.Visible = false, false
 	end
@@ -1641,7 +1684,7 @@ end
 
 function OfHud._showWin(self: any)
 	local me = self.state:me()
-	self.winKeep.Text = string.upper(if me and me.alive then Lang.t("win_modal.keep") else Lang.t("win_modal.spectate"))
+	self.winKeep.Text = `<u>{if me and me.alive then Lang.t("win_modal.keep") else Lang.t("win_modal.spectate")}</u>`
 	self.win.Visible = true
 	-- Fits the screen's height with a margin (on a phone it ran off the top,
 	-- Bruno's 2026-11-04 videos); the verdict strip's tilt needs a little more.

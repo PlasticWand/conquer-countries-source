@@ -27,9 +27,10 @@ export type Renderer = typeof(setmetatable({} :: {
 	core: Core.State, root: Frame, parent: GuiObject, camera: Camera.View, displays: {[number]: Display},
 	labelOccluders: {LabelPlacement.Rect},
 	connections: {RBXScriptConnection}, options: Options, destroyed: boolean, lastError: string?, fitPending: boolean,
-	scene: any?, input: any?, ownSpawnRing: boolean, territoryLabelsVisible: boolean,
+	scene: any?, input: any?, filmCamera: any?, ownSpawnRing: boolean, territoryLabelsVisible: boolean,
 	goToConnection: RBXScriptConnection?, goToTarget: {x: number, y: number, scale: number?, elapsed: number, first: boolean}?,
 	ready: boolean, readyPending: boolean, readyListeners: {ReadyListener}, stateAttached: boolean, progress: number,
+	firstPaintBaseReady: boolean, firstPaintRefreshed: boolean,
 	cameraListeners: {[CameraListener]: boolean}, cameraStamp: Camera.View?,
 	warshipListeners: {[WarshipListener]: boolean},
 	firstPaintBuffers: {[number]: buffer}, firstPaintUploaded: {[number]: boolean}, firstPaintBytes: number,
@@ -93,7 +94,7 @@ function Renderer.pulse(s:Renderer,kind:string,tile:number)
 	s.scene.feel:pulse(kind,tile,os.clock())
 end
 function Renderer.focusAt(s:Renderer,worldX:number,worldY:number)
-	if s.destroyed or not s.scene or worldX~=worldX or worldY~=worldY
+	if (s.filmCamera and s.filmCamera.playing) or s.destroyed or not s.scene or worldX~=worldX or worldY~=worldY
 		or math.abs(worldX)==math.huge or math.abs(worldY)==math.huge then return end
 	s.scene.feel:focusAt(worldX,worldY,os.clock())
 end
@@ -192,7 +193,8 @@ function Renderer.new(parent: GuiObject, terrain: buffer, width: number, height:
 	root.Visible = not full
 	local s = setmetatable({root = root, parent = parent, displays = {}, connections = {}, options = settings, destroyed = false, lastError = nil, scene = nil, input = nil, ownSpawnRing = false, territoryLabelsVisible = true,
 		ready = not full, readyPending = false, readyListeners = {}, cameraListeners = {}, warshipListeners = {}, stateAttached = false, progress = if full then 0 else 1,
-		firstPaintBuffers = {}, firstPaintUploaded = {}, firstPaintBytes = 0,
+		firstPaintBuffers = {}, firstPaintUploaded = {}, firstPaintBytes = 0, firstPaintBaseReady = false,
+		firstPaintRefreshed = false,
 		loadStarted = os.clock(), loadMs = 0, loadFrames = 0, firstPaintWrites = 0,
 		loadCpuMs = 0, loadMaxStepMs = 0, firstPaintPeakBytes = 0,
 		profiler = Timings.new(settings.profile),
@@ -274,6 +276,7 @@ function Renderer.step(s: Renderer, budgetMs: number?, pixelBudget: number?): an
 	assert(not s.destroyed, "renderer destroyed")
 	local started = os.clock()
 	local ok, result = pcall(function()
+		if s.filmCamera then s.filmCamera:step() end
 		Core.beginFrame(s.core)
 		local loading = not s.ready
 		if loading then s.loadFrames += 1 end
@@ -287,7 +290,11 @@ function Renderer.step(s: Renderer, budgetMs: number?, pixelBudget: number?): an
 		end
 		s.profiler:finish("prepare", prepareStarted)
 		local output = {pixels = 0, uploads = 0, ms = 0, page = nil :: number?, atlasUpload = atlasUpload == true}
-		if not atlasUpload then
+		-- Once every base page has been painted and uploaded, hold that complete
+		-- confirmed image for coast composition and the settling frame. Live
+		-- deltas stay queued; they resume under the normal budget after reveal.
+		-- Otherwise an active match can keep first-use coasts waiting forever.
+		if not atlasUpload and not (loading and (not s.stateAttached or s.firstPaintBaseReady)) then
 			local rasterStarted = s.profiler:begin()
 			local liveBudget=budgetMs or s.options.budgetMs
 			local livePixels=pixelBudget or s.options.pixelBudget
@@ -305,7 +312,7 @@ function Renderer.step(s: Renderer, budgetMs: number?, pixelBudget: number?): an
 			end
 			s.rasterBudgetMs=liveBudget or Policy.rasterBaseMs
 			local raster = Core.step(s.core, if loading then s.options.firstPaintBudgetMs or 30 else liveBudget,
-				if loading then math.huge else livePixels)
+				if loading then math.huge else livePixels, if loading then s.firstPaintUploaded else nil)
 			s.profiler:finish("raster", rasterStarted)
 			output.pixels, output.uploads, output.ms, output.page = raster.pixels, raster.uploads, raster.ms, raster.page
 		end
@@ -315,6 +322,11 @@ function Renderer.step(s: Renderer, budgetMs: number?, pixelBudget: number?): an
 			writeDisplay(s, page, 0, 0, page.width, page.height, s.firstPaintBuffers[page.id])
 			s.firstPaintUploaded[page.id] = true; s.firstPaintWrites += 1; uploaded = true
 		end
+		if loading and not s.firstPaintBaseReady then
+			local complete = true
+			for _, p in s.core.pages do if not s.firstPaintUploaded[p.id] then complete = false; break end end
+			s.firstPaintBaseReady = complete
+		end
 		if s.scene then s.scene:step() end
 		if s.coasts then
 			local used=s.coasts:stepViews(math.min(Policy.coastCreatesPerFrame,if s.scene then s.scene.newUnitBudget else 25))
@@ -323,9 +335,21 @@ function Renderer.step(s: Renderer, budgetMs: number?, pixelBudget: number?): an
 		if loading then
 			local elapsed = (os.clock() - started) * 1000
 			s.loadCpuMs += elapsed; s.loadMaxStepMs = math.max(s.loadMaxStepMs, elapsed)
-			local complete = s.stateAttached and not Core.hasPending(s.core) and not s.fitPending
+			local complete = s.stateAttached and s.firstPaintBaseReady and not s.fitPending
 				and s.scene ~= nil and s.scene:isFirstPaintReady()
 				and (not s.coasts or s.coasts:ready())
+			-- Preparation can outlast the base paint. Refresh edits queued up to
+			-- this checkpoint once, including already-uploaded pages. Hold each
+			-- refreshed page again, so continuing traffic cannot restart the pass.
+			if complete and not s.firstPaintRefreshed then
+				s.firstPaintRefreshed = true
+				if Core.hasPending(s.core) then
+					for _, p in s.core.pages do
+						if s.core.deferred.count > 0 or p.head <= #p.queue then s.firstPaintUploaded[p.id] = nil end
+					end
+					s.firstPaintBaseReady, complete = false, false
+				end
+			end
 			for _, p in s.core.pages do if not s.firstPaintUploaded[p.id] then complete = false; break end end
 			s.progress = math.max(s.progress, math.min(.95, .9 * (1 - s.core.pending / s.core.blocks)))
 			if complete and s.readyPending and not atlasUpload and not uploaded then
@@ -440,7 +464,7 @@ end
 -- tile coordinates; adding .5 would change the source destination. Roblox's
 -- frame driver replaces setInterval, using its elapsed time and first 16ms.
 function Renderer.goTo(s: Renderer, worldX: number, worldY: number, scale: number?)
-	if s.destroyed then return end
+	if s.destroyed or (s.filmCamera and s.filmCamera.playing) then return end
 	assert(worldX == worldX and worldY == worldY and math.abs(worldX) < math.huge and math.abs(worldY) < math.huge,
 		"invalid camera destination")
 	assert(scale == nil or (scale > 0 and scale < math.huge), "invalid camera scale")
@@ -467,11 +491,20 @@ function Renderer.setCamera(s: Renderer, view: Camera.View)
 	refreshCamera(s)
 end
 -- Original TransformHandler.onMove.
-function Renderer.pan(s: Renderer, dx: number, dy: number) Camera.onMove(s.camera, dx, dy); Renderer.setCamera(s, s.camera) end
+function Renderer.pan(s: Renderer, dx: number, dy: number)
+	if s.filmCamera and s.filmCamera.playing then return end
+	Camera.onMove(s.camera, dx, dy); Renderer.setCamera(s, s.camera)
+end
 -- Original TransformHandler.onZoom (screen-space anchor includes left/top).
-function Renderer.zoom(s: Renderer, x: number, y: number, delta: number) Camera.onZoom(s.camera, x, y, delta); Renderer.setCamera(s, s.camera) end
+function Renderer.zoom(s: Renderer, x: number, y: number, delta: number)
+	if s.filmCamera and s.filmCamera.playing then return end
+	Camera.onZoom(s.camera, x, y, delta); Renderer.setCamera(s, s.camera)
+end
 -- Original TransformHandler.centerAll.
-function Renderer.centerAll(s: Renderer, fit: number?) Camera.centerAll(s.camera, fit); Renderer.setCamera(s, s.camera) end
+function Renderer.centerAll(s: Renderer, fit: number?)
+	if s.filmCamera and s.filmCamera.playing then return end
+	Camera.centerAll(s.camera, fit); Renderer.setCamera(s, s.camera)
+end
 
 -- Roblox measurement boundary: native pixel bytes exclude platform overhead.
 function Renderer.metrics(s: Renderer): {[string]: number}
@@ -483,6 +516,7 @@ function Renderer.metrics(s: Renderer): {[string]: number}
 	m.rasterBudgetMs,m.rasterMaxMs=s.rasterBudgetMs,s.rasterMaxMs
 	m.firstPaintStagingBytes, m.firstPaintFrames, m.firstPaintMs = s.firstPaintBytes, s.loadFrames, s.loadMs
 	m.firstPaintWrites, m.loadProgress = s.firstPaintWrites, s.progress
+	m.firstPaintBaseReady = if s.firstPaintBaseReady then 1 else 0
 	m.firstPaintCpuMs, m.firstPaintMaxStepMs, m.firstPaintPeakStagingBytes = s.loadCpuMs, s.loadMaxStepMs, s.firstPaintPeakBytes
 	for key, value in s.profiler:metrics() do m[key] = value end
 	local x0, y0 = Camera.worldToScreenCoordinates(s.camera, 0, 0)
@@ -554,6 +588,15 @@ function Renderer.attachState(s: Renderer, state: any)
 		scene.effects:clearConquests()
 		scene:clearStatusEvents(); scene:setDiplomacy(state.diplomacy)
 	end))
+	-- Takeover (ClientState.Rebound; Claude, 2026-11-12, agreed with Codex):
+	-- the old nation's conquest feedback and status history go; the world's
+	-- continuing effects stay.
+	if state.Rebound then
+		table.insert(s.connections,state.Rebound:Connect(function()
+			scene.effects:clearConquests()
+			scene:clearStatusEvents(); scene:setDiplomacy(state.diplomacy)
+		end))
+	end
 	table.insert(s.connections,state.PhaseChanged:Connect(function()
 		if state.winner~=nil then
 			scene.feel:reset(state.units);scene.artillery:reset({});scene.artillery.stopped=true
@@ -676,6 +719,7 @@ end
 function Renderer.destroy(s: Renderer)
 	if s.destroyed then return end
 	s.destroyed = true
+	if s.filmCamera then s.filmCamera:destroy() end
 	if s.scene then s.scene.selection:clear(); s.scene.selection.onSingleChanged=nil end
 	for listener in s.warshipListeners do listener.connected=false end
 	table.clear(s.warshipListeners)

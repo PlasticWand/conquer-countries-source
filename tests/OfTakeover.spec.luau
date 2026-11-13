@@ -89,6 +89,92 @@ return function(t)
 		t.eq(after.you, nation:smallID(), "snapshots are hers")
 	end)
 
+	-- Bruno, 2026-11-12: the takeover reloaded the whole map (slow, once
+	-- stuck). The client rebinds in place: same map, new "you".
+	t.test("the client takes over in place, without a new map", function()
+		local ClientState = t.require("OpenFront.ClientState")
+		local runner, ada, nation = start()
+		local game = runner.game
+		local rep = Replication.newReplicator(runner)
+		local client = ClientState.new()
+		client:applySnapshot(rep:snapshot("1001"))
+		HumanProtection.surrender(game, ada, nation)
+		for _ = 1, 3 do
+			runner:step()
+			client:applyDelta(rep:forViewer(rep:collect(), "1001", game:drainMessages()))
+		end
+		t.eq(client.players[client.you].alive, false, "out")
+		local tiles, units = client.tileState, client.units
+		local snapshots, rebounds, rosters = 0, 0, 0
+		client.Snapshot:Connect(function()
+			snapshots += 1
+		end)
+		client.Rebound:Connect(function()
+			rebounds += 1
+		end)
+		client.RosterChanged:Connect(function()
+			rosters += 1
+		end)
+		t.ok(runner:takeOver("1001"), "done")
+		client:applySnapshot(rep:snapshot("1001"), true)
+		t.eq(snapshots, 0, "no new match on the client")
+		t.eq(rebounds, 1, "rebound once")
+		t.eq(rosters, 1, "the roster redraws (her name on the nation)")
+		t.eq(client.you, nation:smallID(), "she is the nation now")
+		t.eq(client.players[client.you].alive, true)
+		t.eq(client.players[client.you].name, "Ada")
+		t.ok(client.tileState == tiles and client.units == units, "the map and units carry on")
+		-- Deltas keep flowing onto the same state.
+		runner:step()
+		client:applyDelta(rep:forViewer(rep:collect(), "1001", game:drainMessages()))
+		t.eq(client.players[client.you].tiles, nation:numTilesOwned())
+		-- Without inPlace (nothing on screen) it is a new match as before.
+		client:applySnapshot(rep:snapshot("1001"))
+		t.eq(snapshots, 1)
+	end)
+
+	-- Codex, 2026-11-12: everyone else sees the taken nation as the human
+	-- (roster deltas carry changed entries), with the human's flag.
+	t.test("an observer's roster shows the takeover", function()
+		local ClientState = t.require("OpenFront.ClientState")
+		local runner, ada, nation = start()
+		local game = runner.game
+		local rep = Replication.newReplicator(runner)
+		local watcher = ClientState.new()
+		watcher:applySnapshot(rep:snapshot(nil))
+		local function tick()
+			runner:step()
+			watcher:applyDelta(rep:forViewer(rep:collect(), nil, game:drainMessages()))
+		end
+		for _ = 1, Replication.STATS_EVERY do
+			tick()
+		end
+		local n, a = nation:smallID(), ada:smallID()
+		t.eq(watcher.players[n].type, "NATION")
+		t.ok(watcher.players[n].userId == nil, "a nation has no user id")
+		local tilesBefore = watcher.players[n].tiles
+		ada.playerInfo.flag = "f_us"
+		HumanProtection.surrender(game, ada, nation)
+		runner:step()
+		local changed = nil
+		watcher.RosterChanged:Connect(function(ids)
+			changed = ids
+		end)
+		t.ok(runner:takeOver("1001"), "done")
+		for _ = 1, Replication.STATS_EVERY + 1 do
+			tick()
+		end
+		local seen = watcher.players[n]
+		t.eq(seen.type, "HUMAN", "now a human")
+		t.eq(seen.name, "Ada")
+		t.eq(seen.flag, "f_us", "her flag, not the nation's")
+		t.eq(seen.userId, 1001, "her head shot")
+		t.ok(seen.tiles >= tilesBefore, "its stats stay")
+		t.ok(changed ~= nil and table.find(changed, n) ~= nil, "RosterChanged names it")
+		t.ok(watcher.players[a].userId == nil, "the old seat's user id clears")
+		t.eq(#watcher.rosterOrder, #game:allPlayers(), "no duplicate entries")
+	end)
+
 	t.test("never a tribe, and not after the nation is gone", function()
 		local runner, ada, nation = start()
 		local game = runner.game

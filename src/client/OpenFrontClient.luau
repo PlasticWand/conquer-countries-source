@@ -455,10 +455,32 @@ function OpenFrontClient.start()
 		end)
 		buildPreview:setRocketDirection(actionsUi == nil or actionsUi.rocketDirectionUp ~= false)
 		buildPreview:setChosen(if actionsUi then actionsUi.chosen else nil)
+		if game:GetService("RunService"):IsStudio() then
+			local FilmCamera = require(script.Parent.Map.OpenFront.FilmCameraController)
+			FilmCamera.new(current, player, function()
+				if actionsUi then actionsUi:choose(nil) end
+				if buildPreview then buildPreview:setChosen(nil); buildPreview:setPendingTile(nil) end
+			end)
+		end
 	end)
 	state.RosterChanged:Connect(function()
 		if renderer then
 			renderer:setRoster(rosterForRenderer())
+		end
+	end)
+	-- Takeover: you command another nation in the same match. The map stays;
+	-- it marks the new nation as yours and flies there.
+	state.Rebound:Connect(function()
+		-- No build or held selection from the old nation carries over; a
+		-- late preview reply is dropped (setChosen moves its generation).
+		if buildPreview then
+			buildPreview:setChosen(nil)
+			buildPreview:setPendingTile(nil)
+		end
+		if renderer then
+			renderer:clearSelection()
+			renderer:setLocalPlayer(state.you)
+			wentToPlayer = goToPlayer(state.you, 10)
 		end
 	end)
 	state.TilesChanged:Connect(function(changed)
@@ -568,6 +590,14 @@ function OpenFrontClient.start()
 		backToMenu = function()
 			-- Leave the match on the server too, so it stops streaming to us.
 			Start:FireServer({ mode = "leave" })
+			destroyRenderer()
+			hud:showMatch(false)
+			showMenu(true)
+		end,
+		-- A public match's PLAY AGAIN: leave it like EXIT, and the server
+		-- queues this player for the next public match of the same kind.
+		playAgain = function()
+			Start:FireServer({ mode = "again" })
 			destroyRenderer()
 			hud:showMatch(false)
 			showMenu(true)
@@ -799,6 +829,11 @@ function OpenFrontClient.start()
 		cues:reset(state)
 		feel:reset(state)
 	end)
+	-- A Takeover: the old nation's attacks and land history aren't yours.
+	state.Rebound:Connect(function()
+		cues:reset(state)
+		feel:reset(state)
+	end)
 	state.UnitsChanged:Connect(function(changed, removed)
 		local keys = cues:units(state, changed, removed)
 		audio:playAll(keys)
@@ -955,7 +990,9 @@ function OpenFrontClient.start()
 		end
 	end)
 	remotes:WaitForChild("Snapshot").OnClientEvent:Connect(function(snap)
-		state:applySnapshot(snap)
+		-- A snapshot of the match on screen (a Takeover) rebinds in place:
+		-- no new map, no loading cover (ClientState.Rebound below).
+		state:applySnapshot(snap, renderer ~= nil)
 	end)
 	remotes:WaitForChild("Tick").OnClientEvent:Connect(function(delta)
 		state:applyDelta(delta)

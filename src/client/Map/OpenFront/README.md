@@ -1,5 +1,154 @@
 # Renderer ports — v0.35.2
 
+## Capped warship health bars, 2026-11-13
+
+Bruno approved the smaller close-zoom bar. `RenderPolicy.capWarshipHealthBars`
+defaults true: width/height/rim cap at 48/5/1 screen pixels, retaining smaller
+source dimensions at wide zoom. False restores OpenFront's 11x3-tile bar and
+one-tile rim. Set the policy before a new renderer/match, like the other flags.
+Health thresholds, colours, centring/vertical placement and structure bars
+are unchanged. Full-health and zero-health warships still hide the bar.
+
+Runtime functions: new local `SceneOverlay.cappedWarshipBarSize`, and local
+`SceneOverlay.drawUnit`. Its pose-only path refreshes only a visible capped
+bar's rectangles when movement and zoom coincide, retaining the hull/style
+fast path. Recent's original constant-geometry check runs with the cap off;
+SmoothLook also requires that fast path with the cap on.
+No new views/images/uploads. `OpenFrontSmoothLook` checks both policies across
+wide/close zoom, simultaneous movement, structure dimensions, colours,
+placement and hiding. Gate results are in STATUS; native appearance remains
+for Claude/Bruno's recording session.
+
+## First paint during an active match, 2026-11-13
+
+Claude reported a second Studio play session stuck near 90% while the server
+continued expanding and staging ports/warships. Native Studio inventory and
+console reads succeeded here, but the Client Luau readiness sampler was
+rejected before execution (`approval policy is never`). The exact predicates
+in that live session were not inspected; no native restart/rollout proof.
+
+The local harness reproduces a matching deadlock with continuous confirmed
+tile changes: first-use CoastRaster.prepare waits for core.pending == 0, but
+it runs before RasterCore.step. New deltas can make that condition false on
+every frame, even though the raster drains later in the frame. Across two
+raster pages, updates can also keep a previously uploaded page dirty while
+the other page finishes. Waiting for the whole live match to be idle is not
+a finite first-paint contract.
+
+Full paint now holds each fully painted/uploaded base page while the remaining
+pages finish. `RasterCore.step` accepts an optional held-page set for this
+adapter only; pending rows/revisions remain queued. Once all base pages are
+uploaded, `firstPaintBaseReady` permits initial coasts to sample those complete,
+unchanging RGBA pages. The adapter waits for decoded state before painting
+that base. Normal scene preparation, unit/name creation budgets,
+coast readiness and the no-upload settling frame still gate reveal. The map
+stays hidden until that full base and scene are ready. Once coast/scene
+preparation finishes, one final refresh includes paint work queued up to that
+checkpoint, reopening already-uploaded pages as needed. Each refreshed page
+is held again while the resulting coast recolouring finishes. This preserves
+the existing live-invalidation freshness check without letting subsequent
+updates restart loading indefinitely. Those later deltas resume on the next
+frame after reveal under the ordinary budgets; no delta is dropped.
+The initially revealed territory can lag updates received after the final
+refresh checkpoint, then catches up normally.
+Incremental rendering and the single displayed-image-per-frame limit remain.
+`metrics().firstPaintBaseReady` identifies that loading phase.
+
+Exact runtime functions changed: `EditableRenderer.new`, `step`, `metrics`;
+`RasterCore.step`; `CoastOverlay.prepare`;
+`CoastRaster.prepare`. No
+OpenFrontClient/Main, shared/server/config, health-bar or filming edit.
+
+`OpenFrontLoading` covers one and two raster pages, cold and repeat entry,
+ports/damaged moving warships and continuous confirmed ownership updates.
+Both cases fail to finish against the pre-fix HEAD source; after the fix both
+pass. Two more cases cover late state attachment and updates every two/three
+render frames (interleaved with quiet frames). The tests check
+hidden-until-ready, held base bytes within each phase, bounded final refreshes,
+one displayed image per frame, a quiet settling frame, one ready notification,
+queued-delta catch-up, coast colour equality with a fresh composition and
+image cleanup through rematches. The unchanged OpenFrontFirstPaint 9/0 cases
+also pass, including the exact live-update pixels before reveal. An earlier
+full run was 604/1 on that existing freshness assertion; the corrected full
+rerun and final gate results are in STATUS. These are shim observations,
+not native FPS or loading-time measurements.
+
+## Singleton railroad orientation, 2026-11-13
+
+Creator Hub reported `UnitVisuals:115: attempt to perform arithmetic (mod) on
+nil and number` on place version 699. At `cc16624`, that line is railType's
+`other % width`, not a unit position/owner calculation. A one-tile railroad
+has neither previous nor next tile, so `prev or next` was nil. Such paths can
+arrive in a snapshot or after RailNetwork splits a railroad near an endpoint.
+
+The pinned OpenFront v0.35.2 `RailroadPass.computePathOrientations` and
+`RailroadCache.computeRailTiles` explicitly draw a singleton as vertical.
+`Visual.railType` now returns vertical (our encoding 1) when both neighbours
+are nil. Other endpoint/turn rules and authoritative rail data are unchanged.
+No generic missing-unit fallback, tile-zero substitution or packet handling
+was added to the renderer.
+
+Two regressions reproduced the exact line-115 exception before the fix:
+OpenFrontScene checks singleton orientation (including tile zero), and
+OpenFrontAdapters drives ClientState/renderer snapshot attachment, construction,
+a split leaving one tile, rendering and later destruction. Both pass after
+the fix. No native Studio or live-client rollout check by Codex.
+
+Verification over `cc16624` plus this fix: full suite **602/0**, including
+both new regressions **2/0** (subset); fresh-sourcemap full-src strict analysis,
+Rojo build and scoped whitespace checks pass. The warship listener warning is
+the expected error-isolation fixture.
+
+## Studio filming camera, 2026-11-12
+
+Bruno chose full gameplay HUD and nation labels for the Build / Conquer /
+Dominate page video. FilmCameraController leaves both visible; captions and
+the end card belong to the later edit. No simulation or camera-bound change.
+
+After a Studio match creates its renderer, the local Player has a
+`OpenFrontFilmCamera` BindableFunction (absent in live games). In the Client
+data model, wait for the loading cover to disappear, then:
+
+```lua
+local camera = game:GetService("Players").LocalPlayer:WaitForChild("OpenFrontFilmCamera")
+camera:Invoke("play", {duration = 4, keyframes = {
+	{t = 0, x = 1000, y = 500, zoom = 3},
+	{t = 4, x = 1050, y = 500, zoom = 2.8, easing = "smoothstep"},
+}})
+return camera:Invoke("status")
+```
+
+Coordinates are float centres in the **loaded map's tile space** (Compact
+has different dimensions). Zoom is actual screen pixels per loaded tile;
+use a 1920x1080 viewport for the agreed filming scales. No implicit resolution
+scaling is applied. Easing belongs to the destination keyframe, defaults to
+linear, and affects both centre interpolation and logarithmic zoom. The first
+keyframe must be at t=0; times strictly increase within a finite positive
+duration. A single static keyframe is allowed. Inputs are validated and copied.
+
+`play` applies the first pose and returns true without waiting. Renderer.step
+updates the shot from elapsed monotonic time **before** raster/scene work.
+The final pose holds, with status `{playing=true,t=duration}`, until
+`camera:Invoke("stop")`; stop returns true, releases control at that pose and
+clears t. Replay replaces the current shot and starts its clock again. The
+scripted camera blocks map gestures and goTo/focus/fit requests, cancels held
+input and existing fly-to, and clears chosen/pending previews (including stale
+reply generations) through the thin OpenFrontClient callback. HUD controls,
+music, labels, confirmed effects and normal rendering budgets remain active.
+
+Malformed commands stop the current shot and raise an error. Runtime camera
+errors stop filming with a warning; they do not tear down the match. Renderer
+destruction removes the endpoint and its connection; a new renderer creates
+a new endpoint, so reacquire it after a staging reset/new Snapshot. This camera
+does not schedule server staging or OBS: arm recording first, invoke play,
+and use separate calls to inspect status/stop. Test coverage is pure math plus
+the renderer/input property shim; native Studio/OBS pacing remains to verify.
+
+Verification over `41d4c6c` plus this camera and Claude's concurrent server
+staging work: full suite **600/0**, including FilmCamera **10/0** (subset),
+fresh-sourcemap full-src strict analysis clean, Rojo build and scoped whitespace
+checks pass. No native Studio or OBS capture/pacing check by Codex.
+
 ## UI overlap review M1-M6, 2026-11-11
 
 Working tree over `86ca2c9`, from Claude's bounded map-side brief and Bruno's

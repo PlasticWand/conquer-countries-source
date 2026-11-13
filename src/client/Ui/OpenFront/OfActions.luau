@@ -464,8 +464,9 @@ function OfActions.new(state: any, parent: Frame, actions: Actions, slotsHost: F
 		self:_tickPanel()
 		self:_noteAttacks()
 	end))
-	table.insert(self.connections, state.Snapshot:Connect(function()
-		-- What's already under way isn't news.
+	-- A new match, or a Takeover (Rebound: you command another nation): what
+	-- was under way isn't news, and nothing chosen or open carries over.
+	local function freshStart()
 		self.attackTroops = nil
 		self.seenBoats = nil
 		self:_noteBoats(nil)
@@ -477,7 +478,11 @@ function OfActions.new(state: any, parent: Frame, actions: Actions, slotsHost: F
 		self:showWarship(nil)
 		self:_buildSlots()
 		self:_refreshBar()
-	end))
+	end
+	table.insert(self.connections, state.Snapshot:Connect(freshStart))
+	if state.Rebound then
+		table.insert(self.connections, state.Rebound:Connect(freshStart))
+	end
 	table.insert(self.connections, UserInputService.InputBegan:Connect(function(input, processed)
 		self:_notePointer(input)
 		if processed then

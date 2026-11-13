@@ -48,6 +48,7 @@ export type Replicator = typeof(setmetatable(
 	{} :: {
 		runner: any,
 		rosterSent: number,
+		rosterSigs: { [number]: string },
 		collects: number,
 		lastStats: { [number]: StatRow },
 		lastUnits: { [number]: { [string]: any } },
@@ -70,6 +71,7 @@ function Replication.newReplicator(runner: any): Replicator
 	return setmetatable({
 		runner = runner,
 		rosterSent = 0,
+		rosterSigs = {},
 		collects = 0,
 		lastStats = {},
 		lastUnits = {},
@@ -106,6 +108,13 @@ local function rosterEntry(p: any): { [string]: any }
 		-- Bots and nations have none.
 		userId = if p:type() == "HUMAN" then tonumber(p:clientID()) else nil,
 	}
+end
+
+-- What a roster entry shows, as one string: a player whose entry changes
+-- (a Takeover: a nation becomes a human, with their name, flag, skin and
+-- user id; the human it replaced loses theirs) is sent again.
+local function rosterSig(e: { [string]: any }): string
+	return `{e.id}|{e.name}|{e.displayName}|{e.type}|{e.team}|{e.flag}|{e.skin}|{e.userId}`
 end
 
 -- Units whose movement clients derive from motion plans: their records are
@@ -849,16 +858,30 @@ function Replicator.collect(self: Replicator): { [string]: any }
 		end
 	end
 	local tiles = Replication.encodeTileChanges(map, changed)
-	-- New players and changed stats.
+	-- New players, players whose entry changed (checked on full ticks), and
+	-- changed stats. `delta.roster` is "new or changed" (Codex agreed,
+	-- 2026-11-12; same wire version): clients update a known entry in place.
 	local all = game:allPlayers()
 	local roster = {}
+	local full = self.collects % Replication.STATS_EVERY == 0
+	if full then
+		for i = 1, math.min(self.rosterSent, #all) do
+			local e = rosterEntry(all[i])
+			local sig = rosterSig(e)
+			if self.rosterSigs[e.smallID] ~= sig then
+				self.rosterSigs[e.smallID] = sig
+				table.insert(roster, e)
+			end
+		end
+	end
 	for i = self.rosterSent + 1, #all do
-		table.insert(roster, rosterEntry(all[i]))
+		local e = rosterEntry(all[i])
+		self.rosterSigs[e.smallID] = rosterSig(e)
+		table.insert(roster, e)
 	end
 	self.rosterSent = #all
 	-- Stats: every changed row on a full tick; between them only a player
 	-- who appeared, died or moved their capital.
-	local full = self.collects % Replication.STATS_EVERY == 0
 	self.collects += 1
 	local scratch = buffer.create(#all * STAT_ROW)
 	local statBytes = 0

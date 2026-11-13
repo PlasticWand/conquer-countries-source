@@ -750,7 +750,7 @@ end
 function Core.beginFrame(s: State)
 	s.managedFrames=true; s.frames+=1
 end
-function Core.step(s: State, budgetMs: number?, pixelBudget: number?): {pixels: number, uploads: number, page: number?, ms: number}
+function Core.step(s: State, budgetMs: number?, pixelBudget: number?, heldPages: {[number]: boolean}?): {pixels: number, uploads: number, page: number?, ms: number}
 	assert(not s.destroyed, "renderer destroyed")
 	local started,pixels,uploads=os.clock(),0,0
 	local budget,limit=budgetMs or 2,pixelBudget or 65536
@@ -767,6 +767,9 @@ function Core.step(s: State, budgetMs: number?, pixelBudget: number?): {pixels: 
 	local pageCursor=if background then s.nextBackgroundPage elseif ownFirst then s.nextOwnPage else s.nextPage
 	for offset=0,#s.pages-1 do
 		local candidate=s.pages[(pageCursor+offset-1)%#s.pages+1]
+		-- The full-paint adapter holds each fully uploaded page while the other
+		-- pages finish. New deltas retain their rows/revisions for live catch-up.
+		if heldPages and heldPages[candidate.id] then continue end
 		if candidate.head<=#candidate.queue then
 			fallback=fallback or candidate
 			local key=candidate.queue[candidate.head]
