@@ -61,6 +61,8 @@ export type Actions = {
 	openParty: () -> (),
 	-- The starter pack's offer (the red tag under the stars note).
 	openStarter: (() -> ())?,
+	-- The launch event's free starter pack (the same tag, gold, while claimable).
+	openGift: (() -> ())?,
 	-- Conquest General's window (the gold-edged card under it).
 	openGeneral: (() -> ())?,
 }
@@ -604,25 +606,32 @@ end
 
 -- The starter pack's red tag under the stars note: STARTER PACK and its
 -- countdown (setProfile shows it while the offer is for this player).
+-- In front of Conquest General's card (Bruno, 2026-11-13): ZIndex 14 over its 13.
 function MainMenu._buildStarterTag(self: any)
 	local compact = self.compact
-	local tag = Kit.new("TextButton", { Name = "StarterTag", Text = "", AutoButtonColor = false, BackgroundColor3 = C.stamp, BorderSizePixel = 0, AnchorPoint = Vector2.new(0.5, 0), Position = if compact then UDim2.new(1, -140, 0, 80) else at(871, 108), Size = if compact then UDim2.fromOffset(250, 56) else sz(150, 30), Rotation = -2, Visible = false, ZIndex = 13, Parent = if compact then self.layer else self.stage })
+	local tag = Kit.new("TextButton", { Name = "StarterTag", Text = "", AutoButtonColor = false, BackgroundColor3 = C.stamp, BorderSizePixel = 0, AnchorPoint = Vector2.new(0.5, 0), Position = if compact then UDim2.new(1, -140, 0, 80) else at(871, 108), Size = if compact then UDim2.fromOffset(250, 56) else sz(150, 30), Rotation = -2, Visible = false, ZIndex = 14, Parent = if compact then self.layer else self.stage })
 	Kit.corner(6).Parent = tag
 	Kit.stroke(Color3.fromHex("#6E1A14"), 2, 0).Parent = tag
 	Kit.list(Enum.FillDirection.Horizontal, 8, Enum.HorizontalAlignment.Center, Enum.VerticalAlignment.Center).Parent = tag
-	Kit.glyph("gift", { ImageColor3 = C.sheet, Size = UDim2.fromOffset(if compact then 30 else 34, if compact then 30 else 34), LayoutOrder = 1, ZIndex = 13, Parent = tag })
-	local words = Kit.new("Frame", { BackgroundTransparency = 1, Size = UDim2.fromScale(0, 1), AutomaticSize = Enum.AutomaticSize.X, LayoutOrder = 2, ZIndex = 13, Parent = tag })
+	self.starterGlyph = Kit.glyph("gift", { ImageColor3 = C.sheet, Size = UDim2.fromOffset(if compact then 30 else 34, if compact then 30 else 34), LayoutOrder = 1, ZIndex = 14, Parent = tag })
+	local words = Kit.new("Frame", { BackgroundTransparency = 1, Size = UDim2.fromScale(0, 1), AutomaticSize = Enum.AutomaticSize.X, LayoutOrder = 2, ZIndex = 14, Parent = tag })
 	Kit.list(Enum.FillDirection.Vertical, 0, Enum.HorizontalAlignment.Left, Enum.VerticalAlignment.Center).Parent = words
-	stencil({ Text = "STARTER PACK", TextSize = if compact then 22 else 26, TextColor3 = C.sheet, LayoutOrder = 1, ZIndex = 13, Parent = words })
-	self.starterTimer = stencil({ Text = "", TextSize = if compact then 16 else 18, TextColor3 = Color3.fromHex("#F3D9C8"), LayoutOrder = 2, ZIndex = 13, Parent = words })
+	self.starterTitle = stencil({ Text = "STARTER PACK", TextSize = if compact then 22 else 26, TextColor3 = C.sheet, LayoutOrder = 1, ZIndex = 14, Parent = words })
+	self.starterTimer = stencil({ Text = "", TextSize = if compact then 16 else 18, TextColor3 = Color3.fromHex("#F3D9C8"), LayoutOrder = 2, ZIndex = 14, Parent = words })
 	Dossier.clicky(tag, 1.06)
 	tag.Activated:Connect(function()
 		click()
-		if self.actions.openStarter then
+		local view = self.lastView
+		if view and view.gift == "claimable" then
+			if self.actions.openGift then
+				self.actions.openGift()
+			end
+		elseif self.actions.openStarter then
 			self.actions.openStarter()
 		end
 	end)
 	self.starterTag = tag
+	self.starterStroke = tag:FindFirstChildOfClass("UIStroke")
 
 	-- Conquest General's card (Bruno, 2026-11-09: on the menu, as RoWorld
 	-- does), under the starter tag, or in its place when there's none.
@@ -1293,7 +1302,14 @@ function MainMenu._tick(self: any)
 		self.flagTimer.Text = Kit.days(self.flagShopEndsAt - os.time())
 	end
 	self.partyText.Visible = self.partyText.Text ~= ""
-	if self.starterEndsAt and self.starterTimer then
+	if self.giftEndsAt and self.starterTimer then
+		self.starterTimer.Text = `FREE · {Kit.days(math.max(0, self.giftEndsAt - os.time()))}`
+		-- The gold tag breathes while the gift waits (Bruno: "pulsing").
+		local stroke = self.starterStroke
+		if stroke then
+			stroke.Thickness = 2 + 2 * (0.5 + 0.5 * math.sin(os.clock() * 4))
+		end
+	elseif self.starterEndsAt and self.starterTimer then
 		self.starterTimer.Text = `ENDS IN {Kit.clock(math.max(0, self.starterEndsAt - os.time()))}`
 	end
 end
@@ -1306,12 +1322,24 @@ function MainMenu.setProfile(self: any, view: { [string]: any })
 		self.crateText.Text = tostring(view.cratePrice)
 	end
 	self.crateBadge.Visible = view.cratePrice ~= nil
-	-- The starter pack: "ready" (not started: NEW) or "active" (counting).
-	self.starterTag.Visible = view.starter ~= nil
+	-- The starter pack: "ready" (not started: NEW) or "active" (counting);
+	-- during the launch event, its free claim instead (gold: LAUNCH GIFT).
+	local gift = view.gift == "claimable"
+	self.starterTag.Visible = view.starter ~= nil or gift
+	self.starterTag.BackgroundColor3 = if gift then C.hazard else C.stamp
+	self.starterTitle.Text = if gift then "LAUNCH GIFT" else "STARTER PACK"
+	self.starterTitle.TextColor3 = if gift then C.ink else C.sheet
+	self.starterGlyph.ImageColor3 = if gift then C.ink else C.sheet
+	self.starterTimer.TextColor3 = if gift then C.ink else Color3.fromHex("#F3D9C8")
+	if self.starterStroke then
+		self.starterStroke.Color = if gift then C.sheet else Color3.fromHex("#6E1A14")
+		self.starterStroke.Thickness = 2
+	end
+	self.giftEndsAt = if gift and view.giftLeft then os.time() + view.giftLeft else nil
 	self.starterEndsAt = if view.starter == "active" and view.starterLeft then os.time() + view.starterLeft else nil
-	self.starterTimer.Text = if view.starter == "ready" then "NEW · 48 HOURS" else ""
+	self.starterTimer.Text = if gift then "FREE" elseif view.starter == "ready" then "NEW · 48 HOURS" else ""
 	if self.generalCard then
-		self.generalCard.Position = if view.starter ~= nil then self.generalAt.low else self.generalAt.high
+		self.generalCard.Position = if self.starterTag.Visible then self.generalAt.low else self.generalAt.high
 		self.setGeneralOn(view.general == true)
 	end
 end

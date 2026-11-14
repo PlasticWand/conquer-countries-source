@@ -247,6 +247,11 @@ function Analytics.tutorialStep(player: Player, matchId: string, n: number, name
 	end
 end
 
+-- The launch gift claimed (value: the items it unlocked).
+function Analytics.giftClaimed(player: Player, items: number)
+	custom(player, "LaunchGiftClaimed", items)
+end
+
 -- Skip pressed on the tutorial's step `n` (its index in Shared/Tutorial.STEPS).
 function Analytics.tutorialSkipped(player: Player, n: number)
 	custom(player, "TutorialSkippedAtStep", n)

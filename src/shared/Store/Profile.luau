@@ -59,6 +59,8 @@ export type Record = {
 	-- Coach tips already shown (ids), and whether the tutorial's stars were paid.
 	tipsSeen: { [string]: boolean },
 	tutorialPaid: boolean,
+	-- The launch event's free starter pack was claimed (Catalog.LAUNCH_GIFT).
+	giftClaimed: boolean,
 }
 
 export type MatchResult = {
@@ -87,6 +89,7 @@ function Profile.new(): Record
 		tutorial = nil,
 		tipsSeen = {},
 		tutorialPaid = false,
+		giftClaimed = false,
 	}
 end
 
@@ -348,6 +351,8 @@ export type View = {
 	doubleStars: boolean,
 	starter: string?, -- Profile.starterState
 	starterLeft: number?, -- seconds, when this view was made
+	gift: string?, -- Profile.giftState
+	giftLeft: number?, -- seconds until the launch event ends, when this view was made
 	takeovers: number,
 	general: boolean, -- subscribed (the server asks Roblox)
 	tutorial: string?,
@@ -372,6 +377,7 @@ function Profile.view(p: Record, saved: boolean, doubleStars: boolean, general: 
 	local first = not p.firstCrateUsed
 	local crate = Catalog.product(if first then "crateFirst" else "crate1") :: Catalog.Product
 	local starter, starterLeft = Profile.starterState(p, now or os.time())
+	local gift, giftLeft = Profile.giftState(p, now or os.time())
 	return {
 		stars = p.stars,
 		matches = p.matches,
@@ -385,6 +391,8 @@ function Profile.view(p: Record, saved: boolean, doubleStars: boolean, general: 
 		doubleStars = doubleStars or p.owned.b_double == true,
 		starter = starter,
 		starterLeft = starterLeft,
+		gift = gift,
+		giftLeft = giftLeft,
 		takeovers = p.takeovers,
 		general = general == true,
 		tutorial = p.tutorial,
@@ -422,6 +430,7 @@ function Profile.encode(p: Record): { [string]: any }
 		tutorial = p.tutorial,
 		tipsSeen = tipList(p),
 		tutorialPaid = p.tutorialPaid,
+		giftClaimed = if p.giftClaimed then true else nil,
 	}
 end
 
@@ -481,6 +490,7 @@ function Profile.decode(record: any): (Record?, string?)
 		end
 	end
 	p.tutorialPaid = record.tutorialPaid == true
+	p.giftClaimed = record.giftClaimed == true
 	return p, nil
 end
 
@@ -531,6 +541,10 @@ end
 -- nil (not for them: they've paid Robux, haven't played yet, own it all, or
 -- it ended or was bought).
 function Profile.starterState(p: Record, now: number): (string?, number?)
+	-- Never sold while the launch event gives it away.
+	if Profile.giftState(p, now) ~= nil then
+		return nil, nil
+	end
 	local s = p.starter
 	if s then
 		if s.used or now > s.ends then
@@ -557,6 +571,42 @@ function Profile.starterSeen(p: Record, now: number): boolean
 	end
 	p.starter = { started = now, ends = now + Catalog.STARTER.durationS }
 	return true
+end
+
+-- The launch event's free starter pack (Catalog.LAUNCH_GIFT) for this player
+-- at `now`: "claimable" and the seconds until the event ends, or nil (the
+-- event is off or over, they claimed it, or they own every item already).
+function Profile.giftState(p: Record, now: number): (string?, number?)
+	local event = Catalog.LAUNCH_GIFT
+	if event.startsAt <= 0 or now < event.startsAt or now >= event.startsAt + event.durationS or p.giftClaimed then
+		return nil, nil
+	end
+	for _, id in Catalog.STARTER.items do
+		if not p.owned[id] then
+			return "claimable", event.startsAt + event.durationS - now
+		end
+	end
+	return nil, nil
+end
+
+-- Claims the launch gift: the starter pack's items they don't own yet, once.
+-- Also closes the paid starter offer. Nil if it isn't claimable.
+function Profile.claimGift(p: Record, now: number): Grant?
+	if Profile.giftState(p, now) ~= "claimable" then
+		return nil
+	end
+	local grant: Grant = { kind = "launchGift", items = {}, stars = 0 }
+	for _, id in Catalog.STARTER.items do
+		if not p.owned[id] then
+			p.owned[id] = true
+			table.insert(grant.items, id)
+		end
+	end
+	p.giftClaimed = true
+	local s: { started: number, ends: number, used: boolean? } = p.starter or { started = now, ends = now, used = nil }
+	s.used = true
+	p.starter = s
+	return grant
 end
 
 -- A General's crate for UTC day `day`, once a day: true if it's due (and

@@ -71,4 +71,51 @@ return function(t)
 		t.eq(Catalog.crateable(c), false, "subscribers only")
 		t.eq(Catalog.crateable(Catalog.get("s_stripes") :: any), true)
 	end)
+
+	-- The launch event (Bruno, 2026-11-13): the starter pack free for 7 days.
+	t.test("the launch gift: everyone may claim the starter pack once while the event runs", function()
+		local saved = Catalog.LAUNCH_GIFT
+		local starts, days = 10000, 7 * 24 * 3600
+		Catalog.LAUNCH_GIFT = table.freeze({ startsAt = starts, durationS = days }) :: any
+		local ok, err = pcall(function()
+			local fresh = Profile.new()
+			t.eq(Profile.giftState(fresh, starts - 1), nil, "not before it opens")
+			local state, left = Profile.giftState(fresh, starts + 60)
+			t.eq(state, "claimable", "a brand-new player (no match needed)")
+			t.eq(left, days - 60, "counts down to the event's end")
+			t.eq(Profile.giftState(fresh, starts + days), nil, "over after 7 days")
+			t.eq(Profile.claimGift(fresh, starts + days), nil, "nothing to claim after")
+
+			-- While it's claimable the paid offer is hidden; claiming ends it.
+			local p = Profile.new()
+			p.matches = 2
+			p.owned.w_mega = true
+			t.eq(Profile.starterState(p, starts + 5), nil, "never sold while it's free")
+			local grant = Profile.claimGift(p, starts + 5) :: any
+			t.ok(grant ~= nil, "claimed")
+			t.eq(#grant.items, 2, "only the items not owned")
+			t.eq(grant.stars, 0, "no stars for the owned one: it's free")
+			t.ok(p.owned.w_scatter and p.owned.b_double, "Scattershot and 2x Stars")
+			t.eq(Profile.claimGift(p, starts + 6), nil, "once")
+			t.eq(Profile.giftState(p, starts + 6), nil, "claimed: gone")
+			t.eq(Profile.starterState(p, starts + days + 10), nil, "and no paid offer after the event")
+			local back = Profile.decode(Profile.encode(p)) :: any
+			t.eq(back.giftClaimed, true, "the claim is saved")
+			t.eq(Profile.view(p, true, false, false, starts + 6).gift, nil)
+
+			local all = Profile.new()
+			for _, id in Catalog.STARTER.items do
+				all.owned[id] = true
+			end
+			t.eq(Profile.giftState(all, starts + 5), nil, "not for someone who owns it all")
+		end)
+		Catalog.LAUNCH_GIFT = saved
+		if not ok then
+			error(err, 0)
+		end
+	end)
+
+	t.test("the launch gift is off by default", function()
+		t.eq(Profile.giftState(Profile.new(), os.time()), if Catalog.LAUNCH_GIFT.startsAt > 0 then "claimable" else nil)
+	end)
 end

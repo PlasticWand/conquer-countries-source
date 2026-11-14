@@ -196,6 +196,13 @@ local function onShop(player: Player, request: any): any
 		if not result.ok then
 			return { ok = true }
 		end
+	elseif request.op == "claimGift" then
+		-- The launch event's free starter pack (Catalog.LAUNCH_GIFT).
+		local grant = Profile.claimGift(e.record, os.time())
+		result = { ok = grant ~= nil, reason = if grant then nil else "over", items = if grant then grant.items else nil }
+		if grant then
+			Analytics.giftClaimed(player, #grant.items)
+		end
 	elseif request.op == "settings" then
 		local PlayerSettings = require(Shared.PlayerSettings)
 		e.record.settings = PlayerSettings.sanitize(request.settings)
@@ -438,7 +445,8 @@ function Store.start(remotes: Folder)
 	end)
 	if RunService:IsStudio() then
 		-- Studio-only probe for MCP checks: Invoke("newPlayer") resets the
-		-- tutorial and its tips; Invoke("stars", n) gives every
+		-- tutorial and its tips; Invoke("resetGift") unclaims the launch
+		-- gift; Invoke("stars", n) gives every
 		-- player n stars; returns each profile's view.
 		local probe = Instance.new("BindableFunction")
 		probe.Name = "StoreDebug"
@@ -457,6 +465,15 @@ function Store.start(remotes: Folder)
 						e.record.tutorial = nil
 						e.record.tipsSeen = {}
 						e.record.tutorialPaid = false
+						e.dirty = true
+						push(player)
+					elseif code == "resetGift" then
+						-- The launch gift unclaimed and its items gone (the
+						-- Studio store only), to test the event again.
+						e.record.giftClaimed = false
+						for _, id in Catalog.STARTER.items do
+							e.record.owned[id] = nil
+						end
 						e.dirty = true
 						push(player)
 					end

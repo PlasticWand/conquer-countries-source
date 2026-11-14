@@ -259,6 +259,15 @@ Catalog.STARTER = table.freeze({
 	regular = 129 + 67 + 199,
 })
 
+-- The launch event (Bruno, 2026-11-13): for 7 days everyone who plays may
+-- claim the starter pack's items free, once ("[🎁 LAUNCH GIFT]" in the
+-- title). `startsAt` is the UTC os.time() it opens; 0 = off. Runs 2026-11-14
+-- 00:00 UTC to 2026-11-21 00:00 UTC (7 PM EST Nov 13 to 7 PM EST Nov 20).
+Catalog.LAUNCH_GIFT = table.freeze({
+	startsAt = 1794614400,
+	durationS = 7 * 24 * 3600,
+})
+
 -- RoWorld's monthly subscription, here "Conquest General" (2026-11-08): its
 -- Roblox id ("EXP-..."; "" = not created yet, so nothing offers it), the
 -- price set on the dashboard, and the perks: a crate every UTC day played,

@@ -27,6 +27,7 @@ local Party = require(script.Parent.Screens.Party)
 local Settings = require(script.Parent.Screens.Settings)
 local Shops = require(script.Parent.Screens.Shops)
 local StarterOffer = require(script.Parent.Screens.StarterOffer)
+local GiftOffer = require(script.Parent.Screens.GiftOffer)
 local GeneralOffer = require(script.Parent.Screens.GeneralOffer)
 local WaitingRoom = require(script.Parent.Screens.WaitingRoom)
 local Loading = require(script.Parent.Screens.Loading)
@@ -62,6 +63,10 @@ function MenuController.new(root: any, remotes: Instance, hooks: Hooks)
 		modal = nil :: Kit.Modal?,
 		view = nil :: any, -- Store/Profile.View
 		starterOffer = nil :: any, -- the starter pack's window while open
+		giftOffer = nil :: any, -- the launch gift's window while open
+		giftShown = false, -- the launch gift opened by itself this session
+		giftClaiming = false, -- its claim is with the server
+		giftDone = false, -- claimed this session (its window says so, then closes)
 		shop = nil :: string?, -- the shop screen open now
 		shopTab = nil :: string?,
 		shopRemote = Shop,
@@ -142,6 +147,9 @@ function MenuController.new(root: any, remotes: Instance, hooks: Hooks)
 		end,
 		openStarter = function()
 			self:openStarter()
+		end,
+		openGift = function()
+			self:openGift()
 		end,
 		openGeneral = function()
 			self:openGeneral()
@@ -251,6 +259,23 @@ function MenuController.new(root: any, remotes: Instance, hooks: Hooks)
 		end
 		if self.starterOffer and view.starter == nil then
 			self.starterOffer.close() -- bought (or over)
+		end
+		-- The launch gift (Bruno, 2026-11-13) opens by itself once a session
+		-- on a hub, but never over a new player's first match (the tutorial
+		-- starts by itself): they see it when they come back.
+		if view.gift == "claimable" and not self.giftShown and not Tutorial.isNew(view) then
+			local role = ReplicatedStorage:GetAttribute(WaitingRoomModel.ROLE_ATTRIBUTE)
+			if role == nil or role == WaitingRoomModel.ROLE_HUB then
+				self.giftShown = true
+				task.delay(1.2, function()
+					if self.visible and self.modal == nil and self.soloCover == nil and self.view and self.view.gift == "claimable" then
+						self:openGift()
+					end
+				end)
+			end
+		end
+		if self.giftOffer and view.gift == nil and not self.giftClaiming and not self.giftDone then
+			self.giftOffer.close() -- the event ended
 		end
 		-- A shop on screen redraws with what changed.
 		if self.shop and self.modal then
@@ -387,6 +412,43 @@ function MenuController.openStarter(self: any)
 		offer.root.Destroying:Connect(function()
 			if self.starterOffer == offer then
 				self.starterOffer = nil
+			end
+		end)
+		return offer :: any
+	end)
+end
+
+-- The launch gift's window: CLAIM FREE asks the server, which unlocks the
+-- starter pack's items and pushes the new profile.
+function MenuController.openGift(self: any)
+	local view = self.view
+	if view == nil or view.gift ~= "claimable" then
+		return
+	end
+	self.openModal(function()
+		local offer: any
+		offer = GiftOffer.open(self.root.modal, view.giftLeft or 0, function()
+			self.giftClaiming = true
+			task.spawn(function()
+				local ok, result = pcall(function()
+					return self.shopRemote:InvokeServer({ op = "claimGift" })
+				end)
+				self.giftClaiming = false
+				if self.giftOffer ~= offer then
+					return
+				end
+				if ok and type(result) == "table" and result.ok then
+					self.giftDone = true
+					offer.setClaimed()
+				else
+					offer.setFailed()
+				end
+			end)
+		end)
+		self.giftOffer = offer
+		offer.root.Destroying:Connect(function()
+			if self.giftOffer == offer then
+				self.giftOffer = nil
 			end
 		end)
 		return offer :: any
