@@ -446,7 +446,7 @@ function Store.start(remotes: Folder)
 	if RunService:IsStudio() then
 		-- Studio-only probe for MCP checks: Invoke("newPlayer") resets the
 		-- tutorial and its tips; Invoke("resetGift") unclaims the launch
-		-- gift; Invoke("stars", n) gives every
+		-- gift; Invoke("brandNew") makes a first-time player; Invoke("stars", n) gives every
 		-- player n stars; returns each profile's view.
 		local probe = Instance.new("BindableFunction")
 		probe.Name = "StoreDebug"
@@ -465,6 +465,19 @@ function Store.start(remotes: Folder)
 						e.record.tutorial = nil
 						e.record.tipsSeen = {}
 						e.record.tutorialPaid = false
+						e.dirty = true
+						push(player)
+					elseif code == "brandNew" then
+						-- A first-time player (the Studio store only): no
+						-- matches, no tutorial or tips, the launch gift unclaimed.
+						e.record.matches = 0
+						e.record.tutorial = nil
+						e.record.tipsSeen = {}
+						e.record.tutorialPaid = false
+						e.record.giftClaimed = false
+						for _, id in Catalog.STARTER.items do
+							e.record.owned[id] = nil
+						end
 						e.dirty = true
 						push(player)
 					elseif code == "resetGift" then

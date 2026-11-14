@@ -65,6 +65,7 @@ function MenuController.new(root: any, remotes: Instance, hooks: Hooks)
 		starterOffer = nil :: any, -- the starter pack's window while open
 		giftOffer = nil :: any, -- the launch gift's window while open
 		giftShown = false, -- the launch gift opened by itself this session
+		giftPending = false, -- its opening is waiting out the short delay
 		giftClaiming = false, -- its claim is with the server
 		giftDone = false, -- claimed this session (its window says so, then closes)
 		shop = nil :: string?, -- the shop screen open now
@@ -260,20 +261,7 @@ function MenuController.new(root: any, remotes: Instance, hooks: Hooks)
 		if self.starterOffer and view.starter == nil then
 			self.starterOffer.close() -- bought (or over)
 		end
-		-- The launch gift (Bruno, 2026-11-13) opens by itself once a session
-		-- on a hub, but never over a new player's first match (the tutorial
-		-- starts by itself): they see it when they come back.
-		if view.gift == "claimable" and not self.giftShown and not Tutorial.isNew(view) then
-			local role = ReplicatedStorage:GetAttribute(WaitingRoomModel.ROLE_ATTRIBUTE)
-			if role == nil or role == WaitingRoomModel.ROLE_HUB then
-				self.giftShown = true
-				task.delay(1.2, function()
-					if self.visible and self.modal == nil and self.soloCover == nil and self.view and self.view.gift == "claimable" then
-						self:openGift()
-					end
-				end)
-			end
-		end
+		self:_tryGift()
 		if self.giftOffer and view.gift == nil and not self.giftClaiming and not self.giftDone then
 			self.giftOffer.close() -- the event ended
 		end
@@ -415,6 +403,32 @@ function MenuController.openStarter(self: any)
 			end
 		end)
 		return offer :: any
+	end)
+end
+
+-- The launch gift (Bruno, 2026-11-13) opens by itself once a session on a
+-- hub's menu, never over a new player's first match (the tutorial starts by
+-- itself): they see it when they come back. Only an actual opening uses up
+-- the session's turn; a profile push during a match doesn't.
+function MenuController._tryGift(self: any)
+	local view = self.view
+	if self.giftShown or self.giftPending or view == nil or view.gift ~= "claimable" or Tutorial.isNew(view) then
+		return
+	end
+	local role = ReplicatedStorage:GetAttribute(WaitingRoomModel.ROLE_ATTRIBUTE)
+	if role ~= nil and role ~= WaitingRoomModel.ROLE_HUB then
+		return
+	end
+	self.giftPending = true
+	task.delay(1.2, function()
+		self.giftPending = false
+		-- (The tutorial's "Basic training" cover stays as a hidden object
+		-- after it starts: only a cover on screen blocks.)
+		local covered = self.soloCover ~= nil and self.soloCover:isShown()
+		if not self.giftShown and self.visible and self.modal == nil and not covered and self.view and self.view.gift == "claimable" then
+			self.giftShown = true
+			self:openGift()
+		end
 	end)
 end
 
@@ -627,6 +641,9 @@ end
 
 function MenuController.setVisible(self: any, visible: boolean)
 	self.visible = visible
+	if visible then
+		self:_tryGift() -- back in the lobby (after a match on this server)
+	end
 	if not visible and self.soloCover then
 		self.soloCover:hide()
 	end
