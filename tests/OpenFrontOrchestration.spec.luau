@@ -41,8 +41,8 @@ return function(t)
 		local tutorialModule={} -- (Claude, 2026-11-10: Ui/OpenFront/TutorialController)
 		local audioModule,audioCuesModule,dossierModule,feelModule={},{},{},{}
 		local of={ClientState=stateModule,MapLoader=loaderModule,AudioCues=audioCuesModule,FeelCues=feelModule}
-		local skinsModule,productsModule={},{}
-		local shared={WaitForChild=function() return of end,MapCatalog=catalogModule,Store={Skins=skinsModule,Products=productsModule}}
+		local skinsModule,productsModule,engageModule={},{},{}
+		local shared={WaitForChild=function() return of end,MapCatalog=catalogModule,EngagePrompts=engageModule,Store={Skins=skinsModule,Products=productsModule}}
 		local mapFolder={WaitForChild=function(self) return self end}
 		local replicated={WaitForChild=function(_,name)
 			if name=='Shared' then return shared elseif name=='OpenFrontRemotes' then return remotes else return mapFolder end
@@ -54,6 +54,7 @@ return function(t)
 		local renderer,preview,hudCallbacks,ui,hud,root
 		local modules={
 			[productsModule]={}, -- concurrent Takeover wiring imports the product catalog
+			[engageModule]={pick=function() return nil end,DELAY_S=0}, -- the after-match prompts
 			[tutorialModule]={new=function()
 				local noop=function() end
 				return {orderShare=function() return 1 end,floorHeld=noop,noteOrder=noop,noteBoat=noop,destroy=noop}

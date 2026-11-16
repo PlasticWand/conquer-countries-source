@@ -18,6 +18,19 @@ Teleports.RETRIES = 3
 -- long (a LEAVE pressed twice, or the match ending while one is in flight).
 Teleports.PENDING_S = 20
 
+-- `send` returns (true, INFLIGHT) when Roblox says the players are already
+-- teleporting ("already in progress or throttled", 2026-11-15 review: about
+-- 60 a day, mostly a PLAY pressed twice or a retry after a slow first
+-- attempt). The same message also covers a throttled teleport, where the
+-- player isn't moving, so a caller that has a fallback waits INFLIGHT_WAIT_S
+-- and uses it only if the player is still on this server.
+Teleports.INFLIGHT = "inflight"
+Teleports.INFLIGHT_WAIT_S = 20
+
+function Teleports.isInFlightError(msg: string): boolean
+	return string.find(msg, "already in progress", 1, true) ~= nil
+end
+
 export type Teleporter = {
 	reserve: () -> (string, string),
 	send: (players: { Player }, code: string, data: { [string]: any }) -> (boolean, string?),
@@ -39,18 +52,56 @@ function Teleports.live(placeId: number): Teleporter
 	end
 
 	local function send(players: { Player }, code: string, data: { [string]: any }): (boolean, string?)
+		-- Only players still here, and not already on their way (a teleport
+		-- started within PENDING_S that hasn't failed).
+		local now = os.clock()
+		local list, onTheirWay = {}, 0
+		for _, p in players do
+			if p.Parent ~= nil then
+				if pending[p] ~= nil and now - pending[p] <= Teleports.PENDING_S then
+					onTheirWay += 1
+				else
+					table.insert(list, p)
+				end
+			end
+		end
+		if #list == 0 then
+			if onTheirWay > 0 then
+				return true, Teleports.INFLIGHT
+			end
+			return false, "The player left."
+		end
 		local opts = Instance.new("TeleportOptions")
 		opts.ReservedServerAccessCode = code
 		opts:SetTeleportData(data)
 		local last: any = nil
 		for attempt = 1, Teleports.RETRIES do
 			local ok, err = pcall(function()
-				TeleportService:TeleportAsync(placeId, players, opts)
+				TeleportService:TeleportAsync(placeId, list, opts)
 			end)
 			if ok then
+				for _, p in list do
+					pending[p] = os.clock()
+				end
 				return true, nil
 			end
 			last = err
+			if Teleports.isInFlightError(tostring(err)) then
+				-- (they're already moving, or throttled: retrying can't help)
+				for _, p in list do
+					pending[p] = os.clock()
+				end
+				return true, Teleports.INFLIGHT
+			end
+			-- someone may have left while we waited
+			for i = #list, 1, -1 do
+				if list[i].Parent == nil then
+					table.remove(list, i)
+				end
+			end
+			if #list == 0 then
+				return false, "The player left."
+			end
 			task.wait(attempt)
 		end
 		warn("[Lobbies] teleport failed: " .. tostring(last))
@@ -84,7 +135,7 @@ function Teleports.live(placeId: number): Teleporter
 				pending[p] = nil
 			end
 			local msg = tostring(err)
-			if string.find(msg, "already in progress", 1, true) then
+			if Teleports.isInFlightError(msg) then
 				return true, nil
 			end
 			warn("[Lobbies] return teleport failed: " .. msg)

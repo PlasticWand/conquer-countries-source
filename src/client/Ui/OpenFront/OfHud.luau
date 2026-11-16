@@ -97,6 +97,7 @@ export type Actions = {
 	-- Conquest's Arsenal: call Reinforcements (the reinforce intent).
 	reinforce: (() -> ())?,
 	takeover: (() -> ())?, -- the Arsenal's Takeover
+	watchAd: (() -> ())?, -- the result card's FREE CRATE (a rewarded video ad)
 }
 
 local BOARD_ROWS = 10
@@ -541,14 +542,16 @@ function OfHud.new(state: any, host: Frame, root: any, actions: Actions)
 	self.winAgain = again
 	-- Under them, once the Stars are in: the next unlock and 2x Stars. They
 	-- say what is true; a press opens the Arsenal.
-	local function infoPlate(name: string, glyph: string): (ImageButton, TextLabel)
+	local function infoPlate(name: string, glyph: string, onPress: (() -> ())?): (ImageButton, TextLabel)
 		local p = Dossier.rivetPlate(card, "", 22, false, { Name = name, Position = UDim2.fromOffset(CARD_W / 2, 506), Size = UDim2.fromOffset(330, 58), Visible = false, Parent = card })
 		local row = Kit.new("Frame", { BackgroundTransparency = 1, Size = UDim2.fromScale(1, 1), Parent = p })
 		Kit.list(Enum.FillDirection.Horizontal, 8, Enum.HorizontalAlignment.Center, Enum.VerticalAlignment.Center).Parent = row
 		Kit.glyph(glyph, { ImageColor3 = GOLD_INK, Size = UDim2.fromOffset(24, 24), LayoutOrder = 1, Parent = row })
 		local label = stencil({ Text = "", TextSize = 22, LayoutOrder = 2, Parent = row })
 		p.Activated:Connect(function()
-			if actions.openShop then
+			if onPress then
+				onPress()
+			elseif actions.openShop then
 				actions.openShop()
 			end
 		end)
@@ -586,6 +589,16 @@ function OfHud.new(state: any, host: Frame, root: any, actions: Actions)
 	self.takeoverPlate = takeover
 	self.goalPlate, self.unlockText = infoPlate("NextUnlock", "lock")
 	self.doublePlate, self.doubleText = infoPlate("DoubleStars", "star")
+	-- A free Cosmetic Crate for a rewarded video ad (2026-11-15), in 2x
+	-- Stars' place while Roblox has an ad for this player (setAdOffer).
+	self.adPlate, self.adText = infoPlate("AdCrate", "play", function()
+		self.adPlate.Visible = false
+		self:_layoutResult()
+		if actions.watchAd then
+			actions.watchAd()
+		end
+	end)
+	self.adText.Text = "FREE CRATE  ·  WATCH AD"
 	local exit = Dossier.rivetPlate(card, string.upper(Lang.t("win_modal.exit")), 26, false, { Name = "Exit", Position = UDim2.fromOffset(CARD_W / 2, 590), Size = UDim2.fromOffset(420, 64), Parent = card })
 	exit.Activated:Connect(function()
 		actions.backToMenu()
@@ -638,6 +651,7 @@ function OfHud.new(state: any, host: Frame, root: any, actions: Actions)
 		self.shownDeath, self.shownWin = false, false
 		self.resultTrack = ResultModel.newTracker()
 		self.starsPlate.Visible, self.goalPlate.Visible, self.doublePlate.Visible = false, false, false
+		self.adPlate.Visible = false
 		self.nextAt, self.nextText.Visible = nil, false
 		self:_layoutResult()
 		self.incomingBoats = {}
@@ -1007,9 +1021,22 @@ function OfHud._layoutResult(self: any)
 	else
 		self.winAgain.Position = UDim2.fromOffset(W / 2, 418)
 	end
-	local both = self.goalPlate.Visible and self.doublePlate.Visible
+	-- (the ad's free crate takes 2x Stars' place while it's offered)
+	if self.adPlate.Visible then
+		self.doublePlate.Visible = false
+	end
+	local second = if self.adPlate.Visible then self.adPlate else self.doublePlate
+	local both = self.goalPlate.Visible and second.Visible
 	self.goalPlate.Position = UDim2.fromOffset(if both then 210 else W / 2, 506)
-	self.doublePlate.Position = UDim2.fromOffset(if both then 550 else W / 2, 506)
+	second.Position = UDim2.fromOffset(if both then 550 else W / 2, 506)
+end
+
+-- Whether Roblox has a rewarded ad for this player now (OpenFrontClient asks
+-- AdService when the Stars arrive): the FREE CRATE plate shows in 2x Stars'
+-- place, never over the Takeover offer.
+function OfHud.setAdOffer(self: any, available: boolean)
+	self.adPlate.Visible = available and not self.takeoverPlate.Visible and self.win.Visible
+	self:_layoutResult()
 end
 
 -- The highest attack share allowed (the tutorial's rookie cap, after
@@ -1641,7 +1668,7 @@ function OfHud._checkDeath(self: any)
 		if label then
 			label.Text = `TAKE OVER {string.upper(offer.name)}`
 		end
-		self.goalPlate.Visible, self.doublePlate.Visible = false, false
+		self.goalPlate.Visible, self.doublePlate.Visible, self.adPlate.Visible = false, false, false
 	end
 	if self.shownDeath and me ~= nil and me.alive and state.winner == nil then
 		self.shownDeath = false

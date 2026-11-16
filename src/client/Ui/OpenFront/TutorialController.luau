@@ -623,6 +623,8 @@ function TutorialController._target(self: any, target: string?): (Vector2?, numb
 		return self:_tileScreen(self.frontier or self.neighbourTile), nil
 	elseif target == "neighbour" then
 		return self:_tileScreen(self.neighbourTile), nil
+	elseif target == "attack" then
+		return around(actionsUi and actionsUi.attackMain)
 	elseif target == "ownLand" then
 		return self:_tileScreen(self.inland or self:_playerTile(state.you)), nil
 	elseif target == "troops" then
@@ -678,6 +680,7 @@ function TutorialController._observe(self: any): Tutorial.Observation
 		cityBuilt = cityBuilt,
 		placingCity = chosen == "City",
 		confirmOpen = chosen == "City" and actionsUi.confirmCard ~= nil and actionsUi.confirmCard.Visible,
+		attackCardOpen = actionsUi ~= nil and actionsUi.attackCard ~= nil and actionsUi.attackCard.Visible == true,
 	}
 	self.ordered, self.orderedOwner, self.orderedLand = false, false, false
 	return o

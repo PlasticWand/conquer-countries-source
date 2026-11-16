@@ -289,6 +289,11 @@ function MenuController.new(root: any, remotes: Instance, hooks: Hooks)
 		end
 	end)
 	table.insert(self.connections, Granted.OnClientEvent:Connect(function(grant: any)
+		-- Invite rewards (Catalog.REFERRAL): friends they invited played.
+		if type(grant) == "table" and grant.product == "referral" and type(grant.stars) == "number" then
+			self:notice(`+{grant.stars} stars: friends you invited played their first match!`, "menu.stars")
+			return
+		end
 		if type(grant) == "table" and type(grant.items) == "table" and grant.items[1] then
 			if self.sound then
 				self.sound("menu.purchase")
@@ -597,12 +602,13 @@ end
 -- "Ada invited you to their party" with Accept, for 20 seconds.
 -- A short pinned note on the menu (why a public match join didn't work);
 -- one at a time, gone after 6 s.
-function MenuController.notice(self: any, text: string)
+-- (`sound`: the cue instead of the error's, for good news)
+function MenuController.notice(self: any, text: string, sound: string?)
 	if self.noticeCard and self.noticeCard.Parent then
 		self.noticeCard:Destroy()
 	end
 	if self.sound then
-		self.sound("ui.error")
+		self.sound(sound or "ui.error")
 	end
 	local card = Dossier.surface("ImageLabel", "tex_paper", C.sheet, { Name = "MenuNotice", AnchorPoint = Vector2.new(0.5, 0), Position = UDim2.new(0.5, 0, 0, 20), Size = UDim2.fromOffset(600, 70), Rotation = 0.5, ZIndex = 60, Parent = self.root.modal })
 	Kit.stroke(C.sheetLine, 1.5, 0).Parent = card

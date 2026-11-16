@@ -203,6 +203,11 @@ local function onShop(player: Player, request: any): any
 		if grant then
 			Analytics.giftClaimed(player, #grant.items)
 		end
+	elseif request.op == "adCrate" then
+		-- A rewarded video ad for a free Cosmetic Crate (2026-11-15 review,
+		-- Bruno: "Do them all"). Roblox grants the crate1 product through
+		-- ProcessReceipt when the ad completes; nothing is saved here.
+		return Store.showAdCrate(player)
 	elseif request.op == "settings" then
 		local PlayerSettings = require(Shared.PlayerSettings)
 		e.record.settings = PlayerSettings.sanitize(request.settings)
@@ -213,6 +218,142 @@ local function onShop(player: Player, request: any): any
 		push(player)
 	end
 	return result
+end
+
+-- Rewarded video ads (AdService): the reward is the Cosmetic Crate product,
+-- granted like a purchase. One ad at a time a player, and AD_COOLDOWN_S
+-- between completed ones on this server (Roblox applies its own limits too).
+Store.AD_PRODUCT = "crate1"
+Store.AD_COOLDOWN_S = 10 * 60
+local adReward: any = nil
+local adBusy: { [Player]: boolean } = {}
+local adDoneAt: { [Player]: number } = {}
+
+function Store.showAdCrate(player: Player): { [string]: any }
+	local id = Products[Store.AD_PRODUCT]
+	if id == nil or RunService:IsStudio() then
+		return { ok = false, reason = "unavailable" }
+	end
+	if adBusy[player] or os.clock() - (adDoneAt[player] or -math.huge) < Store.AD_COOLDOWN_S then
+		return { ok = false, reason = "wait" }
+	end
+	adBusy[player] = true
+	task.spawn(function()
+		local ok, result = pcall(function(): any
+			local AdService = game:GetService("AdService")
+			if adReward == nil then
+				adReward = AdService:CreateAdRewardFromDevProductId(id)
+			end
+			return AdService:ShowRewardedVideoAdAsync(player, adReward)
+		end)
+		adBusy[player] = nil
+		local completed = ok and result == Enum.ShowAdResult.ShowCompleted
+		if completed then
+			adDoneAt[player] = os.clock()
+		elseif not ok then
+			warn(`[Store] rewarded ad failed: {result}`)
+		end
+		if player.Parent ~= nil then
+			Analytics.adWatched(player, completed)
+		end
+	end)
+	return { ok = true }
+end
+
+-- Invite rewards (Catalog.REFERRAL). An inviter may be on another server
+-- (their profile is session-locked there), so a credit goes into a small
+-- separate key per inviter, which their own server collects: on joining and
+-- every REFERRAL_COLLECT_S while they play.
+Store.REFERRAL_COLLECT_S = 5 * 60
+local referralStore: any = nil
+
+local function referralKey(userId: number): string
+	return `ref_{userId}`
+end
+
+-- The friend who invited a brand-new player, from Roblox's join data
+-- (ReferredByPlayerId, set for every invite type), or the invite's launch
+-- data. It can take a few seconds to arrive.
+local function readReferrer(player: Player): number?
+	for _ = 1, 10 do
+		local ok, data = pcall(function(): any
+			return player:GetJoinData()
+		end)
+		if ok and type(data) == "table" then
+			local id = tonumber((data :: any).ReferredByPlayerId)
+			if id == nil and type(data.LaunchData) == "string" then
+				id = tonumber(string.match(data.LaunchData, "^ref:(%d+)$"))
+			end
+			if id and id > 0 then
+				return id
+			end
+		end
+		task.wait(1)
+		if player.Parent == nil then
+			return nil
+		end
+	end
+	return nil
+end
+
+local function noteReferrer(player: Player)
+	local inviter = readReferrer(player)
+	local e = entries[player.UserId]
+	if inviter and e and Profile.setReferrer(e.record, inviter, player.UserId) then
+		e.dirty = true
+	end
+end
+
+-- Adds one friend's credit to the inviter's key (a few tries).
+local function creditInviter(inviterId: number)
+	if referralStore == nil then
+		return
+	end
+	for attempt = 1, 3 do
+		local ok = pcall(function()
+			referralStore:UpdateAsync(referralKey(inviterId), function(n: any): any
+				return (if type(n) == "number" then n else 0) + 1
+			end)
+		end)
+		if ok then
+			return
+		end
+		task.wait(attempt * 2)
+	end
+	warn(`[Store] invite credit for {inviterId} failed`)
+end
+
+-- Collects the player's waiting credits and pays the stars (the day's limit;
+-- the rest go back for later).
+local function collectReferrals(player: Player)
+	local e = entries[player.UserId]
+	if referralStore == nil or e == nil or not e.saved then
+		return
+	end
+	local taken = 0
+	local ok = pcall(function()
+		referralStore:UpdateAsync(referralKey(player.UserId), function(n: any): any
+			taken = if type(n) == "number" and n > 0 then n else 0
+			return if taken > 0 then 0 else nil
+		end)
+	end)
+	if not ok or taken <= 0 or entries[player.UserId] ~= e then
+		return
+	end
+	local stars, left = Profile.payReferrals(e.record, taken, os.time() // 86400)
+	if stars > 0 then
+		e.dirty = true
+		push(player)
+		grantedRemote:FireClient(player, { items = {}, stars = stars, product = "referral" })
+		Analytics.referralPaid(player, stars // Catalog.REFERRAL.stars)
+	end
+	if left > 0 then
+		pcall(function()
+			referralStore:UpdateAsync(referralKey(player.UserId), function(n: any): any
+				return (if type(n) == "number" then n else 0) + left
+			end)
+		end)
+	end
 end
 
 -- MarketplaceService.ProcessReceipt: grant once, save, then confirm.
@@ -246,6 +387,11 @@ function Store.matchEnded(player: Player, result: Profile.MatchResult): number
 	local stars = Profile.applyMatch(e.record, result, e.doubleStars or e.record.owned.b_double == true, e.general)
 	e.dirty = true
 	push(player)
+	-- An invited player's first real match: their inviter earns the reward.
+	local inviter = if result.minutes >= Catalog.REFERRAL.minMinutes then Profile.referralDue(e.record) else nil
+	if inviter then
+		task.spawn(creditInviter, inviter)
+	end
 	return stars
 end
 
@@ -433,6 +579,10 @@ function Store.start(remotes: Folder)
 	}
 	if not ok then
 		warn("[Store] DataStores unavailable here: profiles are kept in memory for this session")
+	else
+		pcall(function()
+			referralStore = DataStoreService:GetDataStore(if RunService:IsStudio() then "ConquestReferrals_Studio" else "ConquestReferrals_v1")
+		end)
 	end
 	MarketplaceService.ProcessReceipt = processReceipt
 	MarketplaceService.PromptGamePassPurchaseFinished:Connect(function(player: Player, passId: number, bought: boolean)
@@ -497,17 +647,17 @@ function Store.start(remotes: Folder)
 		end
 		probe.Parent = game:GetService("ServerStorage")
 	end
+	local function joined(player: Player)
+		load(player)
+		task.spawn(noteReferrer, player)
+		task.spawn(collectReferrals, player)
+		checkGeneral(player)
+	end
 	Players.PlayerAdded:Connect(function(player)
-		task.spawn(function()
-			load(player)
-			checkGeneral(player)
-		end)
+		task.spawn(joined, player)
 	end)
 	for _, player in Players:GetPlayers() do
-		task.spawn(function()
-			load(player)
-			checkGeneral(player)
-		end)
+		task.spawn(joined, player)
 	end
 	-- Conquest General: a new subscription (or a lapsed one), and each new
 	-- UTC day's crate for those who stay.
@@ -517,8 +667,15 @@ function Store.start(remotes: Folder)
 		end
 	end)
 	task.spawn(function()
+		local collectAt = os.clock() + Store.REFERRAL_COLLECT_S
 		while true do
 			task.wait(60)
+			if os.clock() >= collectAt then
+				collectAt = os.clock() + Store.REFERRAL_COLLECT_S
+				for _, player in Players:GetPlayers() do
+					task.spawn(collectReferrals, player)
+				end
+			end
 			for _, player in Players:GetPlayers() do
 				local e = entries[player.UserId]
 				if e and not e.generalKnown then
@@ -550,6 +707,7 @@ function Store.start(remotes: Folder)
 		end
 		save(player, true)
 		entries[player.UserId] = nil
+		adBusy[player], adDoneAt[player] = nil, nil
 	end)
 	game:BindToClose(function()
 		-- Every save gets to finish (Roblox allows 30 s), not a fixed 3 s.

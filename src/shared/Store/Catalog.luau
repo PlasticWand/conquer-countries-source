@@ -268,6 +268,15 @@ Catalog.LAUNCH_GIFT = table.freeze({
 	durationS = 7 * 24 * 3600,
 })
 
+-- Invite rewards (2026-11-15 review, Bruno: "Do them all"): stars for the
+-- inviter when a brand-new player they invited plays a match of at least
+-- `minMinutes`, at most `perDay` friends a UTC day (more wait for the next).
+Catalog.REFERRAL = table.freeze({
+	stars = 1000,
+	perDay = 5,
+	minMinutes = 3,
+})
+
 -- RoWorld's monthly subscription, here "Conquest General" (2026-11-08): its
 -- Roblox id ("EXP-..."; "" = not created yet, so nothing offers it), the
 -- price set on the dashboard, and the perks: a crate every UTC day played,

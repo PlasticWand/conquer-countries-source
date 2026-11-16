@@ -14,8 +14,12 @@ local SocialService = game:GetService("SocialService")
 local Dossier = require(script.Parent.Parent.Dossier)
 local Kit = require(script.Parent.Parent.Kit)
 local Theme = require(script.Parent.Parent.Theme)
+local Shared = game:GetService("ReplicatedStorage"):WaitForChild("Shared")
+local Catalog = require(Shared.Store.Catalog)
 
 local C = Theme.color
+-- Invite rewards (Catalog.REFERRAL): the line under the invite plate.
+local INVITE_LINE = `Friends who accept join you here. +{Kit.commas(Catalog.REFERRAL.stars)} stars for each new friend who plays!`
 
 local Party = {}
 
@@ -110,7 +114,12 @@ function Party.open(host: Instance, view: View?, send: (request: { [string]: any
 			end)
 			if ok and can then
 				pcall(function()
-					SocialService:PromptGameInvite(me)
+					-- (the launch data names the inviter for the reward, beside
+					-- Roblox's own ReferredByPlayerId)
+					local options = Instance.new("ExperienceInviteOptions")
+					options.PromptMessage = `Invite friends: +{Kit.commas(Catalog.REFERRAL.stars)} stars for each new friend who plays!`
+					options.LaunchData = `ref:{me.UserId}`
+					SocialService:PromptGameInvite(me, options)
 				end)
 			end
 		end)
@@ -125,7 +134,7 @@ function Party.open(host: Instance, view: View?, send: (request: { [string]: any
 		Kit.glyph("party", { ImageColor3 = C.inkBlack, Size = sz(48, 48), LayoutOrder = 1, Parent = row })
 		Dossier.stencil({ Text = "INVITE ROBLOX FRIENDS", TextSize = 64, LayoutOrder = 2, Parent = row })
 		roblox.Activated:Connect(inviteFriends)
-		Dossier.typed({ Text = "Friends who accept join you on this server.", TextColor3 = C.sheet, TextSize = 20, AnchorPoint = Vector2.new(0.5, 0.5), Position = at(w.width / 2, 106), Parent = w.body })
+		Dossier.typed({ Text = INVITE_LINE, TextColor3 = C.sheet, TextSize = 20, AnchorPoint = Vector2.new(0.5, 0.5), Position = at(w.width / 2, 106), Parent = w.body })
 		Dossier.cardArt("ImageLabel", "folder_card", { Name = "Folder", Position = at(14, 126), Size = sz(w.width - 28, w.height - 132), Parent = w.body })
 		local list = Kit.scroll({ Name = "List", Position = at(40, 160), Size = sz(w.width - 110, w.height - 184), ScrollBarThickness = 8, ScrollBarImageColor3 = Color3.fromHex("#1E2019"), Parent = w.body })
 		fill(list, 66, 54, 26, 420, 34, 54, 190, w.close)
@@ -155,7 +164,7 @@ function Party.open(host: Instance, view: View?, send: (request: { [string]: any
 	Dossier.stencil({ Text = "INVITE ROBLOX FRIENDS", TextSize = Dossier.capSize(w, 52), LayoutOrder = 2, Parent = row })
 	roblox.Activated:Connect(inviteFriends)
 	local note = Dossier.sheet("ImageLabel", "header_paper", "tex_paper", C.sheet, { Name = "Note", AnchorPoint = Vector2.new(0.5, 0.5), Position = at(895, 548), Size = sz(920, 82), Parent = w.body })
-	Dossier.typed({ Text = "Friends who accept join you on this server.", TextColor3 = C.inkBlack, TextSize = math.round(32 * w.k), AutomaticSize = Enum.AutomaticSize.None, Size = UDim2.fromScale(1, 1), TextXAlignment = Enum.TextXAlignment.Center, Parent = note })
+	Dossier.typed({ Text = INVITE_LINE, TextColor3 = C.inkBlack, TextSize = math.round(32 * w.k), AutomaticSize = Enum.AutomaticSize.None, Size = UDim2.fromScale(1, 1), TextXAlignment = Enum.TextXAlignment.Center, Parent = note })
 
 	-- The folder and its list.
 	local folderH = refH - 880 + 250

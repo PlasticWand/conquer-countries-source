@@ -111,6 +111,13 @@ return function(t)
 		f = run.update(obs({ neighbour = 7, neighbourName = "Zambia" }), 0.1)
 		t.eq(f.card.text, "Tap Zambia, then press ATTACK")
 		t.eq(f.mark.target, "neighbour")
+		-- their card opens: the mark moves to ATTACK; closing it goes back
+		f = run.update(obs({ neighbour = 7, neighbourName = "Zambia", attackCardOpen = true }), 0.1)
+		t.eq(f.mark.target, "attack")
+		t.eq(f.card.text, Tutorial.ATTACK_PRESS_LINE)
+		f = run.update(obs({ neighbour = 7, neighbourName = "Zambia" }), 0.1)
+		t.eq(f.mark.target, "neighbour")
+		t.eq(f.card.text, "Tap Zambia, then press ATTACK")
 		note(run.update(obs({ neighbour = 7, ordered = true, orderedOwner = true }), 0.1))
 		note(settle(run, obs()))
 		-- ratio: 50% is too much, 35% held is right

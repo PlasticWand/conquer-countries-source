@@ -35,6 +35,11 @@
 -- match members, never a hub's teleports), MatchMinutes, Placement,
 -- TutorialSkippedAtStep, TutorialPassedOver (a step passed over, not done),
 -- LeftMatchAlive (minutes alive in a match left before its result).
+-- Server health (2026-11-15 review: Creator Hub's server heartbeat P10 read
+-- about 5), once a minute per running match, logged against one of its
+-- players: ServerFps (this server's Heartbeat rate over the minute),
+-- StepMeanMs and StepWorstMs (that match's 10 Hz tick cost). Fields: map,
+-- kind (public, solo or hub-solo) and the matches running on the server.
 
 local AnalyticsService = game:GetService("AnalyticsService")
 local HttpService = game:GetService("HttpService")
@@ -121,6 +126,25 @@ local function custom(player: Player, name: string, value: number)
 	end
 	pcall(function()
 		AnalyticsService:LogCustomEvent(player, name, value)
+	end)
+end
+
+-- One minute of server health for a running match (see the header).
+function Analytics.serverHealth(player: Player, map: string, kind: string, matchesHere: number, fps: number, stepMeanMs: number, stepWorstMs: number)
+	local here = if matchesHere >= 4 then "4+" else tostring(matchesHere)
+	trace(`health {map} {kind} x{here}: {math.floor(fps)} fps, step {math.floor(stepMeanMs * 10) / 10} / {math.floor(stepWorstMs)} ms`)
+	if not ENABLED then
+		return
+	end
+	local fields = {
+		[Enum.AnalyticsCustomFieldKeys.CustomField01.Name] = map,
+		[Enum.AnalyticsCustomFieldKeys.CustomField02.Name] = kind,
+		[Enum.AnalyticsCustomFieldKeys.CustomField03.Name] = here,
+	}
+	pcall(function()
+		AnalyticsService:LogCustomEvent(player, "ServerFps", math.floor(fps * 10) / 10, fields)
+		AnalyticsService:LogCustomEvent(player, "StepMeanMs", math.floor(stepMeanMs * 100) / 100, fields)
+		AnalyticsService:LogCustomEvent(player, "StepWorstMs", math.floor(stepWorstMs * 10) / 10, fields)
 	end)
 end
 
@@ -250,6 +274,17 @@ end
 -- The launch gift claimed (value: the items it unlocked).
 function Analytics.giftClaimed(player: Player, items: number)
 	custom(player, "LaunchGiftClaimed", items)
+end
+
+-- Invite rewards collected: how many invited friends were paid for.
+function Analytics.referralPaid(player: Player, friends: number)
+	custom(player, "ReferralPaid", friends)
+end
+
+-- A rewarded video ad for a free crate: 1 when it played to the end
+-- (the crate is granted), 0 when it was cut short or failed.
+function Analytics.adWatched(player: Player, completed: boolean)
+	custom(player, "RewardedAdCrate", if completed then 1 else 0)
 end
 
 -- Skip pressed on the tutorial's step `n` (its index in Shared/Tutorial.STEPS).

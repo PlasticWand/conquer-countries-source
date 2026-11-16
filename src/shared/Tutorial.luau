@@ -130,6 +130,10 @@ Tutorial.STEPS = {
 } :: { Step }
 
 Tutorial.CONTACT_WAIT_LINE = "Keep growing until you meet a neighbour"
+-- The attack step's second half: the attack card is open, so the mark moves
+-- to its ATTACK button (2026-11-15 review: "Attacked" lost 24.8% of the
+-- tutorial's players, the worst step; nothing pointed at the card's button).
+Tutorial.ATTACK_PRESS_LINE = "Now press ATTACK"
 
 -- The "Tutorial" funnel's steps (Creator Dashboard): 1 is the match starting,
 -- then one a step, then finishing. A step passed over (stuck, or nobody to
@@ -241,10 +245,11 @@ export type Observation = {
 	cityBuilt: boolean,
 	placingCity: boolean, -- City chosen in the build bar
 	confirmOpen: boolean, -- the build confirmation's ✓ is up
+	attackCardOpen: boolean?, -- the attack card (tap a nation) is up
 }
 
 -- What to draw. `mark.target`: "spot" | "frontier" | "troops" | "ratio" |
--- "neighbour" | "city" | "ownLand" | "confirm" | nil.
+-- "neighbour" | "attack" | "city" | "ownLand" | "confirm" | nil.
 export type Frame = {
 	card: { visible: boolean, count: string, text: string, bar: number?, tint: string, skip: string },
 	mark: { target: string?, word: string? },
@@ -528,7 +533,17 @@ function Tutorial.newRun()
 				end
 			end
 			if self.neighbour ~= nil then
-				target = "neighbour"
+				if o.attackCardOpen then
+					target = "attack"
+					self.card.text = Tutorial.ATTACK_PRESS_LINE
+				else
+					target = "neighbour"
+					if self.card.text == Tutorial.ATTACK_PRESS_LINE then
+						-- (the card closed without attacking: back to the step's line)
+						local line = if o.touch then step.touch else step.desktop
+						self.card.text = string.format(line, self.neighbourName or "them")
+					end
+				end
 			end
 		elseif id == "city" then
 			if o.cityBuilt then

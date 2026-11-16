@@ -26,6 +26,7 @@ local MapLoader = require(OF.MapLoader)
 local MapCatalog = require(Shared.MapCatalog)
 local Skins = require(Shared.Store.Skins)
 local Products = require(Shared.Store.Products) :: { [string]: number }
+local EngagePrompts = require(Shared.EngagePrompts)
 
 local Renderer = require(script.Parent.Map.OpenFront.EditableRenderer)
 local BuildPreviewController = require(script.Parent.Map.OpenFront.BuildPreviewController)
@@ -579,6 +580,19 @@ function OpenFrontClient.start()
 				game:GetService("MarketplaceService"):PromptProductPurchase(player, Products.takeover)
 			end)
 		end,
+		-- The result card's FREE CRATE: the server shows Roblox's rewarded
+		-- video; when it completes Roblox grants the crate like a purchase
+		-- (the menu's Granted handler opens it).
+		watchAd = function()
+			task.spawn(function()
+				local shop = remotes:FindFirstChild("Shop") :: RemoteFunction?
+				if shop then
+					pcall(function()
+						shop:InvokeServer({ op = "adCrate" })
+					end)
+				end
+			end)
+		end,
 		cancelAttack = function(attackID: string)
 			audio:play("act.retreat")
 			Intent:FireServer({ type = "cancel_attack", attackID = attackID })
@@ -614,6 +628,41 @@ function OpenFrontClient.start()
 	menu.starsGained = function(gained: number)
 		audio:play("menu.stars")
 		hud:showStars(gained, menu.view)
+		-- A rewarded ad's free crate, when Roblox has one for this player.
+		task.spawn(function()
+			local ok, res = pcall(function(): any
+				return game:GetService("AdService"):GetAdAvailabilityNowAsync(Enum.AdFormat.RewardedVideo)
+			end)
+			local available = ok and type(res) == "table" and res.AdAvailabilityResult == Enum.AdAvailabilityResult.IsAvailable
+			hud:setAdOffer(available == true)
+		end)
+		-- One of Roblox's own prompts, once each (Shared/EngagePrompts):
+		-- notifications after the first match, favorite after a win or the
+		-- third match. Saved as a coach tip either way, so it never repeats.
+		local which = EngagePrompts.pick(menu.view)
+		if which then
+			task.delay(EngagePrompts.DELAY_S, function()
+				local tips = remotes:FindFirstChild("Tutorial") :: RemoteEvent?
+				if tips then
+					tips:FireServer({ op = "tip", id = which })
+				end
+				if which == EngagePrompts.NOTIFY then
+					local service = game:GetService("ExperienceNotificationService")
+					local ok, can = pcall(function()
+						return service:CanPromptOptInAsync()
+					end)
+					if ok and can then
+						pcall(function()
+							service:PromptOptIn()
+						end)
+					end
+				else
+					pcall(function()
+						game:GetService("AvatarEditorService"):PromptSetFavorite(game.PlaceId, Enum.AvatarItemType.Asset, true)
+					end)
+				end
+			end)
+		end
 	end
 	menu.sound = function(key: string)
 		audio:play(key)

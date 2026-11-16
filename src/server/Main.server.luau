@@ -4,3 +4,5 @@
 -- history keeps it.
 
 require(script.Parent.OpenFrontServer).start()
+-- "Come back" notifications (off until their setup is done; see the module).
+require(script.Parent.Notifications).start()

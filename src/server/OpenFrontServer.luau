@@ -523,11 +523,17 @@ local function startSolo(player: Player, request: any)
 		local ok, code = pcall(function(): string
 			return (teleports.reserve())
 		end)
-		local sent = false
+		local sent, note = false, nil
 		if ok and type(code) == "string" then
-			sent = teleports.send({ player }, code, { solo = setup })
+			sent, note = teleports.send({ player }, code, { solo = setup })
 		end
-		if not sent and soloSent[player] == setup and player.Parent ~= nil then
+		if sent and note == Teleports.INFLIGHT then
+			-- Already teleporting (a PLAY pressed twice), or throttled: only if
+			-- they are still here after a while does the match run here.
+			task.wait(Teleports.INFLIGHT_WAIT_S)
+			sent = false
+		end
+		if not sent and soloSent[player] == setup and player.Parent ~= nil and matchOf[player] == nil then
 			soloSent[player] = nil
 			warn("[Solo] no server of its own; playing on the hub")
 			startSoloHere(player, setup)
@@ -1105,7 +1111,31 @@ local function announceNext(match: Match)
 	end
 end
 
+-- Server health telemetry (Analytics.serverHealth): Heartbeat frames are
+-- counted for a minute, then each running match with players logs once.
+local HEALTH_INTERVAL = 60
+local healthFrames, healthSince = 0, os.clock()
+
+local function sampleHealth()
+	healthFrames += 1
+	local elapsed = os.clock() - healthSince
+	if elapsed < HEALTH_INTERVAL then
+		return
+	end
+	local fps = healthFrames / elapsed
+	healthFrames, healthSince = 0, os.clock()
+	local all = everyMatch()
+	for _, match in all do
+		local someone = next(match.members)
+		if match.endedAt == nil and someone ~= nil then
+			local kind = if match.public then "public" elseif serverRole == WaitingRoom.ROLE_HUB then "hub-solo" else "solo"
+			Analytics.serverHealth(someone, match.mapName, kind, #all, fps, match.stepMean, math.max(match.stepWorst, match.stepWorstLast))
+		end
+	end
+end
+
 local function onHeartbeat(dt: number)
+	sampleHealth()
 	if directory then
 		hubStep(dt)
 	end

@@ -61,6 +61,14 @@ export type Record = {
 	tutorialPaid: boolean,
 	-- The launch event's free starter pack was claimed (Catalog.LAUNCH_GIFT).
 	giftClaimed: boolean,
+	-- Invite rewards (Catalog.REFERRAL). As the invited: who invited them
+	-- (a userId, set once on a brand-new profile) and whether their first
+	-- match has credited that inviter. As the inviter: the UTC day of the
+	-- last friends paid for and how many that day.
+	referredBy: number?,
+	referralCredited: boolean,
+	referralDay: number,
+	referralsToday: number,
 }
 
 export type MatchResult = {
@@ -90,6 +98,10 @@ function Profile.new(): Record
 		tipsSeen = {},
 		tutorialPaid = false,
 		giftClaimed = false,
+		referredBy = nil,
+		referralCredited = false,
+		referralDay = 0,
+		referralsToday = 0,
 	}
 end
 
@@ -431,6 +443,10 @@ function Profile.encode(p: Record): { [string]: any }
 		tipsSeen = tipList(p),
 		tutorialPaid = p.tutorialPaid,
 		giftClaimed = if p.giftClaimed then true else nil,
+		referredBy = p.referredBy,
+		referralCredited = if p.referralCredited then true else nil,
+		referralDay = if p.referralDay > 0 then p.referralDay else nil,
+		referralsToday = if p.referralsToday > 0 then p.referralsToday else nil,
 	}
 end
 
@@ -491,6 +507,10 @@ function Profile.decode(record: any): (Record?, string?)
 	end
 	p.tutorialPaid = record.tutorialPaid == true
 	p.giftClaimed = record.giftClaimed == true
+	p.referredBy = if isCount(record.referredBy) and record.referredBy > 0 then record.referredBy else nil
+	p.referralCredited = record.referralCredited == true
+	p.referralDay = if isCount(record.referralDay) then record.referralDay else 0
+	p.referralsToday = if isCount(record.referralsToday) then record.referralsToday else 0
 	return p, nil
 end
 
@@ -617,6 +637,44 @@ function Profile.generalDue(p: Record, day: number): boolean
 	end
 	p.generalDay = day
 	return true
+end
+
+-- Invite rewards (Catalog.REFERRAL) -------------------------------------------------------
+
+-- Records who invited this player: only on a brand-new profile (no match
+-- played), once, never themselves. True if it was recorded.
+function Profile.setReferrer(p: Record, inviterId: number, selfId: number): boolean
+	if p.referredBy ~= nil or p.matches > 0 or not isCount(inviterId) or inviterId <= 0 or inviterId == selfId then
+		return false
+	end
+	p.referredBy = inviterId
+	return true
+end
+
+-- After an invited player's match is counted (the caller checks it was long
+-- enough): the inviter to credit, once. Nil otherwise.
+function Profile.referralDue(p: Record): number?
+	if p.referredBy == nil or p.referralCredited or p.matches < 1 then
+		return nil
+	end
+	p.referralCredited = true
+	return p.referredBy
+end
+
+-- The inviter collects `pending` friends' credits on UTC day `day`: pays
+-- up to the day's limit and returns (stars paid, credits left for later).
+function Profile.payReferrals(p: Record, pending: number, day: number): (number, number)
+	if not isCount(pending) or pending <= 0 then
+		return 0, 0
+	end
+	if p.referralDay ~= day then
+		p.referralDay, p.referralsToday = day, 0
+	end
+	local n = math.min(pending, math.max(0, Catalog.REFERRAL.perDay - p.referralsToday))
+	p.referralsToday += n
+	local stars = n * Catalog.REFERRAL.stars
+	p.stars += stars
+	return stars, pending - n
 end
 
 -- Spends one saved Takeover; false when there's none.
