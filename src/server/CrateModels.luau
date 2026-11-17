@@ -11,21 +11,28 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local CrateModels = {}
 
-local ASSETS: { [string]: number } = {
-	Standard = 104794643667639,
-	Legendary = 138891362258996,
+-- Each model's copies, tried in order. InsertService loads only models the
+-- game's owner owns, so the game moving to Bruno's group Echo Arcade (planned
+-- for 2026-11-21) needs the group's copies; World_Echo's stay as the
+-- fallback, so the crates work before and after the move. (Group copies
+-- uploaded 2026-11-16 from World_Echo's, byte for byte; Echo Arcade is
+-- group 574812649.)
+local ASSETS: { [string]: { number } } = {
+	Standard = { 79620105378926, 104794643667639 },
+	Legendary = { 136320926410578, 138891362258996 },
 	-- The supply depot the crate sits in (Bruno: moody, mostly in shadow):
 	-- Floor, Racks and Wall, lighting baked in, placed as they are.
-	Depot = 106300146678827,
+	Depot = { 119320120928262, 106300146678827 },
 }
 
 function CrateModels.start()
 	local folder = Instance.new("Folder")
 	folder.Name = "CrateModels"
 	folder.Parent = ReplicatedStorage
-	for name, id in ASSETS do
+	for name, ids in ASSETS do
 		task.spawn(function()
-			for attempt = 1, 3 do
+			for attempt = 1, 3 * #ids do
+				local id = ids[(attempt - 1) % #ids + 1]
 				local ok, container = pcall(function()
 					return InsertService:LoadAsset(id)
 				end)
@@ -48,9 +55,12 @@ function CrateModels.start()
 					crate.Parent = folder
 					return
 				end
-				task.wait(2 * attempt)
+				-- (the next copy at once; a short wait before going round again)
+				if attempt % #ids == 0 then
+					task.wait(2 * attempt / #ids)
+				end
 			end
-			warn(`[CrateModels] could not load {name} ({id})`)
+			warn(`[CrateModels] could not load {name} ({table.concat(ids, ", ")})`)
 		end)
 	end
 end

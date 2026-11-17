@@ -36,6 +36,7 @@ Notifications.BATCH = 20
 
 local map: any = nil
 local secret: any = nil
+local keyWarned = false
 
 local function schedule(userId: number)
 	local due = os.time() + Notifications.DELAY_S
@@ -73,7 +74,13 @@ local function send(userId: number): boolean
 		return false
 	end
 	-- (429: over Roblox's daily limit for them; 4xx otherwise: not opted in
-	-- or not eligible. Neither is retried.)
+	-- or not eligible. Neither is retried.) A refused key (401/403: the
+	-- secret is wrong or lacks the notifications write permission) is
+	-- warned once a server, so the Error report shows it (2026-11-16).
+	if (res.StatusCode == 401 or res.StatusCode == 403) and not keyWarned then
+		keyWarned = true
+		warn(`[Notifications] key refused (HTTP {res.StatusCode}): check the notify_api_key secret's permission`)
+	end
 	return res.Success == true
 end
 
