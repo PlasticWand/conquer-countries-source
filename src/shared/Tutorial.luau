@@ -534,7 +534,9 @@ function Tutorial.newRun()
 			end
 			if self.neighbour ~= nil then
 				if o.attackCardOpen then
-					target = "attack"
+					-- (no "Click here": the card says it, and under the
+					-- attack card the word would land on the stats bar)
+					target, word = "attack", ""
 					self.card.text = Tutorial.ATTACK_PRESS_LINE
 				else
 					target = "neighbour"
@@ -572,5 +574,65 @@ function Tutorial.newRun()
 end
 
 export type Run = typeof(Tutorial.newRun())
+
+-- Where the mark goes past a border (Bruno, 2026-11-16: on the border tile a
+-- slightly-off tap missed): the expand step's mark EXPAND_PX into the empty
+-- land, the attack step's ATTACK_PX into the neighbour's, measured on screen.
+Tutorial.EXPAND_PX = 40
+Tutorial.ATTACK_PX = 100
+Tutorial.INWARD_CAP = 6000
+
+-- A tile `depth` steps in from `sources` (the target's tiles on your border),
+-- walking only tiles `accept` passes; the deepest reached when it is shallower.
+-- `prefer` (optional) is tried first among those at the goal depth (on screen,
+-- say). Also returns each reached tile's depth, to keep a mark that still fits.
+function Tutorial.inward(
+	width: number,
+	height: number,
+	sources: { number },
+	accept: (number) -> boolean,
+	depth: number,
+	cap: number,
+	prefer: ((number) -> boolean)?
+): (number?, { [number]: number })
+	local dist: { [number]: number } = {}
+	local queue: { number } = {}
+	for _, s in sources do
+		if dist[s] == nil and accept(s) then
+			dist[s] = 0
+			table.insert(queue, s)
+		end
+	end
+	local head = 1
+	local deepest: number? = queue[1]
+	local fallback: number? = nil
+	while head <= #queue and head <= cap do
+		local tile = queue[head]
+		head += 1
+		local d = dist[tile]
+		if d > dist[deepest :: number] then
+			deepest = tile
+		end
+		if d == depth then
+			if prefer == nil or prefer(tile) then
+				return tile, dist
+			end
+			fallback = fallback or tile
+		elseif d < depth then
+			local x, y = tile % width, tile // width
+			for _, o in { { 1, 0 }, { -1, 0 }, { 0, 1 }, { 0, -1 } } do
+				local nx, ny = x + o[1], y + o[2]
+				if nx >= 0 and ny >= 0 and nx < width and ny < height then
+					local nb = ny * width + nx
+					if dist[nb] == nil and accept(nb) then
+						dist[nb] = d + 1
+						table.insert(queue, nb)
+					end
+				end
+			end
+		end
+	end
+	return fallback or deepest, dist
+end
 
 return Tutorial

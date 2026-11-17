@@ -485,6 +485,20 @@ function MenuController._funnel(self: any, req: { [string]: any })
 end
 
 -- Opens (or redraws) a shop: "arsenal", "locker" or "flags".
+-- The unlock card for a locked weapon tapped in the match's ARSENAL fly-out
+-- (Bruno, 2026-11-16: "Offers in the match").
+function MenuController.openUnlock(self: any, weaponId: string)
+	local known = false
+	for _, w in Catalog.ARSENAL do
+		known = known or w.id == weaponId
+	end
+	if not known then
+		return
+	end
+	self:_shop("unlock:" .. weaponId)
+	self:_funnel({ op = "shopOpened", where = "unlock" })
+end
+
 function MenuController._shop(self: any, which: string)
 	if self.view == nil then
 		return -- the profile hasn't arrived yet
@@ -539,9 +553,13 @@ function MenuController._shop(self: any, which: string)
 		self.shopMemo = { tab = self.shopTab }
 	end
 	ctx.memo = self.shopMemo
+	-- "unlock:<weapon id>": the in-match unlock card (Shops.unlock).
+	local unlockId = if string.sub(which, 1, 7) == "unlock:" then string.sub(which, 8) else nil
 	self.openModal(function()
 		local modal
-		if which == "arsenal" then
+		if unlockId then
+			modal = Shops.unlock(root.modal, ctx, unlockId) :: Kit.Modal
+		elseif which == "arsenal" then
 			modal = Shops.arsenal(root.modal, ctx)
 		elseif which == "locker" then
 			modal = Shops.locker(root.modal, ctx)
@@ -652,6 +670,11 @@ function MenuController.setVisible(self: any, visible: boolean)
 	end
 	if not visible and self.soloCover then
 		self.soloCover:hide()
+	end
+	if not visible then
+		-- (a lobby card's tip stayed up over the match when the menu closed
+		-- under the pointer)
+		Kit.hideTip()
 	end
 	self.menu:setVisible(visible)
 	if self.room then

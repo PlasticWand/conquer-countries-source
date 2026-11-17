@@ -104,6 +104,8 @@ export type Actions = {
 	tileToScreen: ((tile: number) -> Vector2?)?,
 	-- Calls back when the map camera moves; returns a disconnect.
 	onCameraChanged: ((callback: () -> ()) -> () -> ())?,
+	-- Opens the unlock card for a locked Arsenal weapon (Catalog weapon id).
+	openUnlock: ((weaponId: string) -> ())?,
 	-- Ends the map's warship selection (the warship card's close).
 	deselectWarship: (() -> ())?,
 	-- Centres the camera on a tile (the wheel's Focus).
@@ -349,6 +351,7 @@ function OfActions.new(state: any, parent: Frame, actions: Actions, slotsHost: F
 		arsenalFly = nil :: any, -- (desktop)
 		arsenalBack = nil :: any, -- a phone's BACK slot in the swapped row
 		arsenalOpen = false,
+		lockedButtons = {} :: { any }, -- the fly-out's locked weapons
 		attackCard = nil :: any, -- built below
 		confirmCard = nil :: any,
 		warshipCard = nil :: any,
@@ -611,6 +614,39 @@ function OfActions._slot(self: any, item: any, width: number, order: number, par
 	return b
 end
 
+-- A locked Arsenal weapon in the fly-out (Bruno, 2026-11-16: "Offers in the
+-- match"): its icon dimmed under a lock, UNLOCK under it; a tap opens the
+-- unlock card (stars progress, Robux price).
+function OfActions._lockedSlot(self: any, l: HudModel.LockedWeapon, width: number, order: number, parent: Instance): any
+	local tileArt = A.slot_tile or ""
+	local b = Kit.new("ImageButton", { Name = "Locked_" .. l.id, AutoButtonColor = false, BackgroundColor3 = Color3.fromHex("#23241C"), BackgroundTransparency = if tileArt ~= "" then 1 else 0, BorderSizePixel = 0, Image = tileArt, ImageTransparency = 0.35, ScaleType = Enum.ScaleType.Stretch, Size = UDim2.fromOffset(width, 104), LayoutOrder = order, Parent = parent }) :: any
+	b:SetAttribute("keepDrawer", true)
+	Kit.corner(4).Parent = b
+	local iconProps = { Name = "Icon", AnchorPoint = Vector2.new(0.5, 0), Position = UDim2.new(0.5, 0, 0, 24), Size = UDim2.fromOffset(50, 50), ImageTransparency = 0.6, Parent = b }
+	if Dossier.art(SLOT_ART[l.type] or "", iconProps) == nil then
+		Kit.glyph(SLOT_ICON[l.type] or "build", Dossier.merge({ ImageColor3 = T.sheet }, iconProps))
+	end
+	Kit.glyph("lock", { Name = "Lock", ImageColor3 = T.hazard, AnchorPoint = Vector2.new(1, 0), Position = UDim2.new(1, -5, 0, 5), Size = UDim2.fromOffset(20, 20), Parent = b })
+	Kit.label({ Name = "Cost", Text = "UNLOCK", FontFace = Theme.font.stencil, TextSize = 15, TextColor3 = T.hazard, AnchorPoint = Vector2.new(0.5, 1), Position = UDim2.new(0.5, 0, 1, -6), Parent = b })
+	b.Activated:Connect(function()
+		Dossier.thud()
+		self:_toggleArsenal(false)
+		if self.actions.openUnlock then
+			self.actions.openUnlock(l.id)
+		end
+	end)
+	Kit.tip(b, function(card)
+		Kit.text({ Text = l.name, FontFace = Theme.font.uiHeavy, TextSize = 19, LayoutOrder = 1, Parent = card })
+		Kit.text({ Text = "Locked: tap to unlock", TextSize = 16, TextColor3 = C.fgSoft, LayoutOrder = 2, Parent = card })
+	end, {
+		above = function(): GuiObject?
+			return if parent.Name == "ArsenalFly" then parent :: GuiObject else nil
+		end,
+	})
+	table.insert(self.lockedButtons, b)
+	return b
+end
+
 -- The build slots for this match: OpenFront's ten, then one ARSENAL slot
 -- when any Arsenal weapon is unlocked (Bruno, 2026-11-08: the bar would
 -- otherwise grow to about twenty). ARSENAL ("-") opens a fly-out above it
@@ -622,6 +658,10 @@ function OfActions._buildSlots(self: any)
 		b:Destroy()
 	end
 	self.itemButtons = {}
+	for _, b in self.lockedButtons do
+		b:Destroy()
+	end
+	self.lockedButtons = {}
 	if self.arsenalSlot then
 		self.arsenalSlot:Destroy()
 		if self.arsenalFly then
@@ -641,12 +681,15 @@ function OfActions._buildSlots(self: any)
 		table.insert(if item.arsenal then extra else base, item)
 	end
 	self.arsenalSig = arsenalSig(state)
+	-- The weapons still locked follow the unlocked ones (2026-11-16), so
+	-- ARSENAL shows whenever the match has the Arsenal.
+	local locked = HudModel.lockedArsenal(state)
 	-- Ten slots at 73; with ARSENAL, eleven at 66 so it never runs under SHOP.
-	local width = if #extra == 0 then 73 else 66
+	local width = if #extra == 0 and #locked == 0 then 73 else 66
 	for i, item in base do
 		self:_slot(item, width, i * 2, bar)
 	end
-	if #extra == 0 then
+	if #extra == 0 and #locked == 0 then
 		return
 	end
 
@@ -658,7 +701,7 @@ function OfActions._buildSlots(self: any)
 	stroke.Enabled = false
 	stroke.Parent = slot
 	Kit.label({ Name = "Key", Text = "-", FontFace = Theme.font.stencil, TextSize = 17, TextColor3 = T.sheetLine, Position = UDim2.fromOffset(6, 3), Parent = slot })
-	Kit.label({ Name = "Count", Text = tostring(#extra), FontFace = Theme.font.stencil, TextSize = 17, TextColor3 = T.sheet, AnchorPoint = Vector2.new(1, 0), Position = UDim2.new(1, -6, 0, 3), Parent = slot })
+	Kit.label({ Name = "Count", Text = if #extra > 0 then tostring(#extra) else "", FontFace = Theme.font.stencil, TextSize = 17, TextColor3 = T.sheet, AnchorPoint = Vector2.new(1, 0), Position = UDim2.new(1, -6, 0, 3), Parent = slot })
 	Kit.glyph("shield", { Name = "Icon", ImageColor3 = T.hazard, AnchorPoint = Vector2.new(0.5, 0), Position = UDim2.new(0.5, 0, 0, 24), Size = UDim2.fromOffset(46, 46), Parent = slot })
 	Kit.label({ Name = "Cost", Text = "ARSENAL", FontFace = Theme.font.stencil, TextSize = 15, TextColor3 = T.hazard, AnchorPoint = Vector2.new(0.5, 1), Position = UDim2.new(0.5, 0, 1, -6), Parent = slot })
 	Kit.tip(slot, function(card)
@@ -683,7 +726,8 @@ function OfActions._buildSlots(self: any)
 	-- shows one set or the other.
 	if self.phone then
 		local rowWidth = 11 * width + 6 + 11 * 4 -- ten slots, the gap, ARSENAL
-		local w = math.min(width, math.floor((rowWidth - 4 * #extra) / (#extra + 1)))
+		local n = #extra + #locked
+		local w = math.min(width, math.floor((rowWidth - 4 * n) / (n + 1)))
 		local back = Kit.new("ImageButton", { Name = "ArsenalBack", AutoButtonColor = false, BackgroundColor3 = Color3.fromHex("#4A3A12"), BorderSizePixel = 0, Size = UDim2.fromOffset(w, 104), LayoutOrder = 30, Visible = false, Parent = bar }) :: any
 		back:SetAttribute("keepDrawer", true)
 		Kit.corner(4).Parent = back
@@ -697,6 +741,9 @@ function OfActions._buildSlots(self: any)
 		for i, item in extra do
 			self:_slot(item, w, 30 + i, bar)
 		end
+		for i, l in locked do
+			self:_lockedSlot(l, w, 30 + #extra + i, bar).Visible = false
+		end
 		return
 	end
 
@@ -704,8 +751,9 @@ function OfActions._buildSlots(self: any)
 	-- growing upwards and leftwards from the slot's right edge. It lives on
 	-- the HUD's top layer (the bar's neighbours would cover it) and is placed
 	-- and sized to the slot each time it opens (_toggleArsenal).
-	local cols = math.min(#extra, 4)
-	local rows = math.ceil(#extra / 4)
+	local cells = #extra + #locked
+	local cols = math.min(cells, 4)
+	local rows = math.ceil(cells / 4)
 	local fly = Kit.new("Frame", { Name = "ArsenalFly", BackgroundColor3 = Color3.fromHex("#1A1B15"), BorderSizePixel = 0, AnchorPoint = Vector2.new(1, 1), Size = UDim2.fromOffset(cols * 73 + (cols - 1) * 4 + 16, rows * 104 + (rows - 1) * 4 + 16), Visible = false, ZIndex = 8, Parent = self.parent })
 	Kit.corner(6).Parent = fly
 	Kit.stroke(T.hazard, 2, 0.2).Parent = fly
@@ -714,6 +762,9 @@ function OfActions._buildSlots(self: any)
 	Kit.new("UIScale", { Name = "Fit", Parent = fly })
 	for i, item in extra do
 		self:_slot(item, 73, i, fly)
+	end
+	for i, l in locked do
+		self:_lockedSlot(l, 73, #extra + i, fly)
 	end
 	self.arsenalFly = fly
 end
@@ -1790,6 +1841,9 @@ function OfActions._refreshBar(self: any)
 		local gap = self.bar:FindFirstChild("Gap")
 		if gap then
 			(gap :: Frame).Visible = not self.arsenalOpen
+		end
+		for _, b in self.lockedButtons do
+			b.Visible = self.arsenalOpen
 		end
 	end
 	for _, item in HudModel.buildItems(state) do

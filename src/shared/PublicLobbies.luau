@@ -8,8 +8,10 @@
 -- servers list the lobbies to their players and seat joiners; the match
 -- server waits for the start and plays the match (nations and tribes fill
 -- the map, as OpenFront's public games do).
---   * Kinds: "ffa" (OpenFront's FFA playlist), "world" (World, always) and
---     "team" (OpenFront's team playlist). One joinable lobby of each is kept
+--   * Kinds: "ffa" (OpenFront's FFA playlist), "world" (World, always),
+--     "blitz" (an FFA playlist match with OpenFront's max timer: at
+--     BLITZ_MINUTES the most land wins; Bruno, 2026-11-16) and "team"
+--     (OpenFront's team playlist). One joinable lobby of each is kept
 --     open, more while the demand calls for them (missing_starts).
 --   * Each lobby is listed at most LOBBY_OPEN_S (90 s) ahead of its start;
 --     joining closes JOIN_CLOSE_S before it (a teleport takes a few seconds).
@@ -25,6 +27,13 @@ local PublicLobbies = {}
 PublicLobbies.KIND_FFA = "ffa"
 PublicLobbies.KIND_WORLD = "world"
 PublicLobbies.KIND_TEAM = "team"
+PublicLobbies.KIND_BLITZ = "blitz"
+-- Blitz's match length (OpenFront's gameConfig.maxTimerValue, minutes).
+PublicLobbies.BLITZ_MINUTES = 10
+-- Public team games with AI nations shared out across the teams (Bruno,
+-- 2026-11-16: with few humans, OpenFront's humans-only team game left a lone
+-- player only tribes to fight). Not OpenFront's public rule; false restores it.
+PublicLobbies.TEAM_NATIONS = true
 
 PublicLobbies.LOBBY_OPEN_S = 90
 PublicLobbies.LOBBY_INTERVAL_S = 45
@@ -90,7 +99,8 @@ export type TakeSpec = {
 export type Demand = { rate: number, size: number }
 
 -- The kinds a join of `kind` may seat in: a free-for-all join takes World's
--- lobbies too (the soonest that fits wins); World and team joins only their own.
+-- lobbies too (the soonest that fits wins); World, Blitz and team joins only
+-- their own.
 function PublicLobbies.takesFrom(kind: string): { string }
 	if kind == PublicLobbies.KIND_FFA then
 		return { PublicLobbies.KIND_FFA, PublicLobbies.KIND_WORLD }
@@ -105,12 +115,16 @@ function PublicLobbies.kinds(worldAvailable: boolean): { { kind: string, target:
 	if worldAvailable then
 		table.insert(out, { kind = PublicLobbies.KIND_WORLD, target = 1 })
 	end
+	table.insert(out, { kind = PublicLobbies.KIND_BLITZ, target = 1 })
 	table.insert(out, { kind = PublicLobbies.KIND_TEAM, target = 1 })
 	return out
 end
 
 function PublicLobbies.isKind(kind: any): boolean
-	return kind == PublicLobbies.KIND_FFA or kind == PublicLobbies.KIND_WORLD or kind == PublicLobbies.KIND_TEAM
+	return kind == PublicLobbies.KIND_FFA
+		or kind == PublicLobbies.KIND_WORLD
+		or kind == PublicLobbies.KIND_TEAM
+		or kind == PublicLobbies.KIND_BLITZ
 end
 
 -- The lobby size: the config's (OpenFront's lobby size for the map), never

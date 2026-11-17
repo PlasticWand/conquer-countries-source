@@ -20,6 +20,7 @@
 -- screen falls back to glyphs and type. It only shows things and calls
 -- `actions`; MenuController owns the remotes.
 
+local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local TweenService = game:GetService("TweenService")
 
@@ -399,8 +400,10 @@ function MainMenu._buildDesktop(self: any)
 	end
 	local party = requisition("Party", "PARTY", 128, 80, 5, "icon_party", "party", { 126, 6, 58, 66, 38 }, actions.openParty)
 	self.partyText = typed({ Name = "Squad", Text = "", TextSize = 18, TextColor3 = C.inkBlack, Position = at(18, 58), Visible = false, Parent = party })
-	requisition("Armory", "ARSENAL", 216, 80, 6, "icon_armory", "silo", { 114, 14, 74, 50, 39 }, actions.openArsenal)
-	requisition("Crates", "SUPPLY\nCRATES", 304, 86, 7, "icon_crates", "chest", { 122, 14, 62, 56, 42 }, actions.openLocker)
+	local armory = requisition("Armory", "ARSENAL", 216, 80, 6, "icon_armory", "silo", { 114, 14, 74, 50, 39 }, actions.openArsenal)
+	self:_dealRibbon(armory, at(3, 56), sz(110, 21), 26)
+	local crates = requisition("Crates", "SUPPLY\nCRATES", 304, 86, 7, "icon_crates", "chest", { 122, 14, 62, 56, 42 }, actions.openLocker)
+	self:_crateRibbon(crates, at(3, 64), sz(124, 20), 25, at(18, 33))
 	local shop = requisition("FlagShop", "FLAG\nSHOP", 398, 104, 8, "icon_flag", "flag", { 122, 10, 60, 60, 42 }, actions.openFlagShop)
 	local ribbon = Kit.new("Frame", { Name = "Ribbon", BackgroundColor3 = RIBBON, BorderSizePixel = 0, Position = at(3, 75), Size = sz(192, 25), Parent = shop })
 	Kit.stroke(Color3.fromRGB(120, 52, 14), 2, 0).Parent = ribbon
@@ -526,10 +529,13 @@ function MainMenu._buildDesktop(self: any)
 	tape(play, "red_tape", 12, 37, 80, 20, 56, 0, C.stamp)
 	tape(play, "red_tape", 214, 15, 80, 20, 48, 0, C.stamp)
 
-	-- Bottom: the other public queues, as field reports.
+	-- Bottom: the other public queues, as field reports (three since Blitz,
+	-- 2026-11-16: the free-for-all, Blitz and the team game).
 	self.reports = {}
-	for i, x in { 285, 640 } do
-		local card, shade = folderCard(stage, `Report{i}`, x, 425, 331, 140, 125, 5, "folder_report", { 168, 56, 58 })
+	local cw, gap = 220, 13
+	for i = 1, 3 do
+		local x = 285 + (i - 1) * (cw + gap)
+		local card, shade = folderCard(stage, `Report{i}`, x, 425, cw, 140, 90, 5, "folder_report", { cw - 62, 62, 46 })
 		-- Lifted up out of the folder.
 		local r: any
 		local hit = self:_lift(card, shade, 0, -48, 0, function()
@@ -537,21 +543,22 @@ function MainMenu._buildDesktop(self: any)
 			self:_press(r.data)
 		end)
 		Dossier.clicky(hit, 1, card, false)
-		local header = typed({ Text = "", TextColor3 = C.inkBlack, TextSize = 22, AnchorPoint = Vector2.new(0, 0.5), Position = at(17, 24), Parent = card })
-		Kit.new("Frame", { BackgroundColor3 = C.inkBlack, BackgroundTransparency = 0.25, BorderSizePixel = 0, Position = at(17, 36), Size = UDim2.fromOffset(math.round(205 * K), 2), Parent = card })
-		local name = stencil({ Text = "", TextSize = 50, LineHeight = 0.88, TextWrapped = true, AutomaticSize = Enum.AutomaticSize.None, Size = sz(205, 66), TextYAlignment = Enum.TextYAlignment.Top, Position = at(17, 42), Parent = card })
-		local tag = Kit.new("Frame", { Name = "Tag", BackgroundColor3 = C.inkBlack, BorderSizePixel = 0, Position = at(238, 7), Size = sz(64, 24), Parent = card })
+		local header = typed({ Text = "", TextColor3 = C.inkBlack, TextSize = 20, TextTruncate = Enum.TextTruncate.AtEnd, AutomaticSize = Enum.AutomaticSize.None, AnchorPoint = Vector2.new(0, 0.5), Position = at(14, 22), Size = sz(cw - 92, 22), Parent = card })
+		Kit.new("Frame", { BackgroundColor3 = C.inkBlack, BackgroundTransparency = 0.25, BorderSizePixel = 0, Position = at(14, 36), Size = UDim2.fromOffset(math.round((cw - 28) * K), 2), Parent = card })
+		local name = stencil({ Text = "", TextSize = 42, TextTruncate = Enum.TextTruncate.AtEnd, AutomaticSize = Enum.AutomaticSize.None, Size = sz(cw - 102, 44), TextYAlignment = Enum.TextYAlignment.Top, Position = at(14, 44), Parent = card })
+		local count = typed({ Text = "", TextColor3 = C.inkBlack, TextSize = 20, AutomaticSize = Enum.AutomaticSize.None, Size = sz(cw - 102, 24), Position = at(14, 90), Parent = card })
+		local tag = Kit.new("Frame", { Name = "Tag", BackgroundColor3 = C.inkBlack, BorderSizePixel = 0, AnchorPoint = Vector2.new(1, 0), Position = at(cw - 8, 7), Size = sz(64, 24), Parent = card })
 		Kit.corner(3).Parent = tag
 		local dot = Kit.new("Frame", { BackgroundColor3 = C.red, BorderSizePixel = 0, AnchorPoint = Vector2.new(0.5, 0.5), Position = at(10, 12), Size = sz(9, 9), Parent = tag })
 		Kit.new("UICorner", { CornerRadius = UDim.new(0.5, 0), Parent = dot })
 		local tagText = stencil({ Text = "LIVE", TextSize = 30, TextColor3 = C.sheet, AnchorPoint = Vector2.new(0, 0.5), Position = at(19, 12), Parent = tag })
 		-- The map as a print with a white border, taped on at the top.
-		local photo = Kit.new("Frame", { Name = "Photo", BackgroundColor3 = C.sheet, BorderSizePixel = 0, Position = at(206, 34), Size = sz(108, 74), Rotation = 3, Parent = card })
+		local photo = Kit.new("Frame", { Name = "Photo", BackgroundColor3 = C.sheet, BorderSizePixel = 0, AnchorPoint = Vector2.new(1, 0), Position = at(cw - 10, 42), Size = sz(82, 58), Rotation = 3, Parent = card })
 		Kit.stroke(C.sheetLine, 1, 0).Parent = photo
-		local photoTape = tape(card, "tape", 260, 36, 56, 16, -4, 7, C.tape)
-		local team = icon("icon_team", "troops", { Name = "Team", Position = at(226, 40), Size = sz(80, 58), Visible = false, Parent = card })
+		local photoTape = tape(card, "tape", cw - 70, 42, 46, 14, -4, 7, C.tape)
+		local team = icon("icon_team", "troops", { Name = "Team", AnchorPoint = Vector2.new(1, 0), Position = at(cw - 12, 44), Size = sz(78, 56), Visible = false, Parent = card })
 		overArt(card)
-		r = { frame = card, header = header, name = name, tag = tag, dot = dot, tagText = tagText, photo = photo, photoTape = photoTape, team = team, pic = nil :: Instance?, picFor = nil :: string?, data = nil :: any }
+		r = { frame = card, header = header, name = name, count = count, tag = tag, dot = dot, tagText = tagText, photo = photo, photoTape = photoTape, team = team, pic = nil :: Instance?, picFor = nil :: string?, data = nil :: any }
 		Kit.tip(hit, function(tip)
 			Kit.text({ Text = if r.data then actionText(r.data, self.queued == r.data.id) else "", FontFace = F.uiBold, Parent = tip })
 		end)
@@ -663,6 +670,59 @@ function MainMenu._buildStarterTag(self: any)
 	end
 end
 
+-- Today's Arsenal deal (Bruno, 2026-11-16): a red DEAL -40% ribbon on the
+-- ARSENAL folder, like the Flag Shop's TODAY'S FLAGS; setProfile shows it
+-- while the player has a deal today (Catalog.todaysDeal).
+function MainMenu._dealRibbon(self: any, card: Instance, pos: UDim2, size: UDim2, textSize: number)
+	self.dealRibbon = MainMenu._redRibbon("DealRibbon", `DEAL -{math.round(Catalog.DEAL.off * 100)}%`, card, pos, size, textSize)
+	self.dealDay = nil
+	self:_paintDeal()
+end
+
+-- A red ribbon across a requisition folder (hidden until shown).
+function MainMenu._redRibbon(name: string, text: string, card: Instance, pos: UDim2, size: UDim2, textSize: number): Frame
+	local ribbon = Kit.new("Frame", { Name = name, BackgroundColor3 = C.stamp, BorderSizePixel = 0, Position = pos, Size = size, Visible = false, Parent = card })
+	Kit.stroke(Color3.fromHex("#6E1A14"), 2, 0).Parent = ribbon
+	stencil({ Text = text, TextSize = textSize, TextColor3 = C.sheet, AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromScale(0.5, 0.5), Parent = ribbon })
+	return ribbon
+end
+
+-- The free crate (Bruno, 2026-11-16): a red FREE CRATE ribbon on SUPPLY
+-- CRATES while it waits; the two-line name moves up to `namePos` for it.
+function MainMenu._crateRibbon(self: any, card: Instance, pos: UDim2, size: UDim2, textSize: number, namePos: UDim2)
+	self.crateRibbon = MainMenu._redRibbon("FreeCrateRibbon", "FREE CRATE", card, pos, size, textSize)
+	local name = card:FindFirstChild("Name") :: TextLabel?
+	self.crateName = name
+	self.crateNameAt = if name then { normal = name.Position, raised = namePos } else nil
+	self:_paintDeal()
+end
+
+-- Shows the ribbons for the profile view: the free crate's, and the deal's
+-- for today (again at midnight UTC).
+function MainMenu._paintDeal(self: any)
+	local view = self.lastView
+	if view == nil then
+		return
+	end
+	if self.crateRibbon then
+		local on = view.freeCrate == true
+		self.crateRibbon.Visible = on
+		if self.crateName and self.crateNameAt then
+			self.crateName.Position = if on then self.crateNameAt.raised else self.crateNameAt.normal
+		end
+	end
+	if self.dealRibbon == nil then
+		return
+	end
+	local mine = {}
+	for _, id in view.owned or {} do
+		mine[id] = true
+	end
+	local player = Players.LocalPlayer
+	self.dealDay = os.time() // 86400
+	self.dealRibbon.Visible = Catalog.todaysDeal(if player then player.UserId else 0, os.time(), mine, view.dealDay) ~= nil
+end
+
 -- Builds the layout again and puts back what the screen was showing.
 function MainMenu._rebuild(self: any)
 	local party = self.partyText.Text
@@ -693,7 +753,7 @@ end
 --   left     the four requisition folders, stacked
 --   centre   the war map with the frontline note and its JOIN
 --   right    the SOLO DEPLOYMENT stamp over PLAY
---   bottom   the two field reports, then the credits line
+--   bottom   the three field reports, then the credits line
 function MainMenu._buildCompact(self: any)
 	local root, actions = self.root, self.actions
 	local W = root.width
@@ -771,7 +831,9 @@ function MainMenu._buildCompact(self: any)
 	local party = requisition("Party", "PARTY", 84, 5, "icon_party", "party", actions.openParty)
 	self.partyText = typed({ Name = "Squad", Text = "", TextSize = 17, TextColor3 = C.inkBlack, Position = at(14, 72), Visible = false, Parent = party })
 	local armory = requisition("Armory", "ARSENAL", 190, 6, "icon_armory", "silo", actions.openArsenal)
+	self:_dealRibbon(armory, at(4, 70), sz(150, 26), 30)
 	local crates = requisition("Crates", "SUPPLY\nCRATES", 296, 7, "icon_crates", "chest", actions.openLocker)
+	self:_crateRibbon(crates, at(4, 68), sz(160, 26), 30, UDim2.fromOffset(14, 36))
 	local shop = requisition("FlagShop", "FLAG SHOP", 402, 8, "icon_flag", "flag", actions.openFlagShop)
 	-- The flag shop's name moves up for its event ribbon.
 	local shopName = shop:FindFirstChild("Name") :: TextLabel
@@ -850,32 +912,33 @@ function MainMenu._buildCompact(self: any)
 		self:_press(self.front.data)
 	end)
 
-	-- Bottom: the other public queues, as field reports.
+	-- Bottom: the other public queues, as field reports (three since Blitz).
 	self.reports = {}
-	local rw = (W - 10 - cx0 - 12) / 2
-	for i = 1, 2 do
+	local rw = (W - 10 - cx0 - 24) / 3
+	for i = 1, 3 do
 		local x = cx0 + (i - 1) * (rw + 12)
-		local card, shade = folderCard(stage, `Report{i}`, x, 362, rw, 140, 150, 5, "folder_report", { rw - 70, 76, 56 })
+		local card, shade = folderCard(stage, `Report{i}`, x, 362, rw, 140, 110, 5, "folder_report", { rw - 66, 80, 50 })
 		local r: any
 		local hit = self:_lift(card, shade, 0, -26, 0, function()
 			click()
 			self:_press(r.data)
 		end)
 		Dossier.clicky(hit, 1, card, false)
-		local header = typed({ Text = "", TextColor3 = C.inkBlack, TextSize = 18, TextTruncate = Enum.TextTruncate.AtEnd, AutomaticSize = Enum.AutomaticSize.None, AnchorPoint = Vector2.new(0, 0.5), Position = at(14, 20), Size = sz(rw - 118, 24), Parent = card })
-		Kit.new("Frame", { BackgroundColor3 = C.inkBlack, BackgroundTransparency = 0.25, BorderSizePixel = 0, Position = at(14, 34), Size = UDim2.fromOffset(math.round(rw - 160), 2), Parent = card })
-		local name = stencil({ Text = "", TextSize = 32, LineHeight = 0.9, TextWrapped = true, AutomaticSize = Enum.AutomaticSize.None, Size = sz(rw - 160, 90), TextYAlignment = Enum.TextYAlignment.Top, Position = at(14, 42), Parent = card })
-		local tag = Kit.new("Frame", { Name = "Tag", BackgroundColor3 = C.inkBlack, BorderSizePixel = 0, AnchorPoint = Vector2.new(1, 0), Position = at(rw - 10, 6), Size = sz(84, 30), Parent = card })
+		local header = typed({ Text = "", TextColor3 = C.inkBlack, TextSize = 18, TextTruncate = Enum.TextTruncate.AtEnd, AutomaticSize = Enum.AutomaticSize.None, AnchorPoint = Vector2.new(0, 0.5), Position = at(12, 20), Size = sz(rw - 104, 24), Parent = card })
+		Kit.new("Frame", { BackgroundColor3 = C.inkBlack, BackgroundTransparency = 0.25, BorderSizePixel = 0, Position = at(12, 34), Size = UDim2.fromOffset(math.round(rw - 24), 2), Parent = card })
+		local name = stencil({ Text = "", TextSize = 36, TextTruncate = Enum.TextTruncate.AtEnd, AutomaticSize = Enum.AutomaticSize.None, Size = sz(rw - 112, 40), TextYAlignment = Enum.TextYAlignment.Top, Position = at(12, 44), Parent = card })
+		local count = typed({ Text = "", TextColor3 = C.inkBlack, TextSize = 18, AutomaticSize = Enum.AutomaticSize.None, Size = sz(rw - 112, 24), Position = at(12, 88), Parent = card })
+		local tag = Kit.new("Frame", { Name = "Tag", BackgroundColor3 = C.inkBlack, BorderSizePixel = 0, AnchorPoint = Vector2.new(1, 0), Position = at(rw - 8, 6), Size = sz(84, 30), Parent = card })
 		Kit.corner(3).Parent = tag
 		local dot = Kit.new("Frame", { BackgroundColor3 = C.red, BorderSizePixel = 0, AnchorPoint = Vector2.new(0.5, 0.5), Position = at(13, 15), Size = sz(10, 10), Parent = tag })
 		Kit.new("UICorner", { CornerRadius = UDim.new(0.5, 0), Parent = dot })
 		local tagText = stencil({ Text = "LIVE", TextSize = 28, TextColor3 = C.sheet, AnchorPoint = Vector2.new(0, 0.5), Position = at(24, 15), Parent = tag })
-		local photo = Kit.new("Frame", { Name = "Photo", BackgroundColor3 = C.sheet, BorderSizePixel = 0, AnchorPoint = Vector2.new(1, 0), Position = at(rw - 12, 44), Size = sz(128, 86), Rotation = 3, Parent = card })
+		local photo = Kit.new("Frame", { Name = "Photo", BackgroundColor3 = C.sheet, BorderSizePixel = 0, AnchorPoint = Vector2.new(1, 0), Position = at(rw - 10, 44), Size = sz(92, 64), Rotation = 3, Parent = card })
 		Kit.stroke(C.sheetLine, 1, 0).Parent = photo
-		local photoTape = tape(card, "tape", rw - 76, 46, 56, 16, -4, 7, C.tape)
-		local team = icon("icon_team", "troops", { Name = "Team", AnchorPoint = Vector2.new(1, 0), Position = at(rw - 16, 46), Size = sz(116, 82), Visible = false, Parent = card })
+		local photoTape = tape(card, "tape", rw - 64, 46, 48, 14, -4, 7, C.tape)
+		local team = icon("icon_team", "troops", { Name = "Team", AnchorPoint = Vector2.new(1, 0), Position = at(rw - 12, 46), Size = sz(88, 62), Visible = false, Parent = card })
 		overArt(card)
-		r = { frame = card, header = header, name = name, tag = tag, dot = dot, tagText = tagText, photo = photo, photoTape = photoTape, team = team, pic = nil :: Instance?, picFor = nil :: string?, data = nil :: any }
+		r = { frame = card, header = header, name = name, count = count, tag = tag, dot = dot, tagText = tagText, photo = photo, photoTape = photoTape, team = team, pic = nil :: Instance?, picFor = nil :: string?, data = nil :: any }
 		self.reports[i] = r
 	end
 	self.tagSizes = { sz(84, 30), sz(108, 30) }
@@ -1260,8 +1323,10 @@ function MainMenu._paintReport(self: any, r: any)
 	end
 	local mine = self.queued == row.id
 	local seconds = self:_clocks(row)
-	r.header.Text = if row.mode then `Team Game: {row.mapName}` else "Public Match: Field Reports"
-	r.name.Text = if row.mode then `{string.upper(row.mode)} ({row.players}/{row.capacity})` else `{string.upper(row.mapName)} ({row.players}/{row.capacity})`
+	-- (header: the kind; name: the map, or the team split; count: the seats)
+	r.header.Text = if row.mode then `Team Game: {row.mapName}` elseif row.minutes then `Blitz · {row.minutes} min` else "Public Match"
+	r.name.Text = if row.mode then string.upper(row.mode) else string.upper(row.mapName)
+	r.count.Text = `{row.players}/{row.capacity} players`
 	local state = if mine then self.queueState else nil
 	r.tagText.Text = if row.live
 		then "LIVE"
@@ -1302,6 +1367,9 @@ function MainMenu._tick(self: any)
 		self.flagTimer.Text = Kit.days(self.flagShopEndsAt - os.time())
 	end
 	self.partyText.Visible = self.partyText.Text ~= ""
+	if self.dealDay ~= nil and os.time() // 86400 ~= self.dealDay then
+		self:_paintDeal()
+	end
 	if self.giftEndsAt and self.starterTimer then
 		self.starterTimer.Text = `FREE · {Kit.days(math.max(0, self.giftEndsAt - os.time()))}`
 		-- The gold tag breathes while the gift waits (Bruno: "pulsing").
@@ -1338,6 +1406,7 @@ function MainMenu.setProfile(self: any, view: { [string]: any })
 	self.giftEndsAt = if gift and view.giftLeft then os.time() + view.giftLeft else nil
 	self.starterEndsAt = if view.starter == "active" and view.starterLeft then os.time() + view.starterLeft else nil
 	self.starterTimer.Text = if gift then "FREE" elseif view.starter == "ready" then "NEW · 48 HOURS" else ""
+	self:_paintDeal()
 	if self.generalCard then
 		self.generalCard.Position = if self.starterTag.Visible then self.generalAt.low else self.generalAt.high
 		self.setGeneralOn(view.general == true)

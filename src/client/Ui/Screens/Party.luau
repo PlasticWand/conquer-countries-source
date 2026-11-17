@@ -163,7 +163,7 @@ function Party.open(host: Instance, view: View?, send: (request: { [string]: any
 	Kit.glyph("party", { ImageColor3 = C.inkBlack, Size = sz(80, 80), LayoutOrder = 1, Parent = row })
 	Dossier.stencil({ Text = "INVITE ROBLOX FRIENDS", TextSize = Dossier.capSize(w, 52), LayoutOrder = 2, Parent = row })
 	roblox.Activated:Connect(inviteFriends)
-	local note = Dossier.sheet("ImageLabel", "header_paper", "tex_paper", C.sheet, { Name = "Note", AnchorPoint = Vector2.new(0.5, 0.5), Position = at(895, 548), Size = sz(920, 82), Parent = w.body })
+	local note = Dossier.sheet("ImageLabel", "header_paper", "tex_paper", C.sheet, { Name = "Note", AnchorPoint = Vector2.new(0.5, 0.5), Position = at(895, 548), Size = sz(1440, 82), Parent = w.body })
 	Dossier.typed({ Text = INVITE_LINE, TextColor3 = C.inkBlack, TextSize = math.round(32 * w.k), AutomaticSize = Enum.AutomaticSize.None, Size = UDim2.fromScale(1, 1), TextXAlignment = Enum.TextXAlignment.Center, Parent = note })
 
 	-- The folder and its list.

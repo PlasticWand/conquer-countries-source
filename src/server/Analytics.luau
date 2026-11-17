@@ -276,6 +276,11 @@ function Analytics.giftClaimed(player: Player, items: number)
 	custom(player, "LaunchGiftClaimed", items)
 end
 
+-- The free crate was opened (once per player; Profile.openFreeCrate).
+function Analytics.freeCrateOpened(player: Player)
+	custom(player, "FreeCrateOpened", 1)
+end
+
 -- Invite rewards collected: how many invited friends were paid for.
 function Analytics.referralPaid(player: Player, friends: number)
 	custom(player, "ReferralPaid", friends)
@@ -285,6 +290,22 @@ end
 -- (the crate is granted), 0 when it was cut short or failed.
 function Analytics.adWatched(player: Player, completed: boolean)
 	custom(player, "RewardedAdCrate", if completed then 1 else 0)
+end
+
+-- Something bought with stars (Bruno, 2026-11-16: "Measure star buys"): an
+-- Arsenal unlock (`what` its id) or a crate ("crate"); value: the stars
+-- spent. Field 1: what; field 2: where the visit opened ("" outside one).
+function Analytics.boughtWithStars(player: Player, what: string, stars: number)
+	trace(`custom BoughtWithStars = {stars} ({what})`)
+	if not ENABLED then
+		return
+	end
+	local fields = {
+		[Enum.AnalyticsCustomFieldKeys.CustomField01.Name] = what,
+	}
+	pcall(function()
+		AnalyticsService:LogCustomEvent(player, "BoughtWithStars", stars, fields)
+	end)
 end
 
 -- Skip pressed on the tutorial's step `n` (its index in Shared/Tutorial.STEPS).

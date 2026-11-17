@@ -181,9 +181,9 @@ return function(t)
 		t.eq(Profile.starsFor({ won = true, placement = 1, players = 100, minutes = 20, difficulty = "Hard" }, true), solo * 2, "2x Stars")
 		local p = Profile.new()
 		t.eq(select(2, Profile.unlockWithStars(p, "w_reinforce")), "stars")
-		p.stars = 20000
+		p.stars = 35000
 		t.ok(Profile.unlockWithStars(p, "w_reinforce"))
-		t.eq(p.stars, 5000)
+		t.eq(p.stars, 5000, "30,000 stars (doubled 2026-11-16)")
 		t.eq(select(2, Profile.unlockWithStars(p, "w_reinforce")), "owned")
 		t.eq(select(2, Profile.unlockWithStars(p, "b_double")), "unknown", "2x Stars is Robux only")
 	end)
@@ -277,5 +277,98 @@ return function(t)
 		local old = Profile.decode({ schema = 1, stars = 5, matches = 2, wins = 0, owned = {}, receipts = {}, tutorial = "weird" }) :: any
 		t.eq(old.tutorial, nil)
 		t.ok(not old.tutorialPaid)
+	end)
+
+	t.test("star packs and daily deals: the smallest pack that covers, one deal a day, grants", function()
+		t.eq(Catalog.starPackFor(0), nil, "nothing short")
+		t.eq((Catalog.starPackFor(5000) :: any).key, "stars10k")
+		t.eq((Catalog.starPackFor(32000) :: any).key, "stars35k")
+		t.eq((Catalog.starPackFor(300000) :: any).key, "stars300k")
+		t.eq(Catalog.starPackFor(300001), nil, "past the biggest pack: unlock instead")
+		for _, pack in Catalog.STAR_PACKS do
+			t.ok(Catalog.product(pack.key) ~= nil, pack.key .. " is a product")
+		end
+		-- every unlock has its deal product at 40% off
+		for _, w in Catalog.ARSENAL do
+			local deal = Catalog.dealProduct(w)
+			if deal then
+				local regular = Catalog.product(w.product :: string) :: any
+				local p = Catalog.product(deal) :: any
+				t.ok(p ~= nil, deal .. " is a product")
+				t.eq(p.price, math.floor(regular.price * 0.6 + 0.5), deal .. " is 40% off")
+				t.eq((Catalog.dealWeapon(deal) :: any).id, w.id)
+			end
+		end
+		-- the same deal for a player all day, never one they own, others differ
+		local owned = { w_reinforce = true }
+		local a = Catalog.dealOf(1642763318, 20408, owned) :: any
+		t.eq((Catalog.dealOf(1642763318, 20408, owned) :: any).id, a.id, "stable for the day")
+		t.ok(a.id ~= "w_reinforce", "never owned")
+		local seen = {}
+		for day = 20408, 20430 do
+			seen[(Catalog.dealOf(1642763318, day, owned) :: any).id] = true
+		end
+		local n = 0
+		for _ in seen do
+			n += 1
+		end
+		t.ok(n >= 4, `deals change from day to day ({n} different)`)
+		local all = {}
+		for _, w in Catalog.ARSENAL do
+			all[w.id] = true
+		end
+		t.eq(Catalog.dealOf(1, 1, all), nil, "nothing left to offer")
+		-- receipts: a pack's stars, a deal's weapon (stars if owned meanwhile)
+		local p = Profile.new()
+		local before = p.stars
+		local g = Profile.grant(p, "stars35k", "r1", function() return 0 end, 0) :: any
+		t.eq(p.stars - before, 35000)
+		t.eq(g.stars, 35000)
+		g = Profile.grant(p, "dealArtillery", "r2", function() return 0 end, 0) :: any
+		t.ok(p.owned.w_artillery == true, "the deal's weapon")
+		t.eq(g.items[1], "w_artillery")
+		local stars = p.stars
+		g = Profile.grant(p, "dealArtillery", "r3", function() return 0 end, 0) :: any
+		t.ok(p.stars > stars, "owned meanwhile: stars instead")
+		t.eq(Profile.grant(p, "dealArtillery", "r3", function() return 0 end, 0), nil, "a receipt only once")
+		-- one deal a day: buying it records the day, and no second deal shows
+		local q = Profile.new()
+		local now = 20408 * 86400 + 3600
+		t.ok(Catalog.todaysDeal(7, now, q.owned, nil) ~= nil, "a deal before buying")
+		local todays = Catalog.todaysDeal(7, now, q.owned, nil) :: any
+		Profile.grant(q, Catalog.dealProduct(todays) :: string, "d1", function() return 0 end, now)
+		t.eq(q.dealDay, 20408)
+		local v = Profile.view(q, true, false, false, now) :: any
+		t.eq(v.dealDay, 20408)
+		t.eq(Catalog.todaysDeal(7, now, q.owned, v.dealDay), nil, "no second deal today")
+		t.ok(Catalog.todaysDeal(7, now + 86400, q.owned, v.dealDay) ~= nil, "a new deal tomorrow")
+		local back = Profile.decode(Profile.encode(q)) :: any
+		t.eq(back.dealDay, 20408, "saved")
+	end)
+
+	t.test("the free crate: once, after the first match, normal crate, saved", function()
+		local p = Profile.new()
+		local roll = function() return 0 end
+		t.eq((Profile.view(p, true, false, false, 0) :: any).freeCrate, nil, "not before a match (the tutorial)")
+		local item, why = Profile.openFreeCrate(p, roll)
+		t.eq(item, nil)
+		t.eq(why, "later")
+		p.matches = 1
+		t.eq((Profile.view(p, true, false, false, 0) :: any).freeCrate, true, "waiting after the first match")
+		local stars = p.stars
+		item, why = Profile.openFreeCrate(p, roll)
+		t.ok(item ~= nil and p.owned[(item :: any).id] == true, "an item, owned")
+		t.eq(p.stars, stars, "costs nothing")
+		t.ok(not p.firstCrateUsed, "the first bought crate's discount stays")
+		t.eq((Profile.view(p, true, false, false, 0) :: any).freeCrate, nil, "gone once opened")
+		item, why = Profile.openFreeCrate(p, roll)
+		t.eq(why, "used", "only once")
+		local back = Profile.decode(Profile.encode(p)) :: any
+		t.eq(back.freeCrateUsed, true, "saved")
+		-- a returning player (old record, no field) gets it too
+		local old = Profile.encode(Profile.new()) :: any
+		old.matches = 30
+		local q = Profile.decode(old) :: any
+		t.ok(Profile.freeCrateReady(q), "returning players get one")
 	end)
 end

@@ -88,6 +88,8 @@ export type Actions = {
 	openSettings: (() -> ())?,
 	toggleMusic: (() -> ())?,
 	openShop: (() -> ())?,
+	-- The Locker (the result card's free crate line).
+	openLocker: (() -> ())?,
 	-- The territory colour of a player (the renderer's palette), if known.
 	playerColor: ((smallID: number) -> Color3?)?,
 	-- The tile under the mouse and its terrain byte, if over the map.
@@ -599,6 +601,17 @@ function OfHud.new(state: any, host: Frame, root: any, actions: Actions)
 		end
 	end)
 	self.adText.Text = "FREE CRATE  ·  WATCH AD"
+	-- The free crate waiting (Bruno, 2026-11-16: "Put the 'A free crate is
+	-- waiting' line on the result card"): in the next unlock's place; a
+	-- press opens the Locker, where it opens.
+	self.cratePlate, self.crateText = infoPlate("FreeCrate", "gift", function()
+		self.cratePlate.Visible = false
+		self:_layoutResult()
+		if actions.openLocker then
+			actions.openLocker()
+		end
+	end)
+	self.crateText.Text = "A FREE CRATE IS WAITING"
 	local exit = Dossier.rivetPlate(card, string.upper(Lang.t("win_modal.exit")), 26, false, { Name = "Exit", Position = UDim2.fromOffset(CARD_W / 2, 590), Size = UDim2.fromOffset(420, 64), Parent = card })
 	exit.Activated:Connect(function()
 		actions.backToMenu()
@@ -651,7 +664,7 @@ function OfHud.new(state: any, host: Frame, root: any, actions: Actions)
 		self.shownDeath, self.shownWin = false, false
 		self.resultTrack = ResultModel.newTracker()
 		self.starsPlate.Visible, self.goalPlate.Visible, self.doublePlate.Visible = false, false, false
-		self.adPlate.Visible = false
+		self.adPlate.Visible, self.cratePlate.Visible, self.doubleWanted = false, false, false
 		self.nextAt, self.nextText.Visible = nil, false
 		self:_layoutResult()
 		self.incomingBoats = {}
@@ -976,8 +989,10 @@ function OfHud.showStars(self: any, gained: number, profile: any?)
 	if goal then
 		self.unlockText.Text = if goal.ready then `{goal.name}  ·  UNLOCK` else `{goal.name}  {Kit.commas(goal.have)} / {Kit.commas(goal.need)}`
 	end
+	self.cratePlate.Visible = profile ~= nil and profile.freeCrate == true and not self.takeoverPlate.Visible
 	local doubled = ResultModel.doubled(gained, profile)
 	self.doublePlate.Visible = doubled ~= nil
+	self.doubleWanted = doubled ~= nil
 	if doubled then
 		self.doubleText.Text = `WITH 2X STARS: +{Kit.commas(doubled)}`
 	end
@@ -1021,13 +1036,21 @@ function OfHud._layoutResult(self: any)
 	else
 		self.winAgain.Position = UDim2.fromOffset(W / 2, 418)
 	end
-	-- (the ad's free crate takes 2x Stars' place while it's offered)
-	if self.adPlate.Visible then
-		self.doublePlate.Visible = false
+	-- (the free crate waiting outranks the ad's crate: two free crates side
+	-- by side would confuse; 2x Stars shows instead)
+	if self.cratePlate.Visible then
+		self.adPlate.Visible = false
 	end
+	-- (the ad's free crate takes 2x Stars' place while it's offered)
+	self.doublePlate.Visible = self.doubleWanted == true and not self.adPlate.Visible and not self.takeoverPlate.Visible
+	-- (the free crate takes the next unlock's place while it waits)
+	if self.cratePlate.Visible then
+		self.goalPlate.Visible = false
+	end
+	local first = if self.cratePlate.Visible then self.cratePlate else self.goalPlate
 	local second = if self.adPlate.Visible then self.adPlate else self.doublePlate
-	local both = self.goalPlate.Visible and second.Visible
-	self.goalPlate.Position = UDim2.fromOffset(if both then 210 else W / 2, 506)
+	local both = first.Visible and second.Visible
+	first.Position = UDim2.fromOffset(if both then 210 else W / 2, 506)
 	second.Position = UDim2.fromOffset(if both then 550 else W / 2, 506)
 end
 
@@ -1669,6 +1692,7 @@ function OfHud._checkDeath(self: any)
 			label.Text = `TAKE OVER {string.upper(offer.name)}`
 		end
 		self.goalPlate.Visible, self.doublePlate.Visible, self.adPlate.Visible = false, false, false
+		self.cratePlate.Visible = false
 	end
 	if self.shownDeath and me ~= nil and me.alive and state.winner == nil then
 		self.shownDeath = false
@@ -1897,12 +1921,17 @@ function OfHud._refreshClock(self: any)
 		Kit.setGlyph(self.clockIcon, "shield")
 		self.clockIcon.ImageColor3 = GOOD_LIGHT
 	else
-		self.clockCaption.Text = "TIME"
-		self.clockCaption.TextColor3 = C.sheetLine
-		self.clockText.TextColor3 = C.sheet
-		self.clockText.Text = Kit.clock(ticks // 10)
+		-- A timed match (OpenFront's maxTimerValue: Blitz) counts down what's
+		-- left, red in the last minute; others count up.
+		local limit = state.gameConfig and state.gameConfig.maxTimerValue
+		local left = if type(limit) == "number" then math.max(0, limit * 60 - ticks // 10) else nil
+		local urgent = left ~= nil and left <= 60
+		self.clockCaption.Text = if left then "TIME LEFT" else "TIME"
+		self.clockCaption.TextColor3 = if urgent then RED else C.sheetLine
+		self.clockText.TextColor3 = if urgent then RED else C.sheet
+		self.clockText.Text = Kit.clock(left or ticks // 10)
 		Kit.setGlyph(self.clockIcon, "clock")
-		self.clockIcon.ImageColor3 = C.sheetLine
+		self.clockIcon.ImageColor3 = if urgent then RED else C.sheetLine
 	end
 end
 

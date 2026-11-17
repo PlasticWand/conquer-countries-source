@@ -28,6 +28,7 @@ WaitingRoom.RETRY_AFTER_S = 20
 export type Room = {
 	mapName: string?,
 	mode: string?,
+	minutes: number?, -- a timed match (Blitz)
 	players: number?,
 	capacity: number?,
 	seconds: number?,
@@ -106,7 +107,7 @@ function WaitingRoom.view(room: Room?, elapsed: number): View
 	local starting = r.starting == true or (left ~= nil and left <= WaitingRoom.LEAVE_LOCK_S)
 	local players = r.players or 0
 	return {
-		kicker = if r.mode then "TEAM GAME  ·  " .. string.upper(r.mode) else "PUBLIC MATCH",
+		kicker = if r.mode then "TEAM GAME  ·  " .. string.upper(r.mode) elseif r.minutes then `BLITZ  ·  {r.minutes} MIN  ·  MOST LAND WINS` else "PUBLIC MATCH",
 		title = string.upper(r.mapName :: string),
 		status = if starting then "Starting…" elseif left then "Match starts in" else "Getting the match ready…",
 		clock = if left and not (r.starting == true and left <= 0) then clock(left) else nil,

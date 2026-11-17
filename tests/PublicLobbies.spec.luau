@@ -17,12 +17,19 @@ return function(t)
 		}
 	end
 
-	t.test("a free-for-all join takes World's seats too; World and team only their own", function()
+	t.test("a free-for-all join takes World's seats too; World, Blitz and team only their own", function()
 		t.eq(table.concat(P.takesFrom("ffa"), ","), "ffa,world")
 		t.eq(table.concat(P.takesFrom("world"), ","), "world")
 		t.eq(table.concat(P.takesFrom("team"), ","), "team")
-		t.eq(#P.kinds(true), 3)
-		t.eq(#P.kinds(false), 2)
+		t.eq(table.concat(P.takesFrom("blitz"), ","), "blitz")
+		-- the menu's order: the free-for-all, World, Blitz, team
+		local order = {}
+		for _, k in P.kinds(true) do
+			table.insert(order, k.kind)
+		end
+		t.eq(table.concat(order, ","), "ffa,world,blitz,team")
+		t.eq(#P.kinds(false), 3)
+		t.ok(P.isKind("blitz"), "blitz is a kind")
 	end)
 
 	t.test("seats: fit, taken once per user, given back only from the ledger", function()

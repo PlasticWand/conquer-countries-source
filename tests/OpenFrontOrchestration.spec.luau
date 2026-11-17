@@ -57,7 +57,7 @@ return function(t)
 			[engageModule]={pick=function() return nil end,DELAY_S=0}, -- the after-match prompts
 			[tutorialModule]={new=function()
 				local noop=function() end
-				return {orderShare=function() return 1 end,floorHeld=noop,noteOrder=noop,noteBoat=noop,destroy=noop}
+				return {orderShare=function() return 1 end,floorHeld=noop,noteOrder=noop,noteBoat=noop,redirectTap=function(_,tile) return tile end,destroy=noop}
 			end},
 			[feelModule]=feelCues,
 			[audioModule]={new=function()

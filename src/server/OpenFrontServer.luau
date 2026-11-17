@@ -620,10 +620,11 @@ local function lobbyRow(l: PublicLobbies.Lobby, now: number, startsIn: number?):
 	local live = l.status == "started"
 	return {
 		id = l.kind,
-		title = if l.kind == PublicLobbies.KIND_FFA then "Public match" else Lobbies.mapName(cfg.gameMap),
+		title = if l.kind == PublicLobbies.KIND_FFA then "Public match" elseif l.kind == PublicLobbies.KIND_BLITZ then "Blitz" else Lobbies.mapName(cfg.gameMap),
 		mapName = Lobbies.mapName(cfg.gameMap),
 		mapType = cfg.gameMap,
 		mode = Lobbies.modeText(cfg),
+		minutes = cfg.maxTimerValue,
 		players = math.min(l.players, l.max),
 		capacity = l.max,
 		seconds = if live then nil else math.floor(startsIn or math.max(0, l.starts - now)),
@@ -694,6 +695,7 @@ local function roomView(): { [string]: any }
 		mapName = Lobbies.mapName(l.config.gameMap),
 		mapType = l.config.gameMap,
 		mode = Lobbies.modeText(l.config),
+		minutes = l.config.maxTimerValue,
 		players = math.min(math.max(l.players, #names), l.max),
 		capacity = l.max,
 		seconds = s,
@@ -1442,7 +1444,15 @@ local function startLobbies()
 		store = store,
 		teleport = teleports,
 		config = function(kind: string): { [string]: any }
-			return playlist:gameConfig(if kind == PublicLobbies.KIND_TEAM then "team" else "ffa", if kind == PublicLobbies.KIND_WORLD then "World" else nil)
+			local cfg = playlist:gameConfig(if kind == PublicLobbies.KIND_TEAM then "team" else "ffa", if kind == PublicLobbies.KIND_WORLD then "World" else nil)
+			if kind == PublicLobbies.KIND_BLITZ then
+				-- OpenFront's max timer (WinCheckExecution): the most land wins then.
+				cfg.maxTimerValue = PublicLobbies.BLITZ_MINUTES
+			elseif kind == PublicLobbies.KIND_TEAM and PublicLobbies.TEAM_NATIONS then
+				-- AI nations on the teams (TeamAssignment shares them out).
+				cfg.nations = "default"
+			end
+			return cfg
 		end,
 		now = clock,
 		rand = function(): number
@@ -1642,6 +1652,9 @@ function OpenFrontServer.start()
 		elseif msg.op == "skip" and inTutorial and type(msg.n) == "number" then
 			Analytics.tutorialSkipped(player, math.floor(msg.n))
 			Store.setTutorial(player, "skipped")
+			if match then
+				match.runner:releaseAiHold()
+			end
 		elseif msg.op == "left" and inTutorial then
 			Store.setTutorial(player, "left")
 		elseif msg.op == "cityGold" and inTutorial and match and not match.tutorialGold[player] then

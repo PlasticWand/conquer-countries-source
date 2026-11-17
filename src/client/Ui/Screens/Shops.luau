@@ -13,7 +13,9 @@
 --              each a folder with an aged flag, name, rarity and price
 -- Nothing is granted here: the server decides (Store) and pushes the view.
 
+local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local RunService = game:GetService("RunService")
 local TweenService = game:GetService("TweenService")
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Catalog = require(Shared.Store.Catalog)
@@ -104,9 +106,13 @@ local function row(parent: Instance, gap: number): Frame
 end
 
 -- A yellow plate with the Robux mark and a price (or a check and OWNED).
-local function pricePlate(w: Dossier.Window, parent: Instance, cx: number, cy: number, ww: number, hh: number, price: number?, cap: number): ImageButton
+-- `was`: the regular price, struck through before it (today's deal).
+local function pricePlate(w: Dossier.Window, parent: Instance, cx: number, cy: number, ww: number, hh: number, price: number?, cap: number, was: number?): ImageButton
 	local p = Dossier.plate(parent, "", { AnchorPoint = Vector2.new(0.5, 0.5), Position = w.at(cx, cy), Size = w.sz(ww, hh), Parent = parent }, 0)
 	local r = row(p, math.round(14 * w.k))
+	if price and was then
+		stencil({ Name = "Was", Text = `<s>{Kit.commas(was)}</s>`, RichText = true, TextSize = capSize(w, cap * 0.7), TextColor3 = ROBUX_DARK, TextTransparency = 0.25, LayoutOrder = 0, Parent = r })
+	end
 	if price then
 		robuxMark(r, math.round(cap * 1.5 * w.k), 1)
 		stencil({ Text = Kit.commas(price), TextSize = capSize(w, cap), LayoutOrder = 2, Parent = r })
@@ -136,6 +142,83 @@ local function manilaButton(w: Dossier.Window, parent: Instance, cx: number, cy:
 	b.Activated:Connect(Dossier.click)
 	Dossier.clicky(b, 1.03)
 	return b, row(b, math.round(12 * w.k))
+end
+
+-- Today's deal and star top-ups (Bruno, 2026-11-16) ------------------------------------------
+
+-- "7h 12m" (or "12m" under an hour).
+local function hoursMinutes(seconds: number): string
+	seconds = math.max(0, seconds)
+	local h, m = seconds // 3600, (seconds // 60) % 60
+	return if h > 0 then `{h}h {m}m` else `{m}m`
+end
+
+-- The Arsenal in the order it shows: today's deal first (Catalog.todaysDeal;
+-- none once bought today), then the rest in catalogue order.
+local function arsenalOrder(view: any, mine: { [string]: boolean }): ({ Catalog.Weapon }, Catalog.Weapon?)
+	local player = Players.LocalPlayer
+	local deal = Catalog.todaysDeal(if player then player.UserId else 0, os.time(), mine, view.dealDay)
+	local list = {}
+	if deal then
+		table.insert(list, deal)
+	end
+	for _, wpn in Catalog.ARSENAL do
+		if wpn ~= deal then
+			table.insert(list, wpn)
+		end
+	end
+	return list, deal
+end
+
+-- The red TODAY'S DEAL -40% stamp on a deal's picture, with "new deal in"
+-- under it. Returns that line for the window's ticker.
+local function dealStamp(print_: GuiObject, k: number, cap: number, small: number): TextLabel
+	local z = print_.ZIndex + 4
+	local stamp = Kit.new("Frame", { Name = "DealStamp", BackgroundColor3 = C.stamp, BorderSizePixel = 0, Position = UDim2.fromOffset(math.round(12 * k), math.round(12 * k)), AutomaticSize = Enum.AutomaticSize.XY, Rotation = -5, ZIndex = z, Parent = print_ })
+	Kit.corner(4).Parent = stamp
+	Kit.stroke(Color3.fromHex("#6E1A14"), 2, 0).Parent = stamp
+	Kit.padding(math.round(5 * k), math.round(12 * k)).Parent = stamp
+	Kit.list(Enum.FillDirection.Vertical, 0, Enum.HorizontalAlignment.Left, Enum.VerticalAlignment.Center).Parent = stamp
+	stencil({ Text = `TODAY'S DEAL -{math.round(Catalog.DEAL.off * 100)}%`, TextSize = cap, TextColor3 = C.sheet, LayoutOrder = 1, ZIndex = z, Parent = stamp })
+	return stencil({ Name = "NewIn", Text = "", TextSize = small, TextColor3 = Color3.fromHex("#F3D9C8"), LayoutOrder = 2, ZIndex = z, Parent = stamp })
+end
+
+-- Keeps a deal stamp's "NEW DEAL IN 7h 12m" current while the window is open.
+local function tickDeal(w: Dossier.Window, label: TextLabel?)
+	if label == nil then
+		return
+	end
+	local function paint()
+		local nextAt = (os.time() // 86400 + 1) * 86400
+		label.Text = `NEW DEAL IN {hoursMinutes(nextAt - os.time())}`
+	end
+	paint()
+	local acc = 0
+	local conn = RunService.Heartbeat:Connect(function(dt)
+		acc += dt
+		if acc >= 1 then
+			acc = 0
+			paint()
+		end
+	end)
+	w.root.Destroying:Connect(function()
+		conn:Disconnect()
+	end)
+end
+
+-- "★ GET 35K STARS · [R$] 89": the smallest star pack covering what a card's
+-- unlock is short of, under its plate.
+local function topUpRow(w: Dossier.Window, ctx: Ctx, parent: Instance, cx: number, cy: number, ww: number, hh: number, pack: Catalog.StarPack, cap: number)
+	local b, r = manilaButton(w, parent, cx, cy, ww, hh)
+	b.Name = "TopUp"
+	local size = capSize(w, cap)
+	Kit.glyph("star", { ImageColor3 = C.inkBlack, Size = UDim2.fromOffset(math.round(size * 0.6), math.round(size * 0.6)), LayoutOrder = 1, Parent = r })
+	stencil({ Text = `GET {pack.stars // 1000}K STARS ·`, TextSize = size, LayoutOrder = 2, Parent = r })
+	robuxMark(r, math.round(size * 0.62), 3)
+	stencil({ Text = Kit.commas(pack.price), TextSize = size, LayoutOrder = 4, Parent = r })
+	b.Activated:Connect(function()
+		ctx.prompt(pack.key)
+	end)
 end
 
 -- Phones ---------------------------------------------------------------------------------------
@@ -168,40 +251,76 @@ local function arsenalPhone(host: Instance, ctx: Ctx): Kit.Modal
 	local cardH = w.height - 22
 	local rows = math.ceil(n / 3)
 	local shelf = Kit.scroll({ Name = "Folders", Size = UDim2.fromScale(1, 1), ScrollingDirection = Enum.ScrollingDirection.Y, AutomaticCanvasSize = Enum.AutomaticSize.None, CanvasSize = UDim2.fromOffset(0, math.round(4 + rows * cardH + (rows - 1) * 14)), ScrollBarThickness = 6, ScrollBarImageColor3 = Color3.fromHex("#1E2019"), Parent = w.body })
-	for i, wpn in Catalog.ARSENAL do
+	local list, deal = arsenalOrder(view, mine)
+	local dealLine: TextLabel? = nil
+	local function has(wpn: Catalog.Weapon): boolean
+		return mine[wpn.id] or (wpn.pass ~= nil and view.doubleStars) or (wpn.subscription == true and view.general == true)
+	end
+	local function packFor(wpn: Catalog.Weapon): Catalog.StarPack?
+		return if wpn.stars and not has(wpn) then Catalog.starPackFor(wpn.stars - (view.stars or 0)) else nil
+	end
+	-- Where a card's buy buttons start (see the stack below).
+	local function stackTop(wpn: Catalog.Weapon): number
+		if has(wpn) or not wpn.stars then
+			return cardH - 85
+		end
+		return if packFor(wpn) then cardH - 173 else cardH - 143
+	end
+	-- One picture height for every card, so the tightest card's description
+	-- (it ends 150 under the picture's top edge) still clears its buttons
+	-- (2026-11-16: the top-up row had cut it in half on a phone).
+	local tightest = math.huge
+	for _, wpn in list do
+		tightest = math.min(tightest, stackTop(wpn))
+	end
+	local photoH = math.clamp(math.min(150, cardW * 0.48, tightest - 156), 50, 150)
+	for i, wpn in list do
 		local col, line = (i - 1) % 3, (i - 1) // 3
 		local card = cardArt("ImageLabel", "folder_portrait", { Name = wpn.id, Position = at(16 + col * (cardW + 14), 2 + line * (cardH + 14)), Size = sz(cardW, cardH), Parent = shelf })
 		-- The photo in a paper border.
-		local photoH = math.min(150, cardW * 0.48)
 		local frame = Kit.new("Frame", { Name = "Print", BackgroundColor3 = C.sheet, BorderSizePixel = 0, Position = at(14, 30), Size = sz(cardW - 28, photoH), Rotation = if col == 1 then 0.6 else -0.4, Parent = card })
 		local pic = Art.card(wpn.id, { Position = UDim2.fromOffset(5, 5), Size = UDim2.new(1, -10, 1, -10), Parent = frame })
 		age(pic)
+		if wpn == deal then
+			dealLine = dealStamp(frame, 1, 26, 17)
+		end
 		local y = 30 + photoH + 14
 		stencil({ Text = string.upper(wpn.name), TextSize = 42, Position = at(18, y), Parent = card })
 		Kit.new("Frame", { BackgroundColor3 = C.inkBlack, BackgroundTransparency = 0.3, BorderSizePixel = 0, Position = at(18, y + 50), Size = sz(cardW - 36, 2), Parent = card })
 		typed({ Text = wpn.desc, TextColor3 = C.inkBlack, TextSize = 20, TextWrapped = true, AutomaticSize = Enum.AutomaticSize.None, TextYAlignment = Enum.TextYAlignment.Top, Position = at(18, y + 58), Size = sz(cardW - 36, 48), Parent = card })
 		for j, bullet in wpn.bullets do
 			local by = y + 118 + (j - 1) * 26
+			-- (Only where it clears the buttons; they used to hide it.)
+			if by + 14 > stackTop(wpn) then
+				break
+			end
 			local dot = Kit.new("Frame", { BackgroundColor3 = C.stamp, BorderSizePixel = 0, AnchorPoint = Vector2.new(0.5, 0.5), Position = at(24, by), Size = sz(9, 9), Parent = card })
 			Kit.new("UICorner", { CornerRadius = UDim.new(0.5, 0), Parent = dot })
 			stencil({ Text = string.upper(bullet), TextSize = 22, TextColor3 = C.stamp, AnchorPoint = Vector2.new(0, 0.5), Position = at(38, by), Parent = card })
 		end
 
-		-- The buy plate at the foot of the folder, the star unlock above it.
-		local cx, plateY = cardW / 2, cardH - 50
-		local has = mine[wpn.id] or (wpn.pass ~= nil and view.doubleStars) or (wpn.subscription == true and view.general == true)
-		if has then
-			pricePlate(w, card, cx, plateY, cardW - 40, 70, nil, 26)
+		-- The buy plate at the foot of the folder, the star unlock above it,
+		-- and a star top-up under it when the unlock is short (all three
+		-- squeeze up to fit).
+		local cx = cardW / 2
+		if has(wpn) then
+			pricePlate(w, card, cx, cardH - 50, cardW - 40, 70, nil, 26)
 		else
+			local stars = view.stars or 0
+			local pack = packFor(wpn)
+			local plateY, plateH, barY, barH = cardH - 50, 70, cardH - 116, 54
+			if pack then
+				plateY, plateH, barY, barH = cardH - 88, 58, cardH - 148, 50
+				topUpRow(w, ctx, card, cx, cardH - 30, cardW - 40, 44, pack, 14)
+			end
 			if wpn.stars then
-				local stars = view.stars or 0
 				local affordable = stars >= wpn.stars
-				local bar, br = manilaButton(w, card, cx, plateY - 66, cardW - 40, 54)
+				local bar, br = manilaButton(w, card, cx, barY, cardW - 40, barH)
 				local fill = Kit.new("Frame", { Name = "Fill", BackgroundColor3 = if affordable then C.hazard else Color3.fromHex("#C9B27A"), BorderSizePixel = 0, Size = UDim2.fromScale(math.clamp(stars / wpn.stars, 0, 1), 1), ZIndex = bar.ZIndex, Parent = bar })
 				Kit.corner(5).Parent = fill
 				br.ZIndex = bar.ZIndex + 1
 				Kit.glyph("star", { ImageColor3 = C.inkBlack, Size = UDim2.fromOffset(28, 28), LayoutOrder = 1, ZIndex = br.ZIndex, Parent = br })
-				stencil({ Text = if affordable then `UNLOCK · {Kit.commas(wpn.stars)}` else Kit.commas(wpn.stars), TextSize = 40, LayoutOrder = 2, ZIndex = br.ZIndex, Parent = br })
+				stencil({ Text = if affordable then `UNLOCK · {Kit.commas(wpn.stars)}` else Kit.commas(wpn.stars), TextSize = if pack then 36 else 40, LayoutOrder = 2, ZIndex = br.ZIndex, Parent = br })
 				bar.Activated:Connect(function()
 					if affordable then
 						local r = ctx.request({ op = "unlock", id = wpn.id })
@@ -212,16 +331,21 @@ local function arsenalPhone(host: Instance, ctx: Ctx): Kit.Modal
 				end)
 			end
 			local key = wpn.product or wpn.pass
+			-- (Today's deal: its own product, the regular price struck through.)
+			local dealKey = if wpn == deal then Catalog.dealProduct(wpn) else nil
+			local dealProduct = if dealKey then Catalog.product(dealKey) else nil
 			-- (Conquest General: Roblox's subscription prompt, its monthly price.)
-			local product: { key: string, price: number }? = if wpn.subscription then { key = "general", price = Catalog.SUBSCRIPTION.robux } elseif key then Catalog.product(key) else nil
+			local product: { key: string, price: number }? = if wpn.subscription then { key = "general", price = Catalog.SUBSCRIPTION.robux } elseif dealProduct then dealProduct elseif key then Catalog.product(key) else nil
+			local regular = if dealProduct and key then Catalog.product(key) else nil
 			if product then
-				local buy = pricePlate(w, card, cx, plateY, cardW - 40, 70, product.price, 26)
+				local buy = pricePlate(w, card, cx, plateY, cardW - 40, plateH, product.price, if pack then 24 else 26, if regular then regular.price else nil)
 				buy.Activated:Connect(function()
 					ctx.prompt(product.key)
 				end)
 			end
 		end
 	end
+	tickDeal(w, dealLine)
 	return (w :: any) :: Kit.Modal
 end
 
@@ -245,7 +369,7 @@ function Shops.arsenal(host: Instance, ctx: Ctx): Kit.Modal
 	Kit.corner(6).Parent = shield
 	Kit.stroke(Color3.fromHex("#A87C12"), 2, 0).Parent = shield
 	Dossier.icon("icon_shield", "shield", { AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromScale(0.5, 0.5), Size = UDim2.fromScale(0.68, 0.68), Parent = shield })
-	bigCaps(w, 86, { Text = "ARSENAL", AnchorPoint = Vector2.new(0, 0.5), Position = at(166, 116), Parent = head })
+	bigCaps(w, 86, { Text = "ARSENAL", AnchorPoint = Vector2.new(0, 0.5), Position = at(166, 102), Parent = head })
 	typed({
 		Text = "Unlock new weapons with stars. Every match earns stars; public matches earn the most.",
 		TextColor3 = C.inkBlack,
@@ -253,7 +377,7 @@ function Shops.arsenal(host: Instance, ctx: Ctx): Kit.Modal
 		TextWrapped = true,
 		AutomaticSize = Enum.AutomaticSize.None,
 		TextYAlignment = Enum.TextYAlignment.Top,
-		Position = at(626, 96),
+		Position = at(626, 74),
 		Size = sz(310, 84),
 		Parent = head,
 	})
@@ -277,7 +401,9 @@ function Shops.arsenal(host: Instance, ctx: Ctx): Kit.Modal
 	local n = #Catalog.ARSENAL
 	local rows = math.ceil(n / 3)
 	local shelf = Kit.scroll({ Name = "Folders", Position = at(0, 200), Size = sz(1409, 770), ScrollingDirection = Enum.ScrollingDirection.Y, AutomaticCanvasSize = Enum.AutomaticSize.None, CanvasSize = UDim2.fromOffset(0, math.round((20 + rows * 750) * w.k)), ScrollBarThickness = 8, ScrollBarImageColor3 = Color3.fromHex("#1E2019"), Parent = w.body })
-	for i, wpn in Catalog.ARSENAL do
+	local list, deal = arsenalOrder(view, mine)
+	local dealLine: TextLabel? = nil
+	for i, wpn in list do
 		local col, line = (i - 1) % 3, (i - 1) // 3
 		local x0 = 40 + col * 445
 		local card = cardArt("ImageLabel", "folder_portrait", { Name = wpn.id, Position = at(x0, 15 + line * 750), Size = sz(430, 735), Parent = shelf })
@@ -288,6 +414,9 @@ function Shops.arsenal(host: Instance, ctx: Ctx): Kit.Modal
 		local frame = Kit.new("Frame", { Name = "Print", BackgroundColor3 = C.sheet, BorderSizePixel = 0, Position = rel(20, 46), Size = sz(386, 270), Rotation = if col == 1 then 0.6 else -0.4, Parent = card })
 		local pic = Art.card(wpn.id, { Position = UDim2.fromOffset(math.round(6 * w.k), math.round(6 * w.k)), Size = UDim2.new(1, -math.round(12 * w.k), 1, -math.round(12 * w.k)), Parent = frame })
 		age(pic)
+		if wpn == deal then
+			dealLine = dealStamp(frame, w.k, capSize(w, 17), capSize(w, 11))
+		end
 		if col == 1 then
 			clip(card, w, 368, 10, 82, 6)
 		end
@@ -306,11 +435,19 @@ function Shops.arsenal(host: Instance, ctx: Ctx): Kit.Modal
 		if has then
 			tapePlate(w, pricePlate(w, card, 215, 665, 370, 92, nil, 34))
 		else
+			-- Short of stars: a top-up row under the plate, the bar and the
+			-- plate moved up to make room.
+			local stars = view.stars or 0
+			local pack = if wpn.stars then Catalog.starPackFor(wpn.stars - stars) else nil
+			local barY, plateY, plateH = 590, 665, 92
+			if pack then
+				barY, plateY, plateH = 556, 628, 72
+				topUpRow(w, ctx, card, 215, 700, 370, 46, pack, 18)
+			end
 			if wpn.stars then
 				-- The star unlock: a bar filling towards the price.
-				local stars = view.stars or 0
 				local affordable = stars >= wpn.stars
-				local bar, br = manilaButton(w, card, 215, 590, 370, 54)
+				local bar, br = manilaButton(w, card, 215, barY, 370, 54)
 				local fill = Kit.new("Frame", { Name = "Fill", BackgroundColor3 = if affordable then C.hazard else Color3.fromHex("#C9B27A"), BorderSizePixel = 0, Size = UDim2.fromScale(math.clamp(stars / wpn.stars, 0, 1), 1), ZIndex = bar.ZIndex, Parent = bar })
 				Kit.corner(5).Parent = fill
 				br.ZIndex = bar.ZIndex + 1
@@ -329,20 +466,100 @@ function Shops.arsenal(host: Instance, ctx: Ctx): Kit.Modal
 				end)
 			end
 			local key = wpn.product or wpn.pass
+			-- (Today's deal: its own product, the regular price struck through.)
+			local dealKey = if wpn == deal then Catalog.dealProduct(wpn) else nil
+			local dealProduct = if dealKey then Catalog.product(dealKey) else nil
 			-- (Conquest General: Roblox's subscription prompt, its monthly price.)
-			local product: { key: string, price: number }? = if wpn.subscription then { key = "general", price = Catalog.SUBSCRIPTION.robux } elseif key then Catalog.product(key) else nil
+			local product: { key: string, price: number }? = if wpn.subscription then { key = "general", price = Catalog.SUBSCRIPTION.robux } elseif dealProduct then dealProduct elseif key then Catalog.product(key) else nil
+			local regular = if dealProduct and key then Catalog.product(key) else nil
 			if product then
-				local buy = tapePlate(w, pricePlate(w, card, 215, 665, 370, 92, product.price, 34))
+				local buy = tapePlate(w, pricePlate(w, card, 215, plateY, 370, plateH, product.price, if pack then 30 else 34, if regular then regular.price else nil))
 				buy.Activated:Connect(function()
 					ctx.prompt(product.key)
 				end)
 			end
 		end
 	end
+	tickDeal(w, dealLine)
 
 	-- The board's stamps and tape.
 	art("stamp_secret", { AnchorPoint = Vector2.new(0.5, 0.5), Position = at(1165, 1012), Size = sz(420, 100), Rotation = -12, ImageTransparency = 0.3, Parent = w.body })
 	tape(w.body, w, "tape", 150, 975, 130, 36, -3)
+	return (w :: any) :: Kit.Modal
+end
+
+-- The unlock card ----------------------------------------------------------------------------
+
+-- A small card for one Arsenal weapon, opened by a locked weapon in the
+-- match's ARSENAL fly-out (Bruno, 2026-11-16: "Offers in the match"): its
+-- picture, name and line, the star unlock bar and the Robux plate (today's
+-- deal price when it's the deal), and the close. Laid out in 520 x 620
+-- reference pixels, as tall as fits.
+function Shops.unlock(host: Instance, ctx: Ctx, weaponId: string): Kit.Modal?
+	local wpn: Catalog.Weapon? = nil
+	for _, x in Catalog.ARSENAL do
+		if x.id == weaponId then
+			wpn = x
+		end
+	end
+	if wpn == nil then
+		return nil
+	end
+	local view = ctx.view
+	local mine = owned(view)
+	local w = Dossier.window(host, 520, 620, math.min(620, Kit.root.height - 24), 36)
+	local at, sz = w.at, w.sz
+	stencil({ Text = "ARSENAL", TextSize = capSize(w, 16), AnchorPoint = Vector2.new(0, 0.5), Position = at(26, 20), Parent = w.header })
+	Dossier.closeManila(w.header, at(474, 82), sz(64, 60), w.close)
+
+	-- The aged picture in a paper border, today's deal stamped on it.
+	local frame = Kit.new("Frame", { Name = "Print", BackgroundColor3 = C.sheet, BorderSizePixel = 0, Position = at(30, 56), Size = sz(400, 250), Rotation = -0.6, Parent = w.body })
+	local pic = Art.card(wpn.id, { Position = UDim2.fromOffset(math.round(6 * w.k), math.round(6 * w.k)), Size = UDim2.new(1, -math.round(12 * w.k), 1, -math.round(12 * w.k)), Parent = frame })
+	age(pic)
+	local _, deal = arsenalOrder(view, mine)
+	local dealLine = if deal == wpn then dealStamp(frame, w.k, capSize(w, 16), capSize(w, 10)) else nil
+	stencil({ Text = string.upper(wpn.name), TextSize = capSize(w, 30), AnchorPoint = Vector2.new(0, 0.5), Position = at(32, 350), Parent = w.body })
+	Kit.new("Frame", { BackgroundColor3 = C.sheet, BackgroundTransparency = 0.4, BorderSizePixel = 0, Position = at(32, 376), Size = sz(456, 2), Parent = w.body })
+	typed({ Text = wpn.desc, TextColor3 = C.sheet, TextSize = math.round(22 * w.k), TextWrapped = true, AutomaticSize = Enum.AutomaticSize.None, TextYAlignment = Enum.TextYAlignment.Top, Position = at(32, 388), Size = sz(456, 56), Parent = w.body })
+
+	if mine[wpn.id] then
+		pricePlate(w, w.body, 260, 560, 456, 76, nil, 30)
+		return (w :: any) :: Kit.Modal
+	end
+	if wpn.stars then
+		-- The star unlock: a bar filling towards the price.
+		local stars = view.stars or 0
+		local affordable = stars >= wpn.stars
+		local bar, br = manilaButton(w, w.body, 260, 484, 456, 54)
+		local fill = Kit.new("Frame", { Name = "Fill", BackgroundColor3 = if affordable then C.hazard else Color3.fromHex("#C9B27A"), BorderSizePixel = 0, Size = UDim2.fromScale(math.clamp(stars / wpn.stars, 0, 1), 1), ZIndex = bar.ZIndex, Parent = bar })
+		Kit.corner(5).Parent = fill
+		br.ZIndex = bar.ZIndex + 1
+		Kit.glyph("star", { ImageColor3 = C.inkBlack, Size = UDim2.fromOffset(math.round(30 * w.k), math.round(30 * w.k)), LayoutOrder = 1, ZIndex = br.ZIndex, Parent = br })
+		stencil({ Text = if affordable then `UNLOCK · {Kit.commas(wpn.stars)}` else `{Kit.commas(stars)} / {Kit.commas(wpn.stars)}`, TextSize = capSize(w, 20), LayoutOrder = 2, ZIndex = br.ZIndex, Parent = br })
+		local weapon = wpn :: Catalog.Weapon
+		bar.Activated:Connect(function()
+			if affordable then
+				local r = ctx.request({ op = "unlock", id = weapon.id })
+				if r and r.ok then
+					w.close()
+					ctx.reveal(weapon.id)
+				end
+			end
+		end)
+	end
+	local key = wpn.product or wpn.pass
+	local dealKey = if deal == wpn then Catalog.dealProduct(wpn) else nil
+	local dealProduct = if dealKey then Catalog.product(dealKey) else nil
+	local product = if dealProduct then dealProduct elseif key then Catalog.product(key) else nil
+	local regular = if dealProduct and key then Catalog.product(key) else nil
+	if product then
+		local p = product :: Catalog.Product
+		local buy = pricePlate(w, w.body, 260, 560, 456, 76, p.price, 30, if regular then regular.price else nil)
+		buy.Activated:Connect(function()
+			ctx.prompt(p.key)
+		end)
+	end
+	tickDeal(w, dealLine)
 	return (w :: any) :: Kit.Modal
 end
 
@@ -422,6 +639,31 @@ local function supplyCrate(w: Dossier.Window, parent: Instance, centre: UDim2, s
 	end)
 end
 
+-- The free crate (Bruno, 2026-11-16: one per player): while it waits, the
+-- crate folder's top plate says OPEN FREE instead of the single crate's
+-- price, and opens it with the usual crate opening.
+local function freeCratePlate(w: Dossier.Window, ctx: Ctx, parent: Instance, cx: number, cy: number, ww: number, hh: number, cap: number): ImageButton
+	local p = Dossier.plate(parent, "", { Name = "FreeCrate", AnchorPoint = Vector2.new(0.5, 0.5), Position = w.at(cx, cy), Size = w.sz(ww, hh), Parent = parent }, 0)
+	local r = row(p, math.round(12 * w.k))
+	local size = capSize(w, cap)
+	Kit.glyph("gift", { ImageColor3 = C.inkBlack, Size = UDim2.fromOffset(math.round(size * 0.75), math.round(size * 0.75)), LayoutOrder = 1, Parent = r })
+	stencil({ Text = "OPEN FREE", TextSize = size, LayoutOrder = 2, Parent = r })
+	Dossier.clicky(p, 1.04)
+	local busy = false
+	p.Activated:Connect(function()
+		if busy then
+			return
+		end
+		busy = true
+		local res = ctx.request({ op = "freeCrate" })
+		if res and res.ok and res.item then
+			ctx.crate(res.item)
+		end
+		busy = false
+	end)
+	return p
+end
+
 -- The crate folder's width on a phone.
 local PHONE_CRATE_W = 300
 
@@ -453,14 +695,19 @@ local function lockerCratePhone(w: Dossier.Window, ctx: Ctx, memo: { [string]: a
 		stencil({ Text = Catalog.RARITY_NAME[o.rarity], FontFace = F.typewriter, TextSize = 20, AnchorPoint = Vector2.new(0, 0.5), Position = at(52, y), Parent = crate })
 		stencil({ Text = `{o.percent}%`, FontFace = F.typewriter, TextSize = 20, AnchorPoint = Vector2.new(1, 0.5), Position = at(cw - 26, y), Parent = crate })
 	end
-	if view.crateKey == "crateFirst" then
-		local regular = Catalog.product("crate1") :: Catalog.Product
-		typed({ Text = `First crate: {view.cratePrice} instead of {regular.price}`, TextColor3 = C.inkBlack, TextSize = 17, AnchorPoint = Vector2.new(0.5, 0.5), Position = at(cw / 2, 266), Parent = crate })
+	if view.freeCrate then
+		typed({ Text = "One crate on us", TextColor3 = C.inkBlack, TextSize = 17, AnchorPoint = Vector2.new(0.5, 0.5), Position = at(cw / 2, 266), Parent = crate })
+		freeCratePlate(w, ctx, crate, cw / 2, 306, cw - 36, 54, 24)
+	else
+		if view.crateKey == "crateFirst" then
+			local regular = Catalog.product("crate1") :: Catalog.Product
+			typed({ Text = `First crate: {view.cratePrice} instead of {regular.price}`, TextColor3 = C.inkBlack, TextSize = 17, AnchorPoint = Vector2.new(0.5, 0.5), Position = at(cw / 2, 266), Parent = crate })
+		end
+		local single = pricePlate(w, crate, cw / 2, 306, cw - 36, 54, view.cratePrice or 49, 24)
+		single.Activated:Connect(function()
+			ctx.prompt(view.crateKey or "crate1")
+		end)
 	end
-	local single = pricePlate(w, crate, cw / 2, 306, cw - 36, 54, view.cratePrice or 49, 24)
-	single.Activated:Connect(function()
-		ctx.prompt(view.crateKey or "crate1")
-	end)
 	local three = Catalog.product("crate3") :: Catalog.Product
 	local pack, pr = manilaButton(w, crate, cw / 2, 362, cw - 36, 46)
 	Kit.new("ImageLabel", { BackgroundTransparency = 1, Image = UiAssets.robux, ImageColor3 = ROBUX_DARK, Size = UDim2.fromOffset(28, 28), LayoutOrder = 1, Parent = pr })
@@ -544,10 +791,14 @@ function Shops.locker(host: Instance, ctx: Ctx): Kit.Modal
 			stencil({ Text = Catalog.RARITY_NAME[o.rarity], FontFace = F.typewriter, TextSize = math.round(26 * w.k), AnchorPoint = Vector2.new(0, 0.5), Position = c(115, y), Parent = crate })
 			stencil({ Text = `{o.percent}%`, FontFace = F.typewriter, TextSize = math.round(26 * w.k), AnchorPoint = Vector2.new(1, 0.5), Position = c(447, y), Parent = crate })
 		end
-		local single = pricePlate(w, crate, 261 - 30, 767 - 212, 393, 75, view.cratePrice or 49, 30)
-		single.Activated:Connect(function()
-			ctx.prompt(view.crateKey or "crate1")
-		end)
+		if view.freeCrate then
+			freeCratePlate(w, ctx, crate, 261 - 30, 767 - 212, 393, 75, 30)
+		else
+			local single = pricePlate(w, crate, 261 - 30, 767 - 212, 393, 75, view.cratePrice or 49, 30)
+			single.Activated:Connect(function()
+				ctx.prompt(view.crateKey or "crate1")
+			end)
+		end
 		local three = Catalog.product("crate3") :: Catalog.Product
 		local pack, pr = manilaButton(w, crate, 261 - 30, 848 - 212, 393, 60)
 		Kit.new("ImageLabel", { BackgroundTransparency = 1, Image = UiAssets.robux, ImageColor3 = ROBUX_DARK, Size = UDim2.fromOffset(math.round(34 * w.k), math.round(34 * w.k)), LayoutOrder = 1, Parent = pr })
@@ -570,7 +821,9 @@ function Shops.locker(host: Instance, ctx: Ctx): Kit.Modal
 		Kit.tip(starsBtn, function(tip)
 			Kit.text({ Text = if canStars then "Open a crate with stars" else `{Kit.commas(Profile.CRATE_STARS - (view.stars or 0))} more stars`, FontFace = F.uiBold, Parent = tip })
 		end)
-		if view.crateKey == "crateFirst" then
+		if view.freeCrate then
+			typed({ Text = "One crate on us: open it free", TextColor3 = C.inkBlack, TextSize = math.round(21 * w.k), AnchorPoint = Vector2.new(0.5, 0.5), Position = c(232, 970), Parent = crate })
+		elseif view.crateKey == "crateFirst" then
 			local regular = Catalog.product("crate1") :: Catalog.Product
 			typed({ Text = `Your first crate: {view.cratePrice} instead of {regular.price}`, TextColor3 = C.inkBlack, TextSize = math.round(21 * w.k), AnchorPoint = Vector2.new(0.5, 0.5), Position = c(232, 970), Parent = crate })
 		end

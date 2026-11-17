@@ -5,7 +5,7 @@
 -- before Roblox is told, the 2x Stars pass, the shops' star purchases and
 -- equips, settings, and the stars each match pays.
 --   Remotes: Shop (RemoteFunction) takes { op = "view" } | { op = "unlock", id } |
---   { op = "crate" } | { op = "equip", kind, id? } | { op = "chooseFlag", id }
+--   { op = "crate" } | { op = "freeCrate" } | { op = "equip", kind, id? } | { op = "chooseFlag", id }
 --   | { op = "settings", settings } and answers { ok, reason?, item? };
 --   Profile (RemoteEvent) pushes Store/Profile.view after every change;
 --   Granted (RemoteEvent) tells the buyer what a Robux purchase gave.
@@ -183,9 +183,23 @@ local function onShop(player: Player, request: any): any
 	elseif request.op == "unlock" and type(request.id) == "string" then
 		local ok, reason = Profile.unlockWithStars(e.record, request.id)
 		result = { ok = ok, reason = reason }
+		local w = if ok then Catalog.weapon(request.id) else nil
+		if w and w.stars then
+			Analytics.boughtWithStars(player, w.id, w.stars)
+		end
 	elseif request.op == "crate" then
 		local item, reason = Profile.crateWithStars(e.record, roll)
 		result = { ok = item ~= nil, reason = reason, item = if item then item.id else nil }
+		if item then
+			Analytics.boughtWithStars(player, "crate", Profile.CRATE_STARS)
+		end
+	elseif request.op == "freeCrate" then
+		-- The free crate, once per player (Profile.openFreeCrate).
+		local item, reason = Profile.openFreeCrate(e.record, roll)
+		result = { ok = item ~= nil or reason == "complete", reason = reason, item = if item then item.id else nil }
+		if result.ok then
+			Analytics.freeCrateOpened(player)
+		end
 	elseif request.op == "equip" and type(request.kind) == "string" and (request.id == nil or type(request.id) == "string") then
 		result = { ok = Profile.equip(e.record, request.kind, request.id) }
 	elseif request.op == "chooseFlag" and type(request.id) == "string" then
@@ -596,7 +610,7 @@ function Store.start(remotes: Folder)
 	if RunService:IsStudio() then
 		-- Studio-only probe for MCP checks: Invoke("newPlayer") resets the
 		-- tutorial and its tips; Invoke("resetGift") unclaims the launch
-		-- gift; Invoke("brandNew") makes a first-time player; Invoke("stars", n) gives every
+		-- gift; Invoke("brandNew") makes a first-time player; Invoke("resetFreeCrate") makes the free crate wait again; Invoke("stars", n) gives every
 		-- player n stars; returns each profile's view.
 		local probe = Instance.new("BindableFunction")
 		probe.Name = "StoreDebug"
@@ -628,6 +642,11 @@ function Store.start(remotes: Folder)
 						for _, id in Catalog.STARTER.items do
 							e.record.owned[id] = nil
 						end
+						e.dirty = true
+						push(player)
+					elseif code == "resetFreeCrate" then
+						-- The free crate waiting again (the Studio store only).
+						e.record.freeCrateUsed = false
 						e.dirty = true
 						push(player)
 					elseif code == "resetGift" then

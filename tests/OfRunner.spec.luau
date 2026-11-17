@@ -1090,4 +1090,163 @@ return function(t)
 		t.eq(card(ship({ type = "Port" })), nil, "not a warship")
 		t.eq(HudModel.warshipCard({ you = 1, units = {} }, 5), nil, "gone")
 	end)
+
+	t.test("the tutorial holds everyone else's attacks until the human's first (or the timeout)", function()
+		local function tutorialRunner(id: string)
+			local runner = Runner.new({
+				gameID = id,
+				mapFolder = Maps.World,
+				gameConfig = {
+					gameMap = "World",
+					gameMapSize = "Compact",
+					gameMode = "Free For All",
+					gameType = "Singleplayer",
+					difficulty = "Medium",
+					bots = 40,
+					nations = "disabled",
+					tutorial = true,
+				},
+			})
+			runner:addHuman("1001", "Bruno")
+			runner:start()
+			local game = runner.game
+			local map = game:map()
+			local spawn = nil
+			for dx = 0, 60 do
+				local tile = map:ref(540 + dx, 150)
+				if map:isLand(tile) and not map:isImpassable(tile) then
+					spawn = tile
+					break
+				end
+			end
+			runner:intent("1001", { type = "spawn", tile = spawn })
+			for _ = 1, 30 do
+				runner:step()
+			end
+			return runner, game
+		end
+		local function othersTiles(game: any): number
+			local n = 0
+			for _, p in game:allPlayers() do
+				if p:clientID() ~= "1001" then
+					n += p:numTilesOwned()
+				end
+			end
+			return n
+		end
+
+		local runner, game = tutorialRunner("of-tutorial-hold")
+		t.ok(not game:inSpawnPhase(), "past the spawn phase")
+		local before = othersTiles(game)
+		for _ = 1, 60 do
+			runner:step()
+		end
+		t.ok(game.aiHold == true, "still held before the human attacks")
+		t.eq(othersTiles(game), before, "nobody else expanded")
+		local me = game:playerByClientID("1001")
+		runner:intent("1001", { type = "attack", troops = me:troops() * 0.2 })
+		for _ = 1, 60 do
+			runner:step()
+		end
+		t.ok(game.aiHold == false, "the human's attack lifts the hold")
+		t.ok(othersTiles(game) > before, "the others expand after it")
+
+		-- Never attacking: the hold ends TUTORIAL_HOLD_TICKS after the spawn phase.
+		local was = Runner.TUTORIAL_HOLD_TICKS
+		Runner.TUTORIAL_HOLD_TICKS = 40
+		local idle, idleGame = tutorialRunner("of-tutorial-timeout")
+		Runner.TUTORIAL_HOLD_TICKS = was
+		t.ok(idleGame.aiHold == true, "held at first")
+		for _ = 1, 45 do
+			idle:step()
+		end
+		t.ok(idleGame.aiHold == false, "the timeout lifts the hold")
+	end)
+
+	t.test("a timed match (Blitz: OpenFront's maxTimerValue) ends then; the most land wins", function()
+		local runner = Runner.new({
+			gameID = "of-blitz",
+			mapFolder = Maps.World,
+			gameConfig = {
+				gameMap = "World",
+				gameMapSize = "Compact",
+				gameMode = "Free For All",
+				gameType = "Singleplayer",
+				difficulty = "Medium",
+				bots = 20,
+				nations = "disabled",
+				maxTimerValue = 0.1, -- six seconds
+			},
+		})
+		runner:addHuman("1001", "Bruno")
+		runner:start()
+		local game = runner.game
+		local map = game:map()
+		for dx = 0, 60 do
+			local tile = map:ref(540 + dx, 150)
+			if map:isLand(tile) and not map:isImpassable(tile) then
+				runner:intent("1001", { type = "spawn", tile = tile })
+				break
+			end
+		end
+		for _ = 1, 30 do
+			runner:step()
+		end
+		t.eq(game:getWinner(), nil, "no winner before the time")
+		-- (play goes on after a win: compare land on the tick it's decided)
+		local winner = nil
+		for _ = 1, 80 do
+			runner:step()
+			winner = game:getWinner()
+			if winner then
+				break
+			end
+		end
+		t.ok(winner ~= nil, "the timer ends the match")
+		local most = 0
+		for _, p in game:players() do
+			most = math.max(most, p:numTilesOwned())
+		end
+		t.eq(winner:numTilesOwned(), most, "the nation with the most land wins")
+	end)
+
+	t.test("a public team game with nations on (PublicLobbies.TEAM_NATIONS): a lone human gets AI teammates and AI rivals", function()
+		local runner = Runner.new({
+			gameID = "of-team-nations",
+			mapFolder = Maps.World,
+			gameConfig = {
+				gameMap = "World",
+				gameMapSize = "Compact",
+				gameMode = "Team",
+				gameType = "Public",
+				playerTeams = 4,
+				difficulty = "Medium",
+				bots = 20,
+				nations = "default",
+			},
+		})
+		runner:addHuman("1001", "Bruno")
+		runner:start()
+		local game = runner.game
+		local me = game:playerByClientID("1001")
+		local myTeam = me:team()
+		t.ok(myTeam ~= nil, "the human has a team")
+		local teams, mates, nations = {}, 0, 0
+		for _, p in game:allPlayers() do
+			if p:type() == "NATION" then
+				nations += 1
+				teams[p:team()] = true
+				if p:team() == myTeam then
+					mates += 1
+				end
+			end
+		end
+		local n = 0
+		for _ in teams do
+			n += 1
+		end
+		t.ok(nations > 4, `nations are in the match ({nations})`)
+		t.ok(mates > 0, `the human has AI teammates ({mates})`)
+		t.eq(n, 4, "nations are on all four teams")
+	end)
 end

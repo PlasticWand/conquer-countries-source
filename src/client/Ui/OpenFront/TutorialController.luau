@@ -46,6 +46,14 @@ local SPAWN_ZOOM = 6
 -- Own tiles looked at per scan (neighbours, the frontier, the coast).
 local SCAN_TILES = 3000
 local SCAN_EVERY = 0.4
+-- The mark's arrow (HUD units): two chevrons, each two arms ARM_L long and
+-- 2 * ARM_T thick (strokes), ARROW_STEP apart; the arrow's box; its bob.
+local ARM_L = 40
+local ARM_T = 7
+local ARROW_STEP = 24
+local ARROW_W = 76
+local ARROW_H = 80
+local ARROW_BOB = 14
 
 -- The coach's tips (RoWorld's, for our controls). `again`: offered every time
 -- (paced by a cool-down), not once per player.
@@ -152,6 +160,15 @@ function TutorialController.new(deps: Deps)
 		scanAt = 0,
 		neighbour = nil :: number?,
 		neighbourTile = nil :: number?, -- their land on your border
+		-- The marks set in from the border (Tutorial.EXPAND_PX, ATTACK_PX).
+		frontierDeep = nil :: number?,
+		neighbourDeep = nil :: number?,
+		-- The tutorial mark's tile, screen point and reach (redirectTap).
+		markTile = nil :: number?,
+		markAt = nil :: Vector2?,
+		markReach = 0,
+		spawnTapped = false, -- a map tap in the spawn phase (_runEvents)
+		focusKey = nil :: string?, -- the last mark the camera went to
 		frontier = nil :: number?,
 		inland = nil :: number?, -- your land away from your name
 		coast = false,
@@ -212,6 +229,33 @@ function TutorialController._build(self: any)
 	Kit.new("UICorner", { CornerRadius = UDim.new(0.5, 0), Parent = dot })
 	Kit.stroke(AMBER, 5, 0).Parent = dot
 	self.dot = dot
+	-- The arrow: two chevrons bobbing toward the spot (Bruno, 2026-11-16: the
+	-- rings alone weren't noticeable), each over a larger dark one for an
+	-- outline on any terrain.
+	-- (Each arm is a zero-height frame drawn by its stroke: like the rings,
+	-- no background, so a tap on the arrow still reaches the map.)
+	local arrow = Kit.new("Frame", { Name = "Arrow", BackgroundTransparency = 1, AnchorPoint = Vector2.new(0.5, 0.5), Size = UDim2.fromOffset(ARROW_W, ARROW_H), Parent = mark })
+	local d = ARM_L / 2 * math.sqrt(0.5)
+	for i = 1, 2 do
+		local apex = ARROW_H - (2 - i) * ARROW_STEP -- the chevron's point
+		for _, layer in { { color = C.inkBlack, thick = ARM_T + 3, z = 1 }, { color = AMBER, thick = ARM_T, z = 2 } } do
+			for _, side in { -1, 1 } do
+				local arm = Kit.new("Frame", {
+					BackgroundTransparency = 1,
+					AnchorPoint = Vector2.new(0.5, 0.5),
+					Position = UDim2.new(0.5, side * d, 0, apex - d - ARM_T),
+					Size = UDim2.fromOffset(ARM_L, 0),
+					Rotation = -side * 45,
+					ZIndex = layer.z,
+					Parent = arrow,
+				})
+				local stroke = Kit.stroke(layer.color, layer.thick, 0)
+				stroke.LineJoinMode = Enum.LineJoinMode.Round
+				stroke.Parent = arm
+			end
+		end
+	end
+	self.arrow = arrow
 	local word = stencil({ Text = "Tap here", TextSize = 24, TextColor3 = C.sheet, TextStrokeColor3 = C.inkBlack, TextStrokeTransparency = 0, AnchorPoint = Vector2.new(0.5, 0), Parent = mark })
 	self.word = word
 
@@ -300,7 +344,10 @@ end
 
 -- Draws the mark at `p` (screen space; nil hides it). `radius`: a control's,
 -- and the rings close onto its edge instead of a dot.
-function TutorialController._drawMark(self: any, p: Vector2?, radius: number?, wordText: string?)
+-- `away` (optional, a screen direction): the arrow sits that way from the mark,
+-- pointing back at it (the expand and attack marks: away from your land, so
+-- it doesn't cover your name).
+function TutorialController._drawMark(self: any, p: Vector2?, radius: number?, wordText: string?, away: Vector2?)
 	local parent = self.parent
 	if p == nil or parent == nil then
 		self.mark.Visible = false
@@ -329,13 +376,35 @@ function TutorialController._drawMark(self: any, p: Vector2?, radius: number?, w
 	end
 	self.dot.Visible = r == nil
 	self.dot.Position = UDim2.fromOffset(local_.X, local_.Y)
+	-- (a near-miss tap within twice the outer ring counts as the spot:
+	-- redirectTap)
+	self.markAt, self.markReach = p, 2 * outer * s
+	-- the arrow over the mark, pointing down at it (under it, pointing up, when
+	-- there's no room above), or `away` from it pointing back
+	local bob = math.abs(math.sin(self.t * math.pi / 0.6)) * ARROW_BOB
+	local reach = outer + 6 + ARROW_H / 2
+	local above = local_.Y - reach - ARROW_H / 2 - ARROW_BOB > 0
+	local dir = if above then Vector2.new(0, -1) else Vector2.new(0, 1)
+	if away then
+		-- (only clear of the HUD's top and bottom bars)
+		local at = local_ + away * (reach + ARROW_BOB + ARROW_H / 2)
+		if at.X > 60 and at.X < size.X - 60 and at.Y > size.Y * 0.16 and at.Y < size.Y * 0.8 then
+			dir = away
+		end
+	end
+	self.arrow.Rotation = math.deg(math.atan2(dir.X, -dir.Y))
+	local at = local_ + dir * (reach + bob)
+	self.arrow.Position = UDim2.fromOffset(at.X, at.Y)
 	self.word.Visible = wordText ~= ""
 	self.word.Text = wordText or (if self.deps.touch() then "Tap here" else "Click here")
-	-- under the mark; over it near the bottom of the screen
-	local gap = outer + 8
-	local below = local_.Y + gap + 34 < size.Y
-	self.word.AnchorPoint = Vector2.new(0.5, if below then 0 else 1)
-	self.word.Position = UDim2.fromOffset(local_.X, if below then local_.Y + gap else local_.Y - gap)
+	-- the word just past the arrow (arrow and word point in together, clear
+	-- of your land); the mark's other side when that is off screen
+	local wordAt = local_ + dir * (reach + ARROW_H / 2 + ARROW_BOB + 14)
+	if wordAt.X < 30 or wordAt.Y < 14 or wordAt.X > size.X - 30 or wordAt.Y > size.Y - 14 then
+		wordAt = local_ - dir * (outer + 20)
+	end
+	self.word.AnchorPoint = Vector2.new(0.5, 0.5)
+	self.word.Position = UDim2.fromOffset(wordAt.X, wordAt.Y)
 end
 
 -- The card's place: top centre, under the HUD's top bar (or the phone's race).
@@ -408,6 +477,8 @@ function TutorialController._onSnapshot(self: any)
 	self.aliveSeconds = 0
 	self.spot, self.spotFocused, self.spotStarts = nil, false, -1
 	self.neighbour, self.neighbourTile, self.frontier, self.inland, self.coast = nil, nil, nil, nil, false
+	self.frontierDeep, self.neighbourDeep, self.markTile = nil, nil, nil
+	self.spawnTapped = false
 	self.rookieFloor = nil
 	self.queue, self.tip = {}, nil
 	self.attackCardWas = false
@@ -484,6 +555,10 @@ function TutorialController._scan(self: any)
 	local you = state.you
 	local found: { [number]: number } = {}
 	local frontier: number? = nil
+	-- (every empty land tile and every neighbour's tile on your border, for
+	-- the marks set inward from it)
+	local frontiers: { number } = {}
+	local borders: { [number]: { number } } = {}
 	local coast = false
 	local n = 0
 	-- (your land 4 to 14 tiles from your name, all yours around it)
@@ -504,11 +579,14 @@ function TutorialController._scan(self: any)
 				local nb = ny * w + nx
 				local owner = state:ownerAt(nb)
 				if owner == 0 then
-					if frontier == nil and deps.isLand(nb) then
-						frontier = nb
+					if deps.isLand(nb) then
+						frontier = frontier or nb
+						table.insert(frontiers, nb)
 					end
 				elseif owner ~= you then
 					found[owner] = found[owner] or nb
+					borders[owner] = borders[owner] or {}
+					table.insert(borders[owner], nb)
 				end
 			end
 		end
@@ -534,6 +612,55 @@ function TutorialController._scan(self: any)
 	self.neighbourTile = if self.neighbour then found[self.neighbour] else nil
 	self.frontier = frontier
 	self.coast = coast
+	-- The marks inward from the border (Tutorial.EXPAND_PX / ATTACK_PX on
+	-- screen), on screen when they can be; a mark that still fits stays put.
+	local px = self:_tilePixels(frontier or self.neighbourTile)
+	local function deep(previous: number?, sources: { number }, accept: (number) -> boolean, goalPx: number): number?
+		if #sources == 0 or px == nil then
+			return nil
+		end
+		local depth = math.clamp(math.round(goalPx / px), 1, 40)
+		local tile, dist = Tutorial.inward(w, h, sources, accept, depth, Tutorial.INWARD_CAP, function(t: number): boolean
+			return self:_onScreen(t)
+		end)
+		if previous and dist[previous] and dist[previous] >= math.max(1, depth // 2) and self:_onScreen(previous) then
+			return previous
+		end
+		return tile
+	end
+	self.frontierDeep = deep(self.frontierDeep, frontiers, function(t: number): boolean
+		return state:ownerAt(t) == 0 and deps.isLand(t)
+	end, Tutorial.EXPAND_PX)
+	local them = self.neighbour
+	self.neighbourDeep = if them
+		then deep(self.neighbourDeep, borders[them] or {}, function(t: number): boolean
+			return state:ownerAt(t) == them
+		end, Tutorial.ATTACK_PX)
+		else nil
+end
+
+-- Screen pixels per map tile at the current zoom (nil off screen).
+function TutorialController._tilePixels(self: any, tile: number?): number?
+	if tile == nil then
+		return nil
+	end
+	local a, b = self.deps.tileToScreen(tile), self.deps.tileToScreen(tile + 1)
+	if a == nil or b == nil then
+		return nil
+	end
+	local d = (b - a).Magnitude
+	return if d > 0 then d else nil
+end
+
+-- Whether a tile is on screen, clear of the HUD's top and bottom bars.
+function TutorialController._onScreen(self: any, tile: number): boolean
+	local p = self.deps.tileToScreen(tile)
+	local camera = workspace.CurrentCamera
+	if p == nil or camera == nil then
+		return false
+	end
+	local size = camera.ViewportSize
+	return p.X > size.X * 0.06 and p.X < size.X * 0.94 and p.Y > size.Y * 0.2 and p.Y < size.Y * 0.72
 end
 
 -- A tile at a player's name (their centre), for the mark.
@@ -620,9 +747,9 @@ function TutorialController._target(self: any, target: string?): (Vector2?, numb
 		return self:_tileScreen(self.spot), nil
 	elseif target == "frontier" then
 		-- (no free land beside you: a neighbour's border, which a tap also takes)
-		return self:_tileScreen(self.frontier or self.neighbourTile), nil
+		return self:_tileScreen(self.frontierDeep or self.frontier or self.neighbourDeep or self.neighbourTile), nil
 	elseif target == "neighbour" then
-		return self:_tileScreen(self.neighbourTile), nil
+		return self:_tileScreen(self.neighbourDeep or self.neighbourTile), nil
 	elseif target == "attack" then
 		return around(actionsUi and actionsUi.attackMain)
 	elseif target == "ownLand" then
@@ -691,7 +818,9 @@ function TutorialController._runEvents(self: any, events: { { [string]: any } })
 	for _, e in events do
 		if e.kind == "step" then
 			deps.report({ op = "step", n = e.n, passed = e.passed })
-		elseif e.kind == "spawn" and self.spot then
+		elseif e.kind == "spawn" and self.spot and not self.spawnTapped and self.deps.state:inSpawnPhase() then
+			-- (not after the player's own tap: sent after it, this tap on the
+			-- spot would arrive past the spawn phase as an expansion)
 			deps.send({ type = "tile_action", tile = self.spot, ratio = Tutorial.DEFAULT_RATIO })
 		elseif e.kind == "cityGold" then
 			deps.report({ op = "cityGold" })
@@ -801,7 +930,59 @@ function TutorialController._frameTutorial(self: any, dt: number)
 		self.card.Visible = false
 	end
 	local p, r = self:_target(f.mark.target)
-	self:_drawMark(p, r, f.mark.word)
+	local target = f.mark.target
+	-- (the expand and attack marks' arrow points in from beyond, away from
+	-- your land)
+	local away: Vector2? = nil
+	if p and (target == "frontier" or target == "neighbour") then
+		local home = self:_tileScreen(self:_playerTile(state.you))
+		if home and (p - home).Magnitude > 1 then
+			away = (p - home).Unit
+		end
+	end
+	self:_drawMark(p, r, f.mark.word, away)
+	-- (the expand and attack steps forgive a tap just beside the mark)
+	local tile = if target == "frontier" then self.frontierDeep or self.frontier or self.neighbourDeep or self.neighbourTile
+		elseif target == "neighbour" then self.neighbourDeep or self.neighbourTile
+		else nil
+	self.markTile = if p == nil then nil else tile
+	-- (the camera goes to an expand or attack spot that's off screen or under
+	-- the HUD: once a target, so it never fights the player's own panning)
+	if tile and not self:_onScreen(tile) then
+		local key = `{target}:{self.neighbour or 0}:{run.i}`
+		if self.focusKey ~= key then
+			self.focusKey = key
+			self.deps.focusTile(tile)
+		end
+	end
+end
+
+-- A map tap during the tutorial's expand and attack steps (OpenFrontClient's
+-- onTap): one that would do nothing (your own land, water, impassable land)
+-- within twice the mark's outer ring counts as its tile (Bruno, 2026-11-16:
+-- a near miss did nothing). Others unchanged.
+function TutorialController.redirectTap(self: any, tile: number): number
+	local state = self.deps.state
+	if state:inSpawnPhase() and state:ownerAt(tile) == 0 and self.deps.isLand(tile) then
+		self.spawnTapped = true -- (the player placed their capital: no auto spawn)
+	end
+	local at = self.markAt
+	if not self.run.active or self.markTile == nil or at == nil or not self.mark.Visible then
+		return tile
+	end
+	-- (a build being placed goes where it was tapped: Codex's review)
+	local actionsUi = self.deps.actionsUi()
+	if actionsUi and actionsUi.chosen ~= nil then
+		return tile
+	end
+	if state:ownerAt(tile) ~= state.you and self.deps.isLand(tile) then
+		return tile
+	end
+	local p = self.deps.tileToScreen(tile)
+	if p and (p - at).Magnitude <= self.markReach then
+		return self.markTile
+	end
+	return tile
 end
 
 -- In a player's first ROOKIE_MATCHES matches the floor holds from the time it
@@ -881,7 +1062,7 @@ function TutorialController._frameCoach(self: any, dt: number)
 	local secs = if state.startTick then (state.tick - state.startTick) / 10 else 0
 	if secs > 3.4 then
 		self:_offer("expand", nil, function()
-			return self:_tileScreen(self.frontier)
+			return self:_tileScreen(self.frontierDeep or self.frontier)
 		end)
 	end
 	if secs > 22 then

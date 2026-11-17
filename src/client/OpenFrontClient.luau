@@ -404,8 +404,19 @@ function OpenFrontClient.start()
 		renderer:attachState(state)
 		local function onTap(tile: number)
 			if not state.ready then return end
+			-- (the tutorial's expand and attack steps take a near miss on your
+			-- own land as a tap on the mark)
+			if tutorial then
+				tile = tutorial:redirectTap(tile)
+			end
 			debugInfo.lastTap = {tile = tile, x = tile % state.width, y = math.floor(tile / state.width)}
 			if actionsUi and actionsUi:onMapTap(tile) then
+				return
+			end
+			-- A tap on water orders nothing (the server's tile_action ignores
+			-- it), so it isn't sent, nor counted as an order by the tutorial.
+			local terrain = hoverTerrain
+			if terrain and not state:inSpawnPhase() and tile < buffer.len(terrain) and bit32.band(buffer.readu8(terrain, tile), 0x80) == 0 then
 				return
 			end
 			-- The source plays its spawn cue on the spawn intent itself.
@@ -527,6 +538,10 @@ function OpenFrontClient.start()
 		end,
 		openShop = function()
 			menu:_shop("arsenal")
+		end,
+		-- The result card's free crate line.
+		openLocker = function()
+			menu:_shop("locker")
 		end,
 		playerColor = function(smallID: number): Color3?
 			local r: any = renderer
@@ -672,6 +687,10 @@ function OpenFrontClient.start()
 	local hudPanelRects: { { x: number, y: number, w: number, h: number } } = {}
 	local actionsActions = {
 		goToPlayer = goToPlayer,
+		-- A locked weapon in the ARSENAL fly-out: the unlock card (Shops.unlock).
+		openUnlock = function(weaponId: string)
+			menu:openUnlock(weaponId)
+		end,
 		buildChosen = function(unitType: string?)
 			if buildPreview then buildPreview:setChosen(unitType) end
 		end,

@@ -56,7 +56,15 @@ ICONS = {
     "takeover": ("crown", (185, 54, 51)),
     "starterPack": ("gift", (46, 163, 91)),
     "doubleStars": ("star", (255, 201, 60)),
+    # Star packs (2026-11-16).
+    "stars10k": ("star", (255, 201, 60)),
+    "stars35k": ("star", (255, 201, 60)),
+    "stars100k": ("star", (255, 201, 60)),
+    "stars300k": ("star", (255, 201, 60)),
 }
+# Daily deals (2026-11-16) wear their weapon's icon.
+for _key in [k for k in ICONS if k.startswith("unlock")]:
+    ICONS["deal" + _key[len("unlock"):]] = ICONS[_key]
 
 with winreg.OpenKey(winreg.HKEY_CURRENT_USER, "Environment") as env:
     KEY = winreg.QueryValueEx(env, "ROBLOX_API_KEY")[0]

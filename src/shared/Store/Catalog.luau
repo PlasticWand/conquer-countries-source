@@ -79,7 +79,7 @@ Catalog.ARSENAL = {
 		name = "Reinforcements",
 		desc = "Troops for gold, on call",
 		bullets = { "+20% of your troop limit at once", "Every 30 seconds" },
-		stars = 15000,
+		stars = 30000,
 		product = "unlockReinforce",
 		weapon = "reinforcements",
 		icon = "troops",
@@ -89,7 +89,7 @@ Catalog.ARSENAL = {
 		name = "Mega Nuke",
 		desc = "Twice the blast radius of an Atom Bomb",
 		bullets = { "4x the blast area", "2.5M gold a launch" },
-		stars = 30000,
+		stars = 60000,
 		product = "unlockMega",
 		weapon = "megaNuke",
 		icon = "atom",
@@ -100,7 +100,7 @@ Catalog.ARSENAL = {
 		name = "Scattershot",
 		desc = "An Atom Bomb with warheads that land around it",
 		bullets = { "4 to 6 extra warheads", "3.75M gold a launch" },
-		stars = 40000,
+		stars = 80000,
 		product = "unlockScatter",
 		weapon = "scattershot",
 		icon = "atom",
@@ -112,7 +112,7 @@ Catalog.ARSENAL = {
 		name = "Artillery",
 		desc = "Shells every enemy in range",
 		bullets = { "Fires on its own", "45-tile range" },
-		stars = 50000,
+		stars = 100000,
 		product = "unlockArtillery",
 		weapon = "artillery",
 		icon = "explosion",
@@ -123,7 +123,7 @@ Catalog.ARSENAL = {
 		name = "Air Strike",
 		desc = "Airfields that bomb anything in reach",
 		bullets = { "15-tile bombing run", "156-tile reach, rearms in 30 s" },
-		stars = 200000,
+		stars = 400000,
 		product = "unlockAirStrike",
 		weapon = "airStrike",
 		icon = "explosion",
@@ -134,7 +134,7 @@ Catalog.ARSENAL = {
 		name = "Railgun",
 		desc = "Hits anywhere on the map",
 		bullets = { "Knocks a building down a level", "Reloads in 25 s" },
-		stars = 500000,
+		stars = 1000000,
 		product = "unlockRailgun",
 		weapon = "railgun",
 		icon = "explosion",
@@ -145,7 +145,7 @@ Catalog.ARSENAL = {
 		name = "Field Works",
 		desc = "Dig in where the front is",
 		bullets = { "A defence post's effect for 60 s", "Built in 1 s, two at a time" },
-		stars = 35000,
+		stars = 70000,
 		product = "unlockFieldWorks",
 		weapon = "fieldWorks",
 		icon = "defense",
@@ -156,7 +156,7 @@ Catalog.ARSENAL = {
 		name = "Coastal Battery",
 		desc = "Shore guns that sink enemy boats",
 		bullets = { "One shell sinks a transport", "40-tile range" },
-		stars = 75000,
+		stars = 150000,
 		product = "unlockCoastal",
 		weapon = "coastalBattery",
 		icon = "port",
@@ -167,7 +167,7 @@ Catalog.ARSENAL = {
 		name = "Sabotage",
 		desc = "Switch off an enemy building",
 		bullets = { "Dark for 30 s after a 5 s fuse", "SAMs, silos, guns, ports" },
-		stars = 100000,
+		stars = 200000,
 		product = "unlockSabotage",
 		weapon = "sabotage",
 		icon = "explosion",
@@ -178,7 +178,7 @@ Catalog.ARSENAL = {
 		name = "Paratroopers",
 		desc = "Fly troops behind the front",
 		bullets = { "Lands up to 120 tiles away", "SAMs can shoot it down" },
-		stars = 150000,
+		stars = 300000,
 		product = "unlockParatroopers",
 		weapon = "paratroopers",
 		icon = "troops",
@@ -245,6 +245,23 @@ Catalog.PRODUCTS = {
 	{ key = "unlockParatroopers", kind = "product", name = "Arsenal: Paratroopers", price = 249, desc = "Unlock Paratroopers for good: fly troops from a city up to 120 tiles away to attack behind the front." },
 	{ key = "unlockArtillery", kind = "product", name = "Arsenal: Artillery", price = 99, desc = "Unlock Artillery for good: batteries that shell every enemy within 45 tiles." },
 	{ key = "doubleStars", kind = "pass", name = "2x Stars", price = 199, desc = "Every match pays double stars, forever." },
+	-- Daily deals, 40% off (Bruno, 2026-11-16; Catalog.dealOf picks one a day).
+	{ key = "dealReinforce", kind = "product", name = "Deal: Reinforcements", price = 47, desc = "Today's deal: unlock Reinforcements for good, 40% off." },
+	{ key = "dealMega", kind = "product", name = "Deal: Mega Nuke", price = 77, desc = "Today's deal: unlock Mega Nuke for good, 40% off." },
+	{ key = "dealScatter", kind = "product", name = "Deal: Scattershot", price = 40, desc = "Today's deal: unlock Scattershot for good, 40% off." },
+	{ key = "dealArtillery", kind = "product", name = "Deal: Artillery", price = 59, desc = "Today's deal: unlock Artillery for good, 40% off." },
+	{ key = "dealAirStrike", kind = "product", name = "Deal: Air Strike", price = 209, desc = "Today's deal: unlock Air Strike for good, 40% off." },
+	{ key = "dealRailgun", kind = "product", name = "Deal: Railgun", price = 599, desc = "Today's deal: unlock Railgun for good, 40% off." },
+	{ key = "dealRapidReload", kind = "product", name = "Deal: Rapid Reload", price = 77, desc = "Today's deal: unlock Rapid Reload for good, 40% off." },
+	{ key = "dealCoastal", kind = "product", name = "Deal: Coastal Battery", price = 89, desc = "Today's deal: unlock Coastal Battery for good, 40% off." },
+	{ key = "dealSabotage", kind = "product", name = "Deal: Sabotage", price = 119, desc = "Today's deal: unlock Sabotage for good, 40% off." },
+	{ key = "dealFieldWorks", kind = "product", name = "Deal: Field Works", price = 47, desc = "Today's deal: unlock Field Works for good, 40% off." },
+	{ key = "dealParatroopers", kind = "product", name = "Deal: Paratroopers", price = 149, desc = "Today's deal: unlock Paratroopers for good, 40% off." },
+	-- Star packs (Bruno, 2026-11-16; Catalog.STAR_PACKS).
+	{ key = "stars10k", kind = "product", name = "10,000 Stars", price = 29, desc = "10,000 stars to spend in the Arsenal and the Locker." },
+	{ key = "stars35k", kind = "product", name = "35,000 Stars", price = 89, desc = "35,000 stars to spend in the Arsenal and the Locker." },
+	{ key = "stars100k", kind = "product", name = "100,000 Stars", price = 219, desc = "100,000 stars to spend in the Arsenal and the Locker." },
+	{ key = "stars300k", kind = "product", name = "300,000 Stars", price = 599, desc = "300,000 stars to spend in the Arsenal and the Locker." },
 } :: { Product }
 
 -- The starter pack (RoWorld's, docs/design/ARSENAL_V2.md; 2026-11-08): its
@@ -327,6 +344,91 @@ function Catalog.generalReleased(id: string, t: number): boolean
 		end
 	end
 	return false
+end
+
+-- Star packs (Bruno, 2026-11-16: "Star top-ups", these four): Robux for
+-- stars, offered on an Arsenal card for what it's short. Smaller packs cost
+-- more a star (2.9 R$ per 1K down to 2.0).
+export type StarPack = { key: string, stars: number, price: number }
+Catalog.STAR_PACKS = table.freeze({
+	table.freeze({ key = "stars10k", stars = 10000, price = 29 }),
+	table.freeze({ key = "stars35k", stars = 35000, price = 89 }),
+	table.freeze({ key = "stars100k", stars = 100000, price = 219 }),
+	table.freeze({ key = "stars300k", stars = 300000, price = 599 }),
+}) :: { StarPack }
+
+-- The daily deal (Bruno, 2026-11-16: "Daily deal", 40% off): each player has
+-- one Arsenal unlock they don't own at a discount each UTC day, its own
+-- "deal" product (Catalog.dealProduct).
+Catalog.DEAL = table.freeze({ off = 0.4 })
+
+-- A weapon's deal product key ("unlockArtillery" -> "dealArtillery").
+function Catalog.dealProduct(w: Weapon): string?
+	local key = w.product
+	if key == nil or string.sub(key, 1, 6) ~= "unlock" then
+		return nil
+	end
+	return "deal" .. string.sub(key, 7)
+end
+
+-- The smallest star pack that covers `short` stars, or nil when none does.
+function Catalog.starPackFor(short: number): StarPack?
+	if short <= 0 then
+		return nil
+	end
+	for _, pack in Catalog.STAR_PACKS do
+		if pack.stars >= short then
+			return pack
+		end
+	end
+	return nil
+end
+
+-- The weapon on a deal for player `userId` on UTC day `day` (os.time() //
+-- 86400): one of the Arsenal unlocks with a deal product they don't own,
+-- picked the same way on the client and the server; nil when they own all.
+function Catalog.dealOf(userId: number, day: number, owned: { [string]: boolean }): Weapon?
+	local candidates = {}
+	for _, w in Catalog.ARSENAL do
+		if Catalog.dealProduct(w) and not owned[w.id] then
+			table.insert(candidates, w)
+		end
+	end
+	if #candidates == 0 then
+		return nil
+	end
+	local h = ((math.abs(userId) % 1000003) * 7919 + day * 104729) % #candidates
+	return candidates[h + 1]
+end
+
+-- Today's deal for a player (Catalog.dealOf), or nil once they've bought a
+-- deal today (`boughtDay`, Profile's dealDay): one deal a day.
+function Catalog.todaysDeal(userId: number, now: number, owned: { [string]: boolean }, boughtDay: number?): Weapon?
+	local day = now // 86400
+	if boughtDay == day then
+		return nil
+	end
+	return Catalog.dealOf(userId, day, owned)
+end
+
+-- A deal product's weapon.
+function Catalog.dealWeapon(productKey: string): Weapon?
+	for _, w in Catalog.ARSENAL do
+		if Catalog.dealProduct(w) == productKey then
+			return w
+		end
+	end
+	return nil
+end
+
+-- A star pack by its product key.
+function Catalog.starPack(productKey: string): StarPack?
+	for _, pack in Catalog.STAR_PACKS do
+		if pack.key == productKey then
+			return pack
+		end
+	end
+	return nil
 end
 
 function Catalog.product(key: string): Product?

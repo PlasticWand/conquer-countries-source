@@ -106,6 +106,7 @@ export type Runner = typeof(setmetatable(
 		namesChanged: boolean,
 		paused: boolean,
 		pauseAfterStep: boolean,
+		holdEndsAt: number?,
 	},
 	Runner
 ))
@@ -169,6 +170,10 @@ function Runner.start(self: Runner)
 	local nations = NationCreation.createNationsForGame(gameConfig, data.nations, data.additionalNations, #humans, random)
 	local game = Game.new(humans, nations, data.gameMap, data.miniGameMap, config, data.teamGameSpawnAreas)
 	;(game :: any).mapName = data.name
+	-- Conquest's tutorial (Bruno, 2026-11-16): nobody else expands or attacks
+	-- until the human's first attack (AttackExecution), Skip (releaseAiHold)
+	-- or TUTORIAL_HOLD_TICKS after the spawn phase. Not OpenFront's.
+	;(game :: any).aiHold = gameConfig.tutorial == true and Runner.TUTORIAL_HOLD_AI
 	-- The map's folder (OpenFrontMaps child), which clients load by name.
 	;(game :: any).mapFolder = if self.mapFolder then (self.mapFolder :: any).Name else nil
 	self.game = game
@@ -824,6 +829,18 @@ function Runner.isPaused(self: Runner): boolean
 	return self.paused
 end
 
+-- The tutorial's hold on everyone else's attacks (Runner.new): on, and how
+-- long it lasts at most after the spawn phase (the tutorial's step limit).
+Runner.TUTORIAL_HOLD_AI = true
+Runner.TUTORIAL_HOLD_TICKS = 750
+
+-- Ends the tutorial's hold now (the player pressed Skip).
+function Runner.releaseAiHold(self: Runner)
+	if self.game then
+		self.game.aiHold = false
+	end
+end
+
 function Runner.step(self: Runner)
 	local game = self.game
 	if self.paused then
@@ -839,6 +856,14 @@ function Runner.step(self: Runner)
 	end
 	local wasInSpawnPhase = game:inSpawnPhase()
 	game:executeNextTick()
+	if game.aiHold then
+		if wasInSpawnPhase and not game:inSpawnPhase() then
+			self.holdEndsAt = game:ticks() + Runner.TUTORIAL_HOLD_TICKS
+		end
+		if self.holdEndsAt and game:ticks() >= self.holdEndsAt then
+			game.aiHold = false
+		end
+	end
 	-- GameRunner: name anchors, recomputed on its schedule.
 	self.namesChanged = self.names:update(game, wasInSpawnPhase)
 	if self.pauseAfterStep then

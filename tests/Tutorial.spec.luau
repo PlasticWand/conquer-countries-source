@@ -114,6 +114,7 @@ return function(t)
 		-- their card opens: the mark moves to ATTACK; closing it goes back
 		f = run.update(obs({ neighbour = 7, neighbourName = "Zambia", attackCardOpen = true }), 0.1)
 		t.eq(f.mark.target, "attack")
+		t.eq(f.mark.word, "")
 		t.eq(f.card.text, Tutorial.ATTACK_PRESS_LINE)
 		f = run.update(obs({ neighbour = 7, neighbourName = "Zambia" }), 0.1)
 		t.eq(f.mark.target, "neighbour")
@@ -220,5 +221,31 @@ return function(t)
 		lost.update(obs(), 0.1)
 		f = lost.update(obs({ alive = false }), 0.1)
 		t.eq(kinds(f.events, "finished")[1].how, "left")
+	end)
+
+	t.test("the mark goes inward from the border, not on it", function()
+		-- a 10x5 map: the target's land is columns 3..9; its border column is 3
+		local W, H = 10, 5
+		local function theirs(tile: number): boolean
+			return tile % W >= 3
+		end
+		local sources = { 2 * W + 3 }
+		local tile, dist = Tutorial.inward(W, H, sources, theirs, 4, 1000)
+		t.eq(dist[tile :: number], 4)
+		t.ok(theirs(tile :: number))
+		-- shallower land than asked: the deepest tile reached
+		local narrow = function(tl: number): boolean
+			return tl % W >= 3 and tl % W <= 5
+		end
+		tile = Tutorial.inward(W, H, sources, narrow, 9, 1000)
+		t.eq((tile :: number) % W, 5)
+		-- `prefer` picks among the tiles at that depth (here: the top row)
+		tile = Tutorial.inward(W, H, sources, theirs, 2, 1000, function(tl: number): boolean
+			return tl // W == 0
+		end)
+		t.eq((tile :: number) // W, 0)
+		-- a source the walk can't stand on gives nothing
+		tile = Tutorial.inward(W, H, { 0 }, theirs, 3, 1000)
+		t.eq(tile, nil)
 	end)
 end

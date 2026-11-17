@@ -11,6 +11,7 @@
 --     requests, and renewal near an alliance's expiry
 
 local ArsenalUnits = require(script.Parent.ArsenalUnits)
+local Catalog = require(script.Parent.Parent.Store.Catalog)
 local Emoji = require(script.Parent.Data.Emoji)
 local EngineConfig = require(script.Parent.EngineConfig)
 local Format = require(script.Parent.Format)
@@ -107,6 +108,33 @@ function HudModel.buildItems(state: any): { BuildItem }
 		})
 	end
 	return items
+end
+
+-- Conquest's Arsenal weapons the viewer hasn't unlocked yet that build
+-- something (Catalog order), for the ARSENAL fly-out's locked tiles: a tap
+-- opens the unlock card (Bruno, 2026-11-16: "Offers in the match"). Empty
+-- when the match has no extra weapons. `type` is the first unit it builds,
+-- for the tile's icon.
+export type LockedWeapon = { id: string, name: string, type: string }
+function HudModel.lockedArsenal(state: any): { LockedWeapon }
+	local out = {}
+	local arsenal = state.arsenal
+	if arsenal == nil then
+		return out
+	end
+	local have = arsenal.weapons or {}
+	for _, w in Catalog.ARSENAL do
+		local key = w.weapon
+		if key and not have[key] then
+			for _, e in ArsenalUnits.BUILD do
+				if e.key == key then
+					table.insert(out, { id = w.id, name = w.name, type = e.type })
+					break
+				end
+			end
+		end
+	end
+	return out
 end
 
 -- Whether the viewer is allied with a player (smallID).

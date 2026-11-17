@@ -74,16 +74,16 @@ return function(t)
 		local a, b = hub(w, "A"), hub(w, "B", 8)
 		a:refresh()
 		b:refresh()
-		t.eq(#w.store.list(), 3, "ffa, world and team, made once")
-		t.eq(w.made, 3)
+		t.eq(#w.store.list(), 4, "ffa, world, blitz and team, made once")
+		t.eq(w.made, 4)
 		local kinds = {}
 		for _, l in b:lobbies() do
 			kinds[l.kind] = l
 		end
-		t.ok(kinds.ffa and kinds.world and kinds.team, "B lists all three")
+		t.ok(kinds.ffa and kinds.world and kinds.blitz and kinds.team, "B lists all four")
 		t.eq(kinds.team.config.playerTeams, 4)
 		t.eq(kinds.world.config.gameMap, "World")
-		t.eq(#b:view(), 3)
+		t.eq(#b:view(), 4)
 		t.eq(b:view()[1].code, nil, "clients never see access codes")
 		-- a hub with a smaller server caps the seats it creates
 		w.now += 200
@@ -195,7 +195,7 @@ return function(t)
 		for _, l in w.store.list() do
 			t.ok(l.starts > w.now - LobbyDirectory.STALE_AFTER_S, `{l.id} is fresh`)
 		end
-		t.ok(first == 3)
+		t.ok(first == 4)
 	end)
 
 	t.test("match server: finds its lobby, holds the start for arrivals, frees lapsed seats, goes live, ends", function()

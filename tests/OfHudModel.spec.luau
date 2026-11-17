@@ -21,6 +21,23 @@ return function(t)
 		}
 	end
 
+	t.test("lockedArsenal: build weapons not unlocked, none without extra weapons", function()
+		local st = state()
+		t.eq(#HudModel.lockedArsenal(st), 0, "no Arsenal in this match")
+		st.arsenal = { weapons = { megaNuke = true, airStrike = true, reinforcements = true } }
+		local locked = HudModel.lockedArsenal(st)
+		local ids, types = {}, {}
+		for _, l in locked do
+			ids[l.id] = true
+			types[l.id] = l.type
+		end
+		t.ok(not ids.w_mega and not ids.w_airstrike, "unlocked ones left out")
+		t.ok(not ids.w_reinforce and not ids.w_rapidreload, "no build unit: not in the fly-out")
+		t.eq(types.w_artillery, "Artillery")
+		t.eq(types.w_railgun, "Railgun")
+		t.eq(#locked, 7)
+	end)
+
 	t.test("ICU plurals choose one or other and fill #", function()
 		local one = Lang.t("events_display.alliance_nukes_destroyed_incoming", { count = 1, name = "Bea" })
 		t.eq(one, "1 nuke launched by Bea was destroyed due to the alliance")

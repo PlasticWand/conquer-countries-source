@@ -69,6 +69,12 @@ export type Record = {
 	referralCredited: boolean,
 	referralDay: number,
 	referralsToday: number,
+	-- The UTC day (os.time() // 86400) a daily deal was last bought: one a
+	-- day, so the Arsenal shows no second deal that day (Catalog.todaysDeal).
+	dealDay: number,
+	-- The free crate (Bruno, 2026-11-16: one per player, new or returning,
+	-- after their first match) was opened.
+	freeCrateUsed: boolean,
 }
 
 export type MatchResult = {
@@ -102,6 +108,8 @@ function Profile.new(): Record
 		referralCredited = false,
 		referralDay = 0,
 		referralsToday = 0,
+		dealDay = 0,
+		freeCrateUsed = false,
 	}
 end
 
@@ -183,6 +191,32 @@ function Profile.openCrate(p: Record, roll: () -> number): Catalog.Cosmetic?
 	local item = pool[math.floor(roll() * #pool) + 1]
 	p.owned[item.id] = true
 	return item
+end
+
+-- The free crate (Bruno, 2026-11-16): once per player, kept until opened,
+-- from the end of their first match (the tutorial counts), so it never
+-- interrupts the tutorial. Normal crate odds; the first bought crate's
+-- discount stays.
+function Profile.freeCrateReady(p: Record): boolean
+	return not p.freeCrateUsed and p.matches >= 1
+end
+
+-- Opens the free crate: the item, or nil and why ("used", "later"). A player
+-- who owns every crate item gets DUPLICATE_STARS instead ("complete").
+function Profile.openFreeCrate(p: Record, roll: () -> number): (Catalog.Cosmetic?, string?)
+	if p.freeCrateUsed then
+		return nil, "used"
+	end
+	if not Profile.freeCrateReady(p) then
+		return nil, "later"
+	end
+	p.freeCrateUsed = true
+	local item = Profile.openCrate(p, roll)
+	if item == nil then
+		p.stars += Profile.DUPLICATE_STARS
+		return nil, "complete"
+	end
+	return item, nil
 end
 
 -- A crate for stars.
@@ -300,6 +334,23 @@ function Profile.grant(p: Record, productKey: string, purchaseId: string, roll: 
 				grant.stars += Profile.DUPLICATE_STARS * 2
 			end
 		end
+	elseif Catalog.starPack(productKey) then
+		-- A star pack (Catalog.STAR_PACKS).
+		local pack = Catalog.starPack(productKey) :: Catalog.StarPack
+		p.stars += pack.stars
+		grant.stars += pack.stars
+	elseif Catalog.dealWeapon(productKey) then
+		-- A daily deal: its weapon for good (paid, so whatever the day now),
+		-- or stars at the deal's price if it's owned meanwhile.
+		local w = Catalog.dealWeapon(productKey) :: Catalog.Weapon
+		p.dealDay = math.max(p.dealDay, now // 86400)
+		if p.owned[w.id] then
+			p.stars += w.stars or Profile.DUPLICATE_STARS
+			grant.stars += w.stars or Profile.DUPLICATE_STARS
+		else
+			p.owned[w.id] = true
+			table.insert(grant.items, w.id)
+		end
 	else
 		local unlocked = false
 		for _, w in Catalog.ARSENAL do
@@ -369,6 +420,8 @@ export type View = {
 	general: boolean, -- subscribed (the server asks Roblox)
 	tutorial: string?,
 	tipsSeen: { string },
+	dealDay: number?, -- the UTC day a daily deal was last bought
+	freeCrate: boolean?, -- the free crate is waiting to be opened
 }
 
 local function tipList(p: Record): { string }
@@ -409,6 +462,8 @@ function Profile.view(p: Record, saved: boolean, doubleStars: boolean, general: 
 		general = general == true,
 		tutorial = p.tutorial,
 		tipsSeen = tipList(p),
+		dealDay = if p.dealDay > 0 then p.dealDay else nil,
+		freeCrate = if Profile.freeCrateReady(p) then true else nil,
 	}
 end
 
@@ -447,6 +502,8 @@ function Profile.encode(p: Record): { [string]: any }
 		referralCredited = if p.referralCredited then true else nil,
 		referralDay = if p.referralDay > 0 then p.referralDay else nil,
 		referralsToday = if p.referralsToday > 0 then p.referralsToday else nil,
+		dealDay = if p.dealDay > 0 then p.dealDay else nil,
+		freeCrateUsed = if p.freeCrateUsed then true else nil,
 	}
 end
 
@@ -511,6 +568,8 @@ function Profile.decode(record: any): (Record?, string?)
 	p.referralCredited = record.referralCredited == true
 	p.referralDay = if isCount(record.referralDay) then record.referralDay else 0
 	p.referralsToday = if isCount(record.referralsToday) then record.referralsToday else 0
+	p.dealDay = if isCount(record.dealDay) then record.dealDay else 0
+	p.freeCrateUsed = record.freeCrateUsed == true
 	return p, nil
 end
 

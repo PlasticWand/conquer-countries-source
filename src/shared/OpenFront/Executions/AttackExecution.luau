@@ -92,6 +92,17 @@ function AttackExecution.init(self: AttackExecution, mg: any, _ticks: number)
 	self.mg = mg
 	self.map = mg:map()
 
+	-- Conquest's tutorial (Runner.new's aiHold): only the human attacks until
+	-- the human's first attack, which lifts the hold.
+	if mg.aiHold then
+		if self._owner:type() == PlayerType.Human then
+			mg.aiHold = false
+		else
+			self.active = false
+			return
+		end
+	end
+
 	if self._targetID ~= nil and not mg:hasPlayer(self._targetID) then
 		self.active = false
 		return

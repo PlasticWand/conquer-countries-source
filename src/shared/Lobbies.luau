@@ -40,6 +40,7 @@ export type Row = {
 	mapName: string,
 	mapType: string,
 	mode: string?, -- "Quads", "5 teams", "Humans vs Nations"
+	minutes: number?, -- a timed match's length (Blitz: OpenFront's maxTimerValue)
 	players: number,
 	capacity: number,
 	seconds: number?, -- countdown, once someone joined
