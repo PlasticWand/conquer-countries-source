@@ -1265,6 +1265,17 @@ function OfActions._askBuild(self: any, unitType: string, tile: number)
 			local able = bu.canUpgrade ~= false or bu.canBuild ~= false
 			setUsable(self.confirmYes, able)
 			setUsable(self.confirmLaunch, able)
+			-- Sabotage says why it can't (Bruno, 2026-11-17: a red box and a
+			-- grey ✓ with no reason when the building was out of reach).
+			if unitType == "Sabotage" then
+				local aim = reply.sabotageAim
+				local why = if aim and aim.targetTile == nil then HudModel.sabotageReason(aim, reply.tick) else nil
+				if why then
+					self.bannerText.Text = why
+				else
+					self:_refreshBanner()
+				end
+			end
 		end)
 	end
 	local opening = not self.confirmCard.Visible

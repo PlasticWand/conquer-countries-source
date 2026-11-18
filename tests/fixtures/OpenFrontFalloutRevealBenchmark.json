@@ -1,0 +1,66 @@
+{
+  "baseCommit": "1fd32e8",
+  "baseline": {
+    "commitMs": {
+      "max": 0,
+      "p50": 0,
+      "p95": 0,
+      "samples": 12
+    },
+    "completionFrames": {
+      "max": 23,
+      "p50": 19,
+      "p95": 23,
+      "samples": 12
+    },
+    "dispatchMs": {
+      "max": 26.965600001858547,
+      "p50": 21.55730000231415,
+      "p95": 26.965600001858547,
+      "samples": 12
+    },
+    "frameMs": {
+      "max": 2.7553000109037384,
+      "p50": 2.5465000071562827,
+      "p95": 2.598999999463558,
+      "samples": 235
+    },
+    "maxRetainedScratchBytes": 0,
+    "meanNativeWrites": 63.833333333333336,
+    "meanUploadedPixels": 34736.416666666664
+  },
+  "budgetMs": 2.5,
+  "coherent": {
+    "commitMs": {
+      "max": 0.16789999790489674,
+      "p50": 0.10830000974237919,
+      "p95": 0.16789999790489674,
+      "samples": 12
+    },
+    "completionFrames": {
+      "max": 21,
+      "p50": 19,
+      "p95": 21,
+      "samples": 12
+    },
+    "dispatchMs": {
+      "max": 28.60309999960009,
+      "p50": 23.932500000228174,
+      "p95": 28.60309999960009,
+      "samples": 12
+    },
+    "frameMs": {
+      "max": 2.9617999971378595,
+      "p50": 2.546600007917732,
+      "p95": 2.607200003694743,
+      "samples": 236
+    },
+    "maxRetainedScratchBytes": 262144,
+    "meanNativeWrites": 1,
+    "meanUploadedPixels": 65536
+  },
+  "excludes": "Roblox native upload, GUI/layout, GPU, replication and phone performance",
+  "pixelBudget": 81920,
+  "workingTree": true,
+  "workload": "12 synthetic Hydrogen impacts: inner 80/outer 100, 320x256 land, visible 200 tiles across"
+}

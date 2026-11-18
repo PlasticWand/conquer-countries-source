@@ -679,41 +679,52 @@ end
 -- tiles of our land (ties to the lower id). Nil while spawn immunity lasts,
 -- one is under way, or the cooldown runs.
 function Player.sabotageTarget(self: Player, tile: number): any?
+	return (self:sabotageAim(tile))
+end
+
+-- The same check, with why there is no target (Bruno, 2026-11-17: the aim
+-- showed a red box and no reason when the building was out of reach).
+-- Reasons: "immunity", "busy" (one under way), "cooldown", "no_building",
+-- "ally" (only friendly or protected buildings there), "dark" (already
+-- switched off), "out_of_reach" (more than REACH tiles from our border).
+function Player.sabotageAim(self: Player, tile: number): (any?, string?)
 	local mg = self.mg
 	if mg:isSpawnImmunityActive() then
-		return nil
+		return nil, "immunity"
 	end
-	if ((self :: any).sabotageReadyAt or 0) > mg:ticks() or #self:units(UnitType.Sabotage) > 0 then
-		return nil
+	if #self:units(UnitType.Sabotage) > 0 then
+		return nil, "busy"
+	end
+	if ((self :: any).sabotageReadyAt or 0) > mg:ticks() then
+		return nil, "cooldown"
 	end
 	local best: any, bestD = nil, math.huge
+	local sawFriendly, sawDark = false, false
 	for _, entry in mg:nearbyUnits(tile, 4, GameTypes.Structures) do
 		local unit = entry.unit
 		local owner = unit:owner()
-		if
-			unit:isActive()
-			and not unit:isDark()
-			and owner:isPlayer()
-			and owner ~= self
-			and not self:isFriendly(owner)
-			and self:canAttackPlayer(owner)
-			and (entry.distSquared < bestD or (entry.distSquared == bestD and unit:id() < best:id()))
-		then
-			best, bestD = unit, entry.distSquared
+		if unit:isActive() and owner:isPlayer() and owner ~= self then
+			if self:isFriendly(owner) or not self:canAttackPlayer(owner) then
+				sawFriendly = true
+			elseif unit:isDark() then
+				sawDark = true
+			elseif entry.distSquared < bestD or (entry.distSquared == bestD and unit:id() < best:id()) then
+				best, bestD = unit, entry.distSquared
+			end
 		end
 	end
 	if best == nil then
-		return nil
+		return nil, if sawFriendly then "ally" elseif sawDark then "dark" else "no_building"
 	end
 	local reach = (require(script.Parent.Executions.SabotageExecution) :: any).REACH
 	local reach2 = reach * reach
 	local at = best:tile()
 	for _, t in self:borderTiles():values() do
 		if mg:euclideanDistSquared(t, at) <= reach2 then
-			return best
+			return best, nil
 		end
 	end
-	return nil
+	return nil, "out_of_reach"
 end
 
 -- Our own Arsenal item (docs/design/ARSENAL_V2.md, Paratroopers): where a

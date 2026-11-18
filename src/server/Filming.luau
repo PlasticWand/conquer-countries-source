@@ -36,8 +36,23 @@
 --                              the player holds `share` of the land (0.77)
 --   finish { ratio?, troops? } the final attack on the biggest neighbour
 --   hold   { on }              freeze the match (the camera can still move)
--- invade, boat, launch, finish and navy take `dry = true`: report the anchor
--- and target without acting, so the camera can be in place first.
+-- For the shorts (Bruno, 2026-11-17: docs/shorts/PLAN.md):
+--   ally   { target?, delay? } we ask a neighbouring nation (as invade picks
+--                              it) for an alliance, and `delay` s later
+--                              (default 1.2) it answers through the game's
+--                              own AllianceRequestExecution
+--   betray { target?, troops?, ratio?, delay? } our ally on the border breaks
+--                              the alliance (the game marks it the traitor)
+--                              and `delay` s later (0.4) attacks us with
+--                              `ratio` (0.6) of its troops, topped up to
+--                              `troops` off camera first
+--   troops { share? }          off camera: our troops set to `share` of our
+--                              maximum (1 = a full bar); replies with the
+--                              growth per second at that level
+--   launch { at = "capital", target = name } picks that nation's capital
+-- invade, boat, launch, finish, navy, ally and betray take `dry = true`:
+-- report the anchor and target without acting, so the camera can be in
+-- place first.
 
 local Filming = {}
 
@@ -391,8 +406,9 @@ function commands.launch(match, me, id, args)
 		-- A neighbouring nation's capital, nearest the silo first: a short
 		-- flight the camera can hold close on.
 		local capitals = {}
+		local want = if args.target ~= nil then string.lower(tostring(args.target)) else nil
 		for p, _ in neighbours(g, me) do
-			if p:type() == "NATION" and p:spawnTile() then
+			if p:type() == "NATION" and p:spawnTile() and (want == nil or string.lower(p:displayName()) == want) then
 				table.insert(capitals, p:spawnTile())
 			end
 		end
@@ -597,6 +613,89 @@ function commands.grow(match, me, _id, args)
 		taken += 1
 	end
 	return { share = share(g, me), taken = taken, anchor = if home then tileAnchor(g, home) else nil }
+end
+
+function commands.ally(match, me, id, args)
+	local g = match.runner.game
+	local target, tiles = invadeTarget(g, me, args.target, tonumber(args.min) or 150)
+	if target == nil then
+		return { error = "no neighbour" }
+	end
+	local reply = { anchor = anchorOf(g, tiles), target = target:displayName(), box = boxOf(g, target:tiles():values()) }
+	if args.dry then
+		reply.dry = true
+		return reply
+	end
+	if me:isAlliedWith(target) then
+		return { error = `already allied with {target:displayName()}` }
+	end
+	local ok, reason = match.runner:intent(id, { type = "allianceRequest", recipient = target:id() })
+	if not ok then
+		return { error = tostring(reason) }
+	end
+	local AllianceRequestExecution = require(game:GetService("ReplicatedStorage").Shared.OpenFront.Executions.AllianceRequestExecution) :: any
+	task.delay(tonumber(args.delay) or 1.2, function()
+		if not target:isAlive() or target:isAlliedWith(me) then
+			return
+		end
+		-- Accepts our pending request; if their AI already turned it down,
+		-- this asks us instead, and our second request below accepts that.
+		g:addExecution(AllianceRequestExecution.new(target, me:id()))
+		task.delay(0.5, function()
+			if target:isAlive() and not target:isAlliedWith(me) then
+				match.runner:intent(id, { type = "allianceRequest", recipient = target:id() })
+			end
+		end)
+	end)
+	return reply
+end
+
+function commands.betray(match, me, _id, args)
+	local g = match.runner.game
+	local want = if args.target ~= nil then string.lower(tostring(args.target)) else nil
+	local traitor, tiles = nil, {}
+	for p, border in neighbours(g, me) do
+		if me:isAlliedWith(p) and (want == nil or string.lower(p:displayName()) == want) and #border > #tiles then
+			traitor, tiles = p, border
+		end
+	end
+	if traitor == nil then
+		return { error = "no ally on our border: ally { target = ... } first" }
+	end
+	local reply = { anchor = anchorOf(g, tiles), target = traitor:displayName(), border = #tiles, box = boxOf(g, me:tiles():values()) }
+	if args.dry then
+		reply.dry = true
+		return reply
+	end
+	if tonumber(args.troops) then
+		traitor:setTroops(tonumber(args.troops) :: number)
+	end
+	local Executions = game:GetService("ReplicatedStorage").Shared.OpenFront.Executions
+	local BreakAllianceExecution = require(Executions.BreakAllianceExecution) :: any
+	local AttackExecution = require(Executions.AttackExecution) :: any
+	g:addExecution(BreakAllianceExecution.new(traitor, me:id()))
+	local ratio = tonumber(args.ratio) or 0.6
+	task.delay(tonumber(args.delay) or 0.4, function()
+		if traitor:isAlive() and me:isAlive() and not traitor:isAlliedWith(me) then
+			g:addExecution(AttackExecution.new(traitor:troops() * ratio, traitor, me:id()))
+		end
+	end)
+	return reply
+end
+
+function commands.troops(match, me, _id, args)
+	local g = match.runner.game
+	local max = g:config():maxTroops(me)
+	local want = math.clamp(tonumber(args.share) or 1, 0, 1)
+	me:setTroops(math.floor(max * want))
+	local home = me:spawnTile()
+	return {
+		troops = me:troops(),
+		max = max,
+		-- troopIncreaseRate is per tick; the match runs 10 ticks a second
+		perSecond = g:config():troopIncreaseRate(me) * 10,
+		anchor = if home then tileAnchor(g, home) else nil,
+	}
 end
 
 function commands.finish(match, me, id, args)

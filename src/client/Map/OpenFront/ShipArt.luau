@@ -61,7 +61,7 @@ end
 function Art.new(): any
 	return {cursor=0,needed=false,pixels=nil,content=nil,image=nil,failed=false}
 end
-function Art.build(state: any, budgetMs: number, maxPixels: number): boolean
+function Art.build(state: any, budgetMs: number, maxPixels: number, minPixels: number?): boolean
 	if not state.needed or state.content or state.failed then return false end
 	if not state.pixels then state.pixels=buffer.create(Art.width*Art.height*4) end
 	local started,count=os.clock(),0
@@ -76,7 +76,7 @@ function Art.build(state: any, budgetMs: number, maxPixels: number): boolean
 			buffer.writeu32(state.pixels,off,gray+gray*256+gray*65536+math.floor(a*255+.5)*16777216)
 		end
 		state.cursor+=1; count+=1
-		if count>=maxPixels or (count%64==0 and (os.clock()-started)*1000>=budgetMs) then break end
+		if count>=maxPixels or (count>=(minPixels or 0) and count%64==0 and (os.clock()-started)*1000>=budgetMs) then break end
 	end
 	state.buildMs=(state.buildMs or 0)+(os.clock()-started)*1000
 	return state.cursor==Art.size*Art.size*Art.count

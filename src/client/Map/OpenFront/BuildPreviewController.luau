@@ -9,6 +9,7 @@ local Arsenal = require(Shared.ArsenalUnits)
 local NukeExecution = require(Shared.Executions.NukeExecution)
 local StrikeExecution = require(Shared.Executions.StrikeExecution)
 local FieldWorksExecution = require(Shared.Executions.FieldWorksExecution)
+local SabotageExecution = require(Shared.Executions.SabotageExecution)
 
 export type Buildable = {
 	type: string, canBuild: number | false, canUpgrade: number | false, cost: number,
@@ -19,7 +20,7 @@ export type Reply = {
 	nukeAim: {siloTile: number, sams: {Trajectory.SAMInfo}}?,
 	strikeAim: {launcherTile:number?,radius:number,reach:number}?,
 	paraAim: {originTile:number?,reach:number,troops:number,readyAt:number}?,
-	sabotageAim: {targetTile:number?,reach:number,readyAt:number}?,
+	sabotageAim: {targetTile:number?,reach:number,readyAt:number,reason:string?}?,
 	fieldWorksAim: {radius:number,readyAt:number}?,
 }
 export type Query = (tile: number?, unit: string) -> Reply?
@@ -89,6 +90,8 @@ function Controller.setChosen(self: any, unitType: string?)
 	self.generation += 1
 	self.reply, self.lastQueryAt, self.dataReply, self.ghostData = nil, -math.huge, nil, nil
 	clear(self)
+	self.sabotageReach=if unitType=='Sabotage' then SabotageExecution.REACH else nil
+	self.renderer:setSabotageReach(self.sabotageReach)
 end
 
 -- Pending intent is a world tile, independent of the pointer/card/safe area.
@@ -257,6 +260,10 @@ function Controller.step(self: any)
 	if self.destroyed then return end
 	if self.renderer.destroyed then self:destroy(); return end
 	local unit: string? = self.chosen
+	local aim=self.reply and self.reply.sabotageAim
+	if aim then self.sabotageReach=aim.reach end
+	self.renderer:setSabotageReach(if unit=='Sabotage' and self.state.ready and not self.state:inSpawnPhase()
+		and self.state:me()~=nil then self.sabotageReach else nil)
 	local active, tile, x, y, impassable = pointer(self)
 	if not unit or not BUILDABLE[unit] then active = false end
 	if active ~= self.pointerActive or tile ~= self.pointerTile then
@@ -295,6 +302,7 @@ end
 function Controller.destroy(self: any)
 	if self.destroyed then return end
 	self.destroyed = true
+	self.renderer:setSabotageReach(nil)
 	self.generation += 1
 	if self.queryThread then pcall(task.cancel, self.queryThread); self.queryThread = nil end
 	for _, connection in self.connections do connection:Disconnect() end

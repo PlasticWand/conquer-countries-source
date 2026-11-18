@@ -8,6 +8,17 @@ return function(t)
 		'image.WritePixelsBuffer=function(_,_,size,pixels) env.frameImages=env.frameImages or {}; env.frameImages[image]=true;')
 	assert(replacements==1,'upload instrumentation was not installed')
 	local native=luau.load(source)()
+	t.test('loading ship-art slices guarantee bounded progress after a spent deadline',function()
+		local H=luau.load(fs.readFile('tests/harness.luau'))()
+		local Art=H.require(H.mount('src/client/Map/OpenFront','OpenFront').ShipArt)
+		local s=Art.new();s.needed=true
+		for _=1,64 do Art.build(s,0,32768,4096) end
+		t.eq(s.cursor,Art.size*Art.size*Art.count,'initial art must finish in bounded calls')
+		local live=Art.new();live.needed=true;Art.build(live,0,4096)
+		t.ok(live.cursor<4096,'ordinary live slices still obey their deadline')
+		local capped=Art.new();capped.needed=true;Art.build(capped,0,128,4096)
+		t.ok(capped.cursor<=128,'minimum work cannot override the pixel cap')
+	end)
 	t.test('first paint finishes when live updates alternate with quiet render frames',function()
 		for _,cadence in {2,3} do
 			local e=native(); local s=e.client(); s.width=1088; s.startTick=0; s.names={}

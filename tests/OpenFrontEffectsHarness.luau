@@ -100,7 +100,7 @@ return function(): any
 	local loaded={}
 	local function load(node: any): any
 		if node~=root.EditableRenderer and node~=root.SceneOverlay and node~=root.EffectOverlay and node~=root.MapInput
-			and node~=root.BuildPreviewController and node~=root.NameStatusOverlay then return Harness.require(node) end
+			and node~=root.BuildPreviewController and node~=root.NameStatusOverlay and node~=root.SabotageReachOverlay then return Harness.require(node) end
 		if loaded[node] then return loaded[node] end
 		local globals=table.clone(native); globals.script,globals.require=node,load
 		if node==root.BuildPreviewController then globals.task=previewTask end

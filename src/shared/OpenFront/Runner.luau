@@ -699,12 +699,14 @@ function Runner.buildPreview(self: Runner, clientID: string, tile: number?, unit
 		fieldWorksAim = { radius = FieldWorksExecution.RADIUS, readyAt = player.fieldWorksReadyAt or 0 }
 	end
 
-	-- Conquest's Sabotage: the building it would hit (nil: none).
+	-- Conquest's Sabotage: the building it would hit (nil: none), and why
+	-- not when there is none (Player.sabotageAim's reason).
 	local sabotageAim = nil
 	if aimTile ~= nil and unitType == UnitType.Sabotage then
-		local target = player:sabotageTarget(aimTile)
+		local target, reason = player:sabotageAim(aimTile)
 		sabotageAim = {
 			targetTile = if target ~= nil then target:tile() else nil,
+			reason = reason,
 			reach = SabotageExecution.REACH,
 			readyAt = player.sabotageReadyAt or 0,
 		}

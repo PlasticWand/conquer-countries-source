@@ -9,6 +9,7 @@ local Defaults = require(script.Parent.RenderDefaults)
 local Edge = require(script.Parent.EdgeSmoothing)
 local Policy = require(script.Parent.RenderPolicy)
 local DeferredDirty = require(script.Parent.DeferredDirty)
+local FalloutReveal = require(script.Parent.FalloutReveal)
 -- Cache the numerical primitives used for each shaded pixel.
 local read8,read16,read32,write32=buffer.readu8,buffer.readu16,buffer.readu32,buffer.writeu32
 local band,btest=bit32.band,bit32.btest
@@ -17,7 +18,7 @@ local Core = {}
 Core.PAGE, Core.BLOCK = 1024, 32
 export type Pattern = {width: number, height: number, scale: number, bytes: buffer}
 export type Player = {id: string, smallID: number, playerType: string, team: string?, cosmetics: Colors.Cosmetics?, pattern: Pattern?}
-export type Page = {id: number, x: number, y: number, width: number, height: number, queue: {number}, head: number, pixels: buffer}
+export type Page = {id: number, x: number, y: number, width: number, height: number, queue: {number}, head: number, pixels: buffer, initialized: boolean}
 export type Sink = {write: (Page, number, number, number, number, buffer) -> (), destroy: () -> ()}
 type Paint = {solid: number?, lut: buffer?, color: Political.RGBA?}
 type Entry = {fill: Political.RGBA, border: Political.RGBA, secondary: Political.RGBA, pattern: Pattern?, paints: {[number]: Paint}}
@@ -39,6 +40,7 @@ export type State = {
 	rowCursor: buffer, rowDirtySince: buffer, ownDirtyRows: buffer, ownQueued: buffer, committedRevisions: buffer, nextOwnPage: number, nextBackgroundPage: number,
 	recentAges: {AgeSample}, recentCursor: number, lastTileTime: number, lastOwnTileTime: number,
 	deferred: any,
+	falloutReveal: any,
 	frontDirtyRows: buffer, frontQueued: buffer, frontRowSince: buffer,
 	normalCursor: number,
 }
@@ -49,7 +51,7 @@ function Core.new(terrain: buffer, width: number, height: number, sink: Sink): S
 	assert(width > 0 and height > 0 and width % 1 == 0 and height % 1 == 0 and buffer.len(terrain) == width * height, "invalid terrain dimensions")
 	local pages: {Page} = {}
 	for y = 0, height - 1, Core.PAGE do for x = 0, width - 1, Core.PAGE do
-		table.insert(pages, {id = #pages + 1, x = x, y = y, width = math.min(Core.PAGE, width - x), height = math.min(Core.PAGE, height - y), queue = {}, head = 1, pixels=buffer.create(math.min(Core.PAGE,width-x)*math.min(Core.PAGE,height-y)*4)})
+		table.insert(pages, {id = #pages + 1, x = x, y = y, width = math.min(Core.PAGE, width - x), height = math.min(Core.PAGE, height - y), queue = {}, head = 1, initialized=false, pixels=buffer.create(math.min(Core.PAGE,width-x)*math.min(Core.PAGE,height-y)*4)})
 	end end
 	local cols, rows = math.ceil(width / Core.BLOCK), math.ceil(height / Core.BLOCK)
 	local s: State = {width = width, height = height, terrain = buffer.create(buffer.len(terrain)), tileState = buffer.create(width * height * 2),
@@ -65,6 +67,7 @@ function Core.new(terrain: buffer, width: number, height: number, sink: Sink): S
 		ownDirtyRows=buffer.create(cols*rows*128),nextOwnPage=1,nextBackgroundPage=1,
 		recentAges={},recentCursor=0,lastTileTime=-1,lastOwnTileTime=-1,
 		deferred=DeferredDirty.new(Policy.deferredOwnership,Policy.deferredMaxPendingRecords),
+		falloutReveal=FalloutReveal.new(Policy.coherentFallout,Policy.falloutRevealMaxPixels,Policy.falloutRevealRegions),
 		frontDirtyRows=buffer.create(cols*rows*128),frontQueued=buffer.create(cols*rows),frontRowSince=buffer.create(cols*rows*128),normalCursor=0}
 	buffer.fill(s.borderFlags,0,255)
 	buffer.copy(s.terrain, 0, terrain)
@@ -184,7 +187,7 @@ local function flushRegions(s: State, regions: {[number]: {number}})
 end
 
 function Core.hasPending(s: State): boolean
-	return s.pending>0 or s.deferred.count>0
+	return s.pending>0 or s.deferred.count>0 or #s.falloutReveal.regions>0
 end
 
 -- Ported from RoWorld 2be8efb (src/client/Map/MapSurface.luau), © lukechatton and contributors, AGPL-3.0. Modified for Conquest.
@@ -438,15 +441,27 @@ end
 
 -- Original GameView packed tile updates. Copy only listed refs; full nil means
 -- snapshot/full repaint, empty list means no updates. TileRef 0 is valid.
-function Core.applyTileStates(s: State, states: buffer, changedTiles: {number}?, changes: {own: {number}, fallout: {number}}?)
+function Core.applyTileStates(s: State, states: buffer, changedTiles: {number}?, changes: {own: {number}, fallout: {number}}?, stageFallout: boolean?)
 	assert(not s.destroyed and buffer.len(states) == s.width * s.height * 2, "invalid tile state buffer")
-	if changedTiles == nil then s.terrainOnly = false; buffer.copy(s.tileState, 0, states); Core.repaint(s); return end
+	if changedTiles == nil then s.falloutReveal:clear(); s.terrainOnly = false; buffer.copy(s.tileState, 0, states); Core.repaint(s); return end
 	for _, tile in changedTiles do assert(tile >= 0 and tile < s.width * s.height and tile % 1 == 0, "invalid TileRef") end
 	local bulk: buffer?=nil
 	if s.deferred.enabled and #changedTiles>=4096 and s.deferred.count+2<=s.deferred.cap
 		and s.deferred.batchBytes+#changedTiles*16<=Policy.deferredBatchBytes then bulk=buffer.create(#changedTiles*8) end
 	local bulkOwn,bulkOther=0,0
 	local regions: {[number]: {number}} = {}
+	local falloutCount=0
+	local revealEnabled=s.falloutReveal.enabled and stageFallout~=false
+	local falloutFirst,falloutLast,falloutLeft,falloutRight=math.huge,-1,s.width,-1
+	local falloutRunFirst:number?=nil
+	local falloutRunLast=0
+	local function falloutBounds(from:number,to:number)
+		local left,right=from%s.width,to%s.width
+		if from<falloutFirst then falloutFirst=from end
+		if to>falloutLast then falloutLast=to end
+		if left<falloutLeft then falloutLeft=left end
+		if right>falloutRight then falloutRight=right end
+	end
 	local first: number?=nil
 	local last: number?=nil
 	local ownRun=false
@@ -460,6 +475,7 @@ function Core.applyTileStates(s: State, states: buffer, changedTiles: {number}?,
 	local frontBatch=#changedTiles<4096
 	local function flush()
 		if first then
+			if falloutRunFirst then falloutBounds(falloutRunFirst,falloutRunLast);falloutRunFirst=nil end
 			if s.deferred.enabled then
 				if last and last>first then
 					for from=first,last,256 do
@@ -475,6 +491,8 @@ function Core.applyTileStates(s: State, states: buffer, changedTiles: {number}?,
 		local v = buffer.readu16(states, tile * 2)
 		local old=read16(s.tileState,tile*2)
 		if v ~= old then
+			local falloutChanged=band(bit32.bxor(old,v),8192)~=0
+			local newFallout=revealEnabled and falloutChanged and btest(v,8192)
 			s.lastTileTime=now
 			local oldOwner,newOwner=band(old,4095),band(v,4095)
 			local own=s.localPlayer>0 and (oldOwner==s.localPlayer or newOwner==s.localPlayer)
@@ -483,7 +501,7 @@ function Core.applyTileStates(s: State, states: buffer, changedTiles: {number}?,
 			-- a nation-sized batch again before this copy. Never retain the lists.
 			if changes then
 				if own and oldOwner~=newOwner then table.insert(changes.own,tile) end
-				if band(bit32.bxor(old,v),8192)~=0 then table.insert(changes.fallout,tile) end
+				if falloutChanged then table.insert(changes.fallout,tile) end
 			end
 			if own then s.lastOwnTileTime=s.lastTileTime end
 			s.terrainOnly=false; buffer.writeu16(s.tileState,tile*2,v)
@@ -497,9 +515,24 @@ function Core.applyTileStates(s: State, states: buffer, changedTiles: {number}?,
 				-- unchanged; large/unsorted gaps still use their original spans.
 				last=tile;ownRun=ownRun or own
 			else flush();first,last,ownRun,firstOld=tile,tile,own,old;rowEnd=(math.floor(tile/s.width)+1)*s.width end
+			if newFallout then
+				falloutCount+=1
+				if bulk then falloutBounds(tile,tile)
+				else falloutRunFirst=falloutRunFirst or tile;falloutRunLast=tile end
+			end
 		end
 	end
 	flush(); flushRegions(s, regions)
+	if falloutCount>=Policy.falloutRevealMinTiles then
+		local batch=s.falloutReveal:begin()
+		local top,bottom=math.floor(falloutFirst/s.width),math.floor(falloutLast/s.width)+1
+		for _,page in s.pages do
+			if page.initialized and falloutLeft<page.x+page.width and falloutRight>=page.x and top<page.y+page.height and bottom>page.y then
+				s.falloutReveal:add(page,math.max(falloutLeft,page.x),math.max(top,page.y),
+					math.min(falloutRight+1,page.x+page.width),math.min(bottom,page.y+page.height),s.frames,batch)
+			end
+		end
+	end
 	if bulk then
 		s.deferred:pushBatch(bulk,0,bulkOwn,true,s.frames+1)
 		s.deferred:pushBatch(bulk,#changedTiles*4,bulkOther,false,s.frames+1)
@@ -758,18 +791,25 @@ function Core.step(s: State, budgetMs: number?, pixelBudget: number?, heldPages:
 	s.steps+=1; if not s.managedFrames then s.frames+=1 end
 	if s.deferred.count>0 then Core.flushInvalidations(s,math.min(Policy.deferredMs,budget*.5)) end
 	s.visiblePending=prioritize(s)
-	local page: Page?=nil
+	local presenting:number?=if #s.falloutReveal.regions>0 then s.falloutReveal:nextPage(s) else nil
+	-- A ready cohort still gets an image slot when unrelated fronts keep the
+	-- ordinary queues busy. Once started, its remaining pages follow directly.
+	if not presenting and #s.falloutReveal.regions>0 and s.steps%4==0 then presenting=s.falloutReveal:readyPage(s) end
+	local page: Page?=if presenting and not (heldPages and heldPages[presenting]) then s.pages[presenting] else nil
 	local fallback: Page?=nil
 	local foreground: Page?=nil
 	local ownForeground: Page?=nil
+	local presentation: Page?=nil
 	local ownFirst=s.viewport~=nil and s.steps%4~=0
 	local background=s.viewport~=nil and s.steps%8==0
 	local pageCursor=if background then s.nextBackgroundPage elseif ownFirst then s.nextOwnPage else s.nextPage
 	for offset=0,#s.pages-1 do
+		if page then break end
 		local candidate=s.pages[(pageCursor+offset-1)%#s.pages+1]
 		-- The full-paint adapter holds each fully uploaded page while the other
 		-- pages finish. New deltas retain their rows/revisions for live catch-up.
 		if heldPages and heldPages[candidate.id] then continue end
+		if #s.falloutReveal.regions>0 and candidate.head>#candidate.queue and s.falloutReveal:hasReadyPage(s,candidate.id) then presentation=presentation or candidate end
 		if candidate.head<=#candidate.queue then
 			fallback=fallback or candidate
 			local key=candidate.queue[candidate.head]
@@ -781,7 +821,7 @@ function Core.step(s: State, budgetMs: number?, pixelBudget: number?, heldPages:
 			end
 		end
 	end
-	page=page or ownForeground or foreground or fallback
+	page=page or ownForeground or foreground or presentation or fallback
 	if not page then return {pixels=0,uploads=0,ms=(os.clock()-started)*1000} end
 	local selected=page :: Page
 	s.job=nil
@@ -880,7 +920,8 @@ function Core.step(s: State, budgetMs: number?, pixelBudget: number?, heldPages:
 			buffer.copy(selected.pixels,((work.y+row-selected.y)*selected.width+work.x-selected.x)*4,out,row*w*4,w*4)
 		end
 		local sinkStarted=os.clock()
-		s.sink.write(selected,work.x-selected.x,work.y-selected.y,w,rows,out)
+		local held=#s.falloutReveal.regions>0 and s.falloutReveal:holds(selected.id,work.x-selected.x,work.y-selected.y,w,rows)
+		if not held then s.sink.write(selected,work.x-selected.x,work.y-selected.y,w,rows,out) end
 		s.sinkMs+=(os.clock()-sinkStarted)*1000
 		local sameRevision=work.revision==read32(s.revisions,key*4)
 		if sameRevision then
@@ -910,9 +951,12 @@ function Core.step(s: State, budgetMs: number?, pixelBudget: number?, heldPages:
 		end
 		if old and not full then for owner in old do work.owners[owner]=true end end
 		s.blockOwners[key]=work.owners
-		s.paintedPixels+=w*rows; s.uploadedBytes+=w*rows*4; s.uploads+=1; uploads+=1
-		s.lastUploadAgeFrames=age; s.maxUploadAgeFrames=math.max(s.maxUploadAgeFrames,age)
-		if visible(s,key) then recordAge(s,age,ownUpload,frontAge) end
+		s.paintedPixels+=w*rows
+		if not held then
+			s.uploadedBytes+=w*rows*4; s.uploads+=1; uploads+=1
+			s.lastUploadAgeFrames=age; s.maxUploadAgeFrames=math.max(s.maxUploadAgeFrames,age)
+			if visible(s,key) then recordAge(s,age,ownUpload,frontAge) end
+		end
 		local remains,ownRemains,frontRemains=false,false,false
 		if not sameRevision then hasFront=hasFront or read8(s.frontQueued,key)~=0 end
 		for row=0,blockHeight-1 do
@@ -936,7 +980,17 @@ function Core.step(s: State, budgetMs: number?, pixelBudget: number?, heldPages:
 		end
 		if pixels>=limit or (os.clock()-started)*1000>=budget then break end
 	end
-	if selected.head>#selected.queue then table.clear(selected.queue); selected.head=1
+	if #s.falloutReveal.regions>0 then
+		local revealStarted=os.clock()
+		local revealed=s.falloutReveal:flush(s,selected)
+		s.sinkMs+=(os.clock()-revealStarted)*1000
+		if revealed>0 then
+			s.uploadedBytes+=revealed*4;s.uploads+=1;uploads+=1
+			s.lastUploadAgeFrames=s.falloutReveal.lastDelayFrames
+			s.maxUploadAgeFrames=math.max(s.maxUploadAgeFrames,s.lastUploadAgeFrames)
+		end
+	end
+	if selected.head>#selected.queue then table.clear(selected.queue); selected.head=1;selected.initialized=true
 	elseif selected.head>256 then
 		local compact={}; for i=selected.head,#selected.queue do table.insert(compact,selected.queue[i]) end
 		selected.queue,selected.head=compact,1
@@ -977,6 +1031,11 @@ function Core.metrics(s: State): {[string]: number}
 	end end
 	local rowBytes=buffer.len(s.rowCursor)+buffer.len(s.rowDirtySince)+buffer.len(s.ownDirtyRows)+buffer.len(s.ownQueued)+buffer.len(s.committedRevisions)+buffer.len(s.relationRows)+buffer.len(s.frontDirtyRows)+buffer.len(s.frontQueued)+buffer.len(s.frontRowSince)
 	return {pages = #s.pages, stride = 1, pendingBlocks = s.pending, paintedPixels = s.paintedPixels, uploads = s.uploads,
+		falloutRevealPending=#s.falloutReveal.regions,falloutRevealCommits=s.falloutReveal.commits,
+		falloutRevealHeldWrites=s.falloutReveal.heldWrites,falloutRevealFallbacks=s.falloutReveal.fallbacks,
+		falloutRevealMaxPixels=s.falloutReveal.maxCommitPixels,falloutRevealPixels=s.falloutReveal.pixels,
+		falloutRevealMaxDelayFrames=s.falloutReveal.maxDelayFrames,falloutRevealCommitMs=s.falloutReveal.commitMs,
+		falloutRevealScratchBytes=buffer.len(s.falloutReveal.scratch),
 		invalidationPendingRecords=s.deferred.count,invalidationOwnRecords=s.deferred.ownCount,
 		invalidationAgeFrames=invalidationAge,invalidationOwnAgeFrames=invalidationOwnAge,
 		invalidationExpandedTiles=s.deferred.expanded,invalidationFallbacks=s.deferred.fallbacks,
@@ -995,7 +1054,7 @@ function Core.metrics(s: State): {[string]: number}
 		uploadedBytes = s.uploadedBytes, steps = s.steps, indexEntries = s.indexEntries, paintBytes = s.paintBytes, maxUploadAgeFrames = s.maxUploadAgeFrames,
 		cpuBufferBytes = buffer.len(s.terrain) + buffer.len(s.tileState) + buffer.len(s.terrainLut) + buffer.len(s.queued)
 			+ (if s.destroyed then 0 else s.width*s.height*4) + invalidationBytes + buffer.len(s.borderFlags) + buffer.len(s.dirtyRows) + buffer.len(s.fullDirty)
-			+ buffer.len(s.revisions) + buffer.len(s.dirtyBounds) + buffer.len(s.dirtySince) + buffer.len(s.relations) + s.scratchBytes + s.paintBytes + patternBytes+rowBytes,
+			+ buffer.len(s.revisions) + buffer.len(s.dirtyBounds) + buffer.len(s.dirtySince) + buffer.len(s.relations) + s.scratchBytes + s.paintBytes + patternBytes+rowBytes+buffer.len(s.falloutReveal.scratch),
 		imagePixelBytes = if s.destroyed then 0 else s.width * s.height * 4}
 end
 
@@ -1004,6 +1063,7 @@ function Core.destroy(s: State)
 	if s.destroyed then return end
 	s.destroyed = true; s.sink.destroy()
 	s.deferred:clear()
+	s.falloutReveal:clear()
 	s.job = nil; s.palette = {}; s.roster = {}; s.paints = {}; s.scratch = {}; s.ownerBlocks = {}; s.blockOwners = {}; s.pages = {}
 	table.clear(s.recentAges); s.recentCursor=0; s.lastTileTime,s.lastOwnTileTime=-1,-1
 	table.clear(s.trails); table.clear(s.spawnDiscs); table.clear(s.overlayRows)

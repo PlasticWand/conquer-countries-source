@@ -25,7 +25,7 @@ function H.sink(width: number, height: number): any
 end
 function H.drain(core: any, budget: number?): {number}
 	local times = {}
-	while core.pending > 0 do
+	while H.Core.hasPending(core) do
 		assert(#times < 100000, "raster queue failed to drain")
 		local result = H.Core.step(core, budget or 2)
 		table.insert(times, result.ms)

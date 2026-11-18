@@ -24,6 +24,7 @@ local LabelPlacement = require(script.Parent.LabelPlacement)
 local StructureCache = require(script.Parent.StructureAtlas)
 local Structure = require(script.Parent.StructureMath)
 local Artillery = require(script.Parent.ArtilleryOverlay)
+local SabotageReach = require(script.Parent.SabotageReachOverlay)
 local Shared = game:GetService('ReplicatedStorage').Shared.OpenFront
 local StrikeExecution = require(Shared.Executions.StrikeExecution)
 local LauncherExecution = require(Shared.Executions.LauncherExecution)
@@ -179,6 +180,7 @@ function Overlay.new(renderer: any): any
 	self.feel=Feel.new(self,{new=Instance.new,UDim=UDim,UDim2=UDim2,Vector2=Vector2,Color3=Color3})
 	self.artillery=Artillery.new(self,{new=Instance.new,UDim2=UDim2,Vector2=Vector2,Color3=Color3,Enum=Enum},StrikeExecution.SPEC)
 	self.airfields={};self.strikeRangeKeys={}
+	self.sabotageReach=SabotageReach.new(renderer,passParent(renderer,'Ground'))
 	return self
 end
 
@@ -1623,6 +1625,8 @@ local function drawNames(self: any)
 	local now=os.clock()
 	local capFraction=if Policy.capNameScreenHeight then Policy.nameMaxViewportHeight else nil
 	local capLimit=if capFraction then camera.viewportHeight*capFraction else math.huge
+	local filmPixels=self.filmLabelPixels
+	if filmPixels then capLimit=filmPixels*camera.viewportHeight/1920 end
 	local maintenance=now-(self.lastNameMaintenance or -1)>=.1
 	local all=maintenance or self.cameraDirty or self.statusDirty or self.namesPending or self.nameStatus.pending
 	if maintenance then self.lastNameMaintenance=now end
@@ -1654,7 +1658,7 @@ local function drawNames(self: any)
 			local cached = view and view.sizing
 			local rawCached=view and view.sourceSizing
 			local sourceLodDirty=rawCached and self.nameLodDirty and (status.target or rawCached.visible~=(rawCached.nameWorldScale*72*camera.scale/camera.viewportWidth>=Defaults.name.cullThreshold))
-			local capDirty=view and (view.capLimit~=capLimit or ((view.capped or (view.rawNameWorldScale or 0)*camera.scale*48>capLimit) and view.zoom~=camera.scale))
+			local capDirty=view and (view.filmPixels~=filmPixels or view.capLimit~=capLimit or ((view.capped or (view.rawNameWorldScale or 0)*camera.scale*48>capLimit) and view.zoom~=camera.scale))
 			local anchorSize=math.max(1,math.floor(anchor.size))
 			local palette=self.renderer.core.palette[p.smallID]
 			local sourceText=p.displayName or p.name
@@ -1687,7 +1691,15 @@ local function drawNames(self: any)
 				raw = Labels.size(anchor.size, 2 * camera.scale / camera.viewportWidth, false, false, status.target == true)
 			end
 			if raw==rawCached and not capDirty then size,projected=cached,view.projected
-			else size=Labels.limitHeight(raw,camera.scale,camera.viewportHeight,capFraction); projected=Labels.project(size,64) end
+			else
+				size=if filmPixels then Labels.filmHeight(raw,camera.scale,camera.viewportHeight,filmPixels)
+					else Labels.limitHeight(raw,camera.scale,camera.viewportHeight,capFraction)
+				projected=Labels.project(size,64)
+				if filmPixels then
+					projected.troopPixels=projected.namePixels*.7
+					projected.lineOffset=projected.namePixels*.95
+				end
+			end
 			size.visible=raw.visible
 			local sx, sy = anchor.x*64, anchor.y*64
 			-- Preserve the old padded frustum in world tiles, retaining views.
@@ -1721,22 +1733,23 @@ local function drawNames(self: any)
 			if view then setNameVisible(view,visible) end
 			if visible then
 				if self.nameTransitions[p.smallID] then self.namesAnimating=true end
-				local geometry=view.pixels~=projected.namePixels
+				local geometry=view.pixels~=projected.namePixels or view.filmPixels~=filmPixels
 				view.sizing, view.projected, view.anchorSize = size, projected, anchorSize
 				view.zoom=camera.scale
+				view.filmPixels=filmPixels
 				view.sourceZoom=camera.scale
 				view.sourceSizing,view.rawNameWorldScale,view.capLimit,view.capped=raw,raw.nameWorldScale,capLimit,size~=raw
 				view.viewportWidth, view.targeted = camera.viewportWidth, status.target
 				local pixels, guiScale = projected.namePixels, projected.guiScale
-				local width = math.max(30*64, math.min(600*64, pixels * 10))
+				local width = if filmPixels then pixels*10 else math.max(30*64, math.min(600*64, pixels * 10))
 				local text = string.sub(p.displayName or p.name, 1, 32)
 				view.width=width
-				if view.sx ~= sx or view.sy ~= sy or view.pixels ~= pixels then
+				if view.sx ~= sx or view.sy ~= sy or geometry then
 					putRect(view.root, sx - width / 2, sy - pixels / 2, width / guiScale,
 						(pixels / 2 + projected.lineOffset + projected.troopPixels / 2) / guiScale)
 					view.sx, view.sy = sx, sy
 				end
-				if view.pixels ~= pixels then
+				if geometry then
 					view.scale.Scale = guiScale
 					view.name.TextSize = math.clamp(pixels / guiScale, 1, 100)
 					view.name.Size = UDim2.fromOffset(width / guiScale, pixels / guiScale)
@@ -1851,6 +1864,14 @@ local function drawNames(self: any)
 	self.namesPlaced = true
 end
 
+-- Called only by the Studio-only film camera; nil restores normal gameplay.
+function Overlay.setFilmLabelPixels(self:any,pixels:number?)
+	if self.filmLabelPixels==pixels then return end
+	self.filmLabelPixels=pixels
+	self.cameraDirty,self.nameCameraDirty,self.nameCapDirty=true,true,true
+	self.labelLayoutDirty=true
+end
+
 local function seedSpawnNames(self: any)
 	if self.nameAnchorMode == "server" then return end
 	local core = self.renderer.core
@@ -1892,6 +1913,7 @@ function Overlay.setOwnSpawnRing(self: any, active: boolean)
 end
 function Overlay.setLocalPlayer(self: any, id: number)
 	if self.localPlayer~=id then self.feel:reset(self.units) end
+	self.sabotageReach:setAim(id,self.sabotageReach.reach)
 	self.samsDirty=true
 	self.localPlayer = id; self.railsDirty, self.unitsDirty, self.statusDirty, self.unitCameraDirty = true, true, true, true; syncSpawn(self)
 	patrolUnit(self)
@@ -1996,7 +2018,10 @@ function Overlay.prepareFrame(self: any): boolean
 	if uploaded then return true end
 	local loading=self.renderer.options.firstPaint=='full' and not self.renderer.ready
 	local ships=self.shipArt
-	if ShipArt.build(ships,if loading then 8 else Policy.shipArtMs,if loading then 32768 else Policy.shipArtPixelsPerFrame) then
+	-- Loading has a finite-progress floor within the same pixel cap. Real-time
+	-- deadlines alone can starve first-use art on a slow or contended host.
+	if ShipArt.build(ships,if loading then 8 else Policy.shipArtMs,if loading then 32768 else Policy.shipArtPixelsPerFrame,
+		if loading then 4096 else nil) then
 		local ok,result=pcall(function(): Content?
 			local img=game:GetService('AssetService'):CreateEditableImage({Size=Vector2.new(ShipArt.width,ShipArt.height)})
 			if not img then return nil end
@@ -2116,6 +2141,7 @@ function Overlay.setHighlightStructureTypes(self:any,types:{string}?)
 	self.highlightTypes={}; if types then for _, kind in types do self.highlightTypes[kind]=true end end
 end
 function Overlay.setCamera(self: any)
+	self.sabotageReach:setCamera()
 	self.labelLayoutDirty,self.costLayoutDirty=true,true
 	local c,core=self.renderer.camera,self.renderer.core
 	local fade,detail=railFade(c.scale),c.scale>=Defaults.railroad.railDetailZoom
@@ -2181,6 +2207,7 @@ function Overlay.setCamera(self: any)
 	-- refresh now; frustum, topology colors and continuous fade stay at 10Hz.
 end
 function Overlay.tilesChanged(self: any,ownTiles:{number}?)
+	self.sabotageReach:tilesChanged(ownTiles)
 	self.namesDirty, self.railsDirty, self.statusDirty = true, true, true
 	self.defense:tilesChanged(ownTiles)
 end
@@ -2407,6 +2434,7 @@ end
 function Overlay.destroy(self: any)
 	if self.destroyed then return end
 	self.destroyed = true
+	self.sabotageReach:destroy()
 	self.feel:destroy()
 	self.artillery:destroy()
 	if self.spreadRoot then self.spreadRoot:Destroy() end

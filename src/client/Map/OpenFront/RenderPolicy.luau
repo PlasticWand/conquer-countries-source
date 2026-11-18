@@ -52,6 +52,10 @@ return {
 	rasterDesktopMaxMs = 4,
 	rasterTouchMaxMs = 2.5,
 	rasterMaxPixels = 131072,
+	coherentFallout = true, -- Bruno, 2026-11-17: hide the dirty-block reveal grid.
+	falloutRevealMinTiles = 64,
+	falloutRevealMaxPixels = 65536, -- one <=256 KiB native write, no extra images
+	falloutRevealRegions = 8, -- overload retains ordinary bounded raster progress
 	defenseProbeTilesPerFrame = 2048,
 	defenseProbeMs = 1,
 	defenseExplosionScale = 2.5,

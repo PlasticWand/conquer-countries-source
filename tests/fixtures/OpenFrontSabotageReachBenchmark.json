@@ -1,0 +1,207 @@
+{
+  "base": "78a526247e8ff80de2cbe9f692d96111ac30e8b0",
+  "note": "Unpaced Lune CPU slices and RGBA copy sink; excludes Roblox uploads, GUI/GPU, replication and phones. The .6ms budget is cooperative, not a hard frame ceiling.",
+  "trials": [
+    {
+      "borderEntries": 1556,
+      "cold": {
+        "calls": 356,
+        "cpuMs": 224.93839998787735,
+        "maxMs": 0.8021000103326514,
+        "p95Ms": 0.698900010320358
+      },
+      "copySinkMaxMs": 0.01309999788645655,
+      "delta": {
+        "borderRows": 19,
+        "calls": 45,
+        "cpuMs": 28.929600011906587,
+        "dispatchMs": 0.38300000596791506,
+        "maxMs": 0.7361000025412068,
+        "p95Ms": 0.6924999906914309
+      },
+      "height": 512,
+      "idleMs": 0.000920400008908473,
+      "initialWrites": 4,
+      "maskBytes": 524288,
+      "trial": 1,
+      "warmArmMs": 0.0014999968698248267,
+      "width": 1024
+    },
+    {
+      "borderEntries": 1556,
+      "cold": {
+        "calls": 320,
+        "cpuMs": 202.73720000113826,
+        "maxMs": 0.8342999935848638,
+        "p95Ms": 0.6977000011829659
+      },
+      "copySinkMaxMs": 0.012600008631125093,
+      "delta": {
+        "borderRows": 19,
+        "calls": 47,
+        "cpuMs": 29.76969999144785,
+        "dispatchMs": 0.41090000013355166,
+        "maxMs": 0.714300011168234,
+        "p95Ms": 0.6911000091349706
+      },
+      "height": 512,
+      "idleMs": 0.0008486000006087124,
+      "initialWrites": 4,
+      "maskBytes": 524288,
+      "trial": 2,
+      "warmArmMs": 0.0018999999156221747,
+      "width": 1024
+    },
+    {
+      "borderEntries": 1556,
+      "cold": {
+        "calls": 305,
+        "cpuMs": 191.70030001259875,
+        "maxMs": 0.8731999987503514,
+        "p95Ms": 0.6729999877279624
+      },
+      "copySinkMaxMs": 0.040099999750964344,
+      "delta": {
+        "borderRows": 19,
+        "calls": 46,
+        "cpuMs": 29.57349999633152,
+        "dispatchMs": 0.5916999944020063,
+        "maxMs": 0.7430999976349995,
+        "p95Ms": 0.7138999935705215
+      },
+      "height": 512,
+      "idleMs": 0.0008726000087335706,
+      "initialWrites": 4,
+      "maskBytes": 524288,
+      "trial": 3,
+      "warmArmMs": 0.0017999991541728377,
+      "width": 1024
+    },
+    {
+      "borderEntries": 1556,
+      "cold": {
+        "calls": 313,
+        "cpuMs": 197.34439998865128,
+        "maxMs": 0.8574000094085932,
+        "p95Ms": 0.6892999954288825
+      },
+      "copySinkMaxMs": 0.017099999240599573,
+      "delta": {
+        "borderRows": 19,
+        "calls": 44,
+        "cpuMs": 28.345300001092255,
+        "dispatchMs": 0.5129999917699024,
+        "maxMs": 0.7579999946756288,
+        "p95Ms": 0.6960000027902424
+      },
+      "height": 512,
+      "idleMs": 0.0008640000014565885,
+      "initialWrites": 4,
+      "maskBytes": 524288,
+      "trial": 4,
+      "warmArmMs": 0.0011999945854768157,
+      "width": 1024
+    },
+    {
+      "borderEntries": 3116,
+      "cold": {
+        "calls": 770,
+        "cpuMs": 477.9847999889171,
+        "maxMs": 0.7734999962849542,
+        "p95Ms": 0.6693000032100827
+      },
+      "copySinkMaxMs": 0.047299996367655694,
+      "delta": {
+        "borderRows": 19,
+        "calls": 22,
+        "cpuMs": 13.786800001980737,
+        "dispatchMs": 0.8401000086450949,
+        "maxMs": 0.8858000073814765,
+        "p95Ms": 0.7246999884955585
+      },
+      "height": 1024,
+      "idleMs": 0.0009006000036606565,
+      "initialWrites": 4,
+      "maskBytes": 524288,
+      "trial": 1,
+      "warmArmMs": 0.0015999976312741637,
+      "width": 2048
+    },
+    {
+      "borderEntries": 3116,
+      "cold": {
+        "calls": 851,
+        "cpuMs": 532.9807999951299,
+        "maxMs": 0.9125999931711704,
+        "p95Ms": 0.6809000042267144
+      },
+      "copySinkMaxMs": 0.011299998732283711,
+      "delta": {
+        "borderRows": 19,
+        "calls": 24,
+        "cpuMs": 15.235899991239421,
+        "dispatchMs": 0.14460000966209918,
+        "maxMs": 0.687899999320507,
+        "p95Ms": 0.6833999941591173
+      },
+      "height": 1024,
+      "idleMs": 0.0012146999943070114,
+      "initialWrites": 4,
+      "maskBytes": 524288,
+      "trial": 2,
+      "warmArmMs": 0.0014999968698248267,
+      "width": 2048
+    },
+    {
+      "borderEntries": 3116,
+      "cold": {
+        "calls": 851,
+        "cpuMs": 532.3823999933666,
+        "maxMs": 0.9075999987544492,
+        "p95Ms": 0.6809000042267144
+      },
+      "copySinkMaxMs": 0.011900003300979733,
+      "delta": {
+        "borderRows": 19,
+        "calls": 22,
+        "cpuMs": 13.873300005798228,
+        "dispatchMs": 0.149500003317371,
+        "maxMs": 0.6877999985590577,
+        "p95Ms": 0.676199997542426
+      },
+      "height": 1024,
+      "idleMs": 0.0008718000026419759,
+      "initialWrites": 4,
+      "maskBytes": 524288,
+      "trial": 3,
+      "warmArmMs": 0.0013999961083754897,
+      "width": 2048
+    },
+    {
+      "borderEntries": 3116,
+      "cold": {
+        "calls": 833,
+        "cpuMs": 519.9042000022018,
+        "maxMs": 0.8051000040723011,
+        "p95Ms": 0.673400005325675
+      },
+      "copySinkMaxMs": 0.012300006346777081,
+      "delta": {
+        "borderRows": 19,
+        "calls": 26,
+        "cpuMs": 16.463199994177558,
+        "dispatchMs": 1.0241999989375472,
+        "maxMs": 0.7314999966183677,
+        "p95Ms": 0.7268000044859946
+      },
+      "height": 1024,
+      "idleMs": 0.0008783999946899712,
+      "initialWrites": 4,
+      "maskBytes": 524288,
+      "trial": 4,
+      "warmArmMs": 0.0016999983927235007,
+      "width": 2048
+    }
+  ],
+  "workingTree": true
+}

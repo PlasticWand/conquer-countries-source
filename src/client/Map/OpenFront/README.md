@@ -1,5 +1,251 @@
 # Renderer ports — v0.35.2
 
+## Sabotage reach while armed, 2026-11-17
+
+Bruno chose to retain Sabotage's 60-tile rule and show its reason and reach.
+Claude owns the new `sabotageAim.reason` and HUD text. This map change adds
+an amber fill outside our territory with a stronger outer edge while Sabotage
+is chosen. It remains visible without a mouse pointer or pinned target and
+hides immediately on deselection or controller teardown. The existing red/
+yellow target box and authoritative target/build permission are unchanged.
+The region indicates distance only: allied, dark or absent buildings and
+cooldown/immunity still use the server's reason and target checks.
+
+`SabotageReach` indexes confirmed four-neighbour owned border tiles as row
+runs. Off-map neighbours are ignored, matching `Game.updateBorderStatus`.
+Circle dilation uses squared Euclidean distance, including the reach boundary;
+it does not flood through land or use Manhattan/path distance. Mask samples
+are exact at their sampled tile centres, including islands and holes. The
+display is deliberately approximate between samples: the longest mask side
+is at most 512 pixels, with normal image filtering and a roughly 1.5-mask-pixel
+outer band. Server target validation remains authoritative at the visual edge.
+
+The index and mask queue when a local player binds; background work starts
+after first paint, before the weapon is selected. Cold initialization scans the map once across
+bounded jobs. Thereafter `SceneOverlay.tilesChanged` reuses RasterCore's
+existing own-ownership transition list; unrelated ownership, defence and
+fallout updates do not invalidate it. Only affected border row spans rescan,
+and mask rows within reach are queued. Navigation, pointer movement, ordinary
+replies and deselect/reselect reuse the cache. The execution's `REACH` seeds
+prewarming; a confirmed `sabotageAim.reach` overrides it and survives pointer
+churn. Snapshot, owner or reach changes invalidate the old image immediately.
+
+Jobs have a cooperative 0.6ms / 8,192-operation step allowance, yielding every
+128 work units. This is an additional presentation cost, not a hard frame
+ceiling. Revisions reject rows invalidated during a yield; consumed queue
+storage compacts. Completed mask blocks progress round-robin during later
+edits, so initial presentation does not require a quiet map. A single optional
+EditableImage is allocated on first aim. Its writes use the renderer's shared
+image slot (one every fourth frame while the base raster is busy), at most
+64 rows / 128KiB per write. Initial presentation waits until every image block
+has been initialized. Later updates retain the last displayed confirmed mask
+while bounded work catches up. No native image writes run in the preview's
+RenderStepped callback.
+
+Maximum additional image pixels are 1MiB; the persistent RGBA mask is at most
+1MiB and retained upload scratch at most 128KiB. Border-run tables scale with
+the actual boundary, and jobs temporarily retain one row's geometry. No copy
+of the ownership map is kept. Allocation refusal disables this optional mask
+and records `sabotageReachFailed`; the target box and HUD reasons still work.
+Metrics prefixed `sabotageReach` report CPU work/time, queue rows, border
+entries, native-write time/bytes/count, and explicit buffer/image bytes.
+In Studio these are returned by `LocalPlayer.OpenFrontDebugClient:Invoke("render")`.
+
+Changed existing functions: BuildPreviewController `setChosen`, `step`,
+`destroy` (plus the Reply reason type); EditableRenderer `step`, `metrics`
+and new `setSabotageReach`; SceneOverlay `new`, `setLocalPlayer`, `setCamera`,
+`tilesChanged`, `prepareFrame`, `destroy`; ShipArt `build`. The new pure cache and native adapter own their
+cleanup. No Main, OpenFrontClient, shared/server, Net, combat, HUD or audio
+files were changed by Codex. The effects test harness only adds the new
+adapter to its native-property module loader.
+
+`OpenFrontSabotageReach` has 12 passing tests covering an independent brute-
+force distance oracle, radius boundaries, holes/islands/edges, downsampling,
+row-span invalidation, queued changes, inactive edits, snapshots/takeover,
+continuous traffic, cache reuse, camera origin/scale, cursor churn, teardown
+and the shared image slot. Existing Support is 8/0 and Preview is 16/0.
+Loading is 5/0, FirstPaint 9/0 and WideZoom 1/0. The fixed-tree full rerun is
+**652/0**, with the expected warship-listener isolation warning. Fresh full-src
+strict analysis, Rojo build and whitespace checks pass; the base and scope are
+recorded in STATUS. This host's final full run took about 36 minutes.
+
+The first full run was 649/2. The historical WideZoom scene has no optional
+reach adapter, so the renderer now tolerates its absence without changing the
+archived measured code. The late-snapshot loading fixture also exposed ship
+art running out of its wall-clock preparation budget before the unchanged
+100-call readiness assertion. Optional reach work now waits for first paint.
+Loading-only ship preparation additionally guarantees 4,096 pixels of progress
+per call within the existing 32,768-pixel cap; its 8ms deadline is cooperative
+and can be exceeded to meet that floor. `ShipArt.build`'s new fourth argument
+is optional, so ordinary live-play deadlines/work limits are unchanged. A
+spent-deadline test verifies finite progress and that the floor cannot override
+the pixel cap. No existing gate assertion or archived baseline was weakened.
+
+`tests/OpenFrontSabotageReachBenchmark.luau` and its JSON fixture record four
+trials after a warmup at each of 1024x512 and 2048x1024, over `78a5262` plus
+this working tree. Synthetic large territories, a 289-tile local edit, real
+RGBA copy sink, unpaced Lune calls: median cold background CPU **200/526ms**
+across **316.5/842 calls**; median local update CPU **29.25/14.55ms** across
+**45.5/23 calls**, rescanning 19 partial border rows. Largest recorded slice
+p95 **0.727ms**, maximum **0.913ms**, against the cooperative 0.6ms target.
+Warm arming **<=0.0019ms**, idle **<=0.00122ms/call**; initial image needs four
+upload slots. Dispatch **0.145-1.024ms**; copy sink max **0.0473ms**. Each
+fixture mask is 512KiB. These exclude Roblox native upload, GUI/GPU, other
+systems and phones. Call counts are not FPS or wall-clock seconds. Arming
+before prewarming completes can still wait for background geometry; native
+warmup/reveal latency needs validation, especially after a large takeover.
+
+`tmp/codex_sabotage_reach_preview.png` was inspected at world/closer view. It
+is labelled **headless, not Studio**; the scripts/RGBA data are retained.
+The additional `tmp/codex_sabotage_reach_fallout.luau` property-shim check
+passed 160 changing ownership/fallout frames with reach armed and never
+updated more than one image per frame. It is not native-upload evidence.
+Official Studio inventory found the correct place in Edit. Execution remains
+blocked by the previously recorded approval-never rejection; no workaround,
+restart, native screenshot, publish or device measurement was attempted.
+Claude/Bruno should check first aim, world/phone zoom, busy-front freshness,
+cooldown/out-of-reach reasons and native memory/frame cost in the actual game.
+
+## Coherent fallout reveal, 2026-11-17
+
+Bruno reported a Hydrogen impact filling in as rectangular patches in normal
+gameplay. This was the live raster scheduler: completed rows/32-tile blocks
+were immediately uploaded, exposing its work order during a large fallout
+and ownership-clear delta. It was not the cosmetic fallout-glow mask.
+
+`RenderPolicy.coherentFallout` defaults true. At least 64 newly confirmed
+fallout tiles register a block-aligned, halo-inclusive region on each affected
+image page. Ordinary row/revision/priority work composes into the **existing**
+RGBA page under the existing live paint budget, while uploads inside those
+regions are held. All pieces of the impact must finish preparation before the
+first reveal. Each completed region is then copied into one scratch buffer and
+published with one native write. Cross-page pieces use consecutive image slots;
+Roblox's one-displayed-EditableImage-per-frame rule is retained. New edits can
+release that short presentation priority so other active pages keep progressing.
+Ready cohorts also get a periodic slot when unrelated fronts stay busy.
+
+This is presentation only. Confirmed tile state changes immediately; rendering
+does not delay or change replication, ownership, blast formulas or outcomes.
+The blast FX and other map/scene work continue normally. Unrelated regions are
+not held behind the blast. Local updates, reversed tile order, overlapping
+bursts, deferred invalidation and reentrant sinks retain the latest pixels;
+the resulting pages must equal a fresh repaint. Snapshot and destruction clear
+the staging state. The loading-cover adapter opts out and keeps its existing
+hidden first-paint pipeline.
+
+Bounds are collected once per existing horizontal run, avoiding a second
+per-tile scan. The fixed staging limits are **8 regions**, **65,536 pixels per
+commit** and **256 KiB retained scratch**. There are no new native images or
+per-impact pixel buffers. Readiness checks use bounded block flags, not pixel
+scans. Native writes remain non-preemptible and the final copy/write is an
+additional bounded cost after the usual paint work, not a hard millisecond
+guarantee. A large distant/multiple-blast batch whose bounding region exceeds
+the cap, or a full region pool, uses ordinary bounded raster progress instead;
+`falloutRevealFallbacks` records this overload case. It can still expose work
+order there rather than permitting an unbounded upload/allocation.
+
+Core metrics additionally expose `falloutRevealPending`, `Commits`, `HeldWrites`,
+`Fallbacks`, `MaxPixels`, `Pixels`, `MaxDelayFrames`, `CommitMs` and `ScratchBytes`
+(all with the `falloutReveal` prefix). `Core.hasPending` includes completed
+regions waiting for their native image slot. Upload counters count actual sink
+writes, and the scratch buffer is included in explicit CPU-buffer accounting.
+Set the policy false before a new renderer for the old reveal, for comparison.
+
+`tests/OpenFrontFalloutReveal.spec.luau` covers Hydrogen/Atom coherence, overlap,
+later edits, independent fronts, cross-page/offscreen preparation and successive
+image slots, mid-presentation traffic, loading, snapshots/reentrancy, capacity
+fallback and cleanup. Existing raster, loading, first-paint and scheduling
+checks remain required. `tests/OpenFrontFalloutRevealBenchmark.luau` runs 12
+alternating paired synthetic Hydrogen trials after warmups, with a real RGBA
+copy sink, 2.5ms target, 81,920-pixel shading limit and a 200-tile-wide viewport.
+The recorded result is `tests/fixtures/OpenFrontFalloutRevealBenchmark.json`.
+The baseline disables staging in the same working tree; it is not a separate
+checkout of the base commit.
+
+Over `1fd32e8` plus this work: baseline/coherent paint-step p95 **2.599/2.607ms**,
+max **2.755/2.962ms**; coherent final commit max **0.168ms**. Mean impact sink
+writes **63.83 -> 1**; uploaded pixels **34,736 -> 65,536** (the coherent write
+includes unchanged pixels inside its bounding rectangle). Median `Core.applyTileStates`
+**21.56/23.93ms**, completion **19/19 worker calls**. These are shared-host Lune
+CPU timings, including buffer-copy sink work, **not** Roblox native upload,
+GUI/GPU, replication, real-time FPS or weak-phone performance. Run-to-run host/GC
+variation was observed; this is no claim of a CPU speedup. Full gate results
+are in STATUS. `tmp/fallout_evidence/codex_scheduler_comparison.png` is a labelled
+synthetic raster comparison, not a Studio frame.
+
+Official Studio inventory found the correct place in Edit, but `execute_luau`
+was rejected because approval policy is `never`. No native launch, screenshot
+or timing was obtained. Claude/Bruno should replay the Hydrogen/Atom shots in
+the actual game, including a page boundary and ordinary gameplay camera.
+
+## Portrait shorts camera, 2026-11-17
+
+Studio-only `LocalPlayer.OpenFrontFilmCamera` still uses the same renderer,
+uniform pixels-per-tile scale and real confirmed state. It does not change
+orientation, hide HUDs, stage gameplay or control audio. Ordinary gameplay
+and the original `{t,x,y,zoom,easing?}` keyframes retain their behaviour.
+
+`play` now also accepts:
+
+- A keyframe `{t, box={x,y,w,h}, fit=.9, easing?}`. `x/y` are the **centre**,
+  `w/h` are tile extents, exactly matching `ConquestFilming`'s returned `box`.
+  This replaces `x/y/zoom` on that keyframe. Fit uses the smaller of available
+  width / box width and available height / box height, with optional breathing
+  room `fit` in (0,1]. It recomputes on viewport resize, including during the
+  final hold. Boxes and explicit zooms can be mixed in one timeline.
+- An optional shot `frame={x,y,w,h}` in **viewport fractions**, all inside
+  [0,1]. The box/anchor is centred in this rectangle, and box fitting uses its
+  dimensions. Omit it for the full viewport. This is composition, not a crop
+  or clipping mask; terrain continues to fill the actual viewport.
+- Optional shot `labelPixels=60`: visible names use a 60px em and troop counts
+  a 42px em at 1920px viewport height (30/21 at 960px, intended to export at
+  2x). Flags, heads and status icons follow the name; troops get extra line
+  spacing. Default/source LOD and label exclusions still apply: zoom in on
+  the important nations rather than trying to show every tiny name. The
+  override resets on `stop`, shot replacement, error and teardown; no global
+  render policy or normal player text is changed.
+
+After restarting Play for Rojo edits, enter a match and wait for map readiness.
+Set the Studio emulator/window to 9:16. In the **Client** data model:
+
+```luau
+local player = game:GetService("Players").LocalPlayer
+player.PlayerGui.ScreenOrientation = Enum.ScreenOrientation.Portrait
+-- Paste the Server ConquestFilming reply's box into this Client-side table.
+-- These numbers are an example; use the actual staged map coordinates.
+local box = {x=1000, y=500, w=180, h=260}
+player.OpenFrontFilmCamera:Invoke("play", {
+    duration=6,
+    labelPixels=60,
+    frame={x=60/1080, y=310/1920, w=820/1080, h=940/1920},
+    keyframes={{t=0, box=box, fit=.9}},
+})
+-- Hold the last pose until explicitly released:
+-- player.OpenFrontFilmCamera:Invoke("stop")
+```
+
+For an anchor close-up instead, supply
+`box={x=reply.anchor.x,y=reply.anchor.y,w=160,h=240}`. Adjust extents to include
+the action and inspect long labels at capture size. The example safe frame
+maps to x60–880/y310–1250 in 1080x1920 output; its centre is (470,780).
+To reserve more room for the y370 caption, increase `frame.y` and reduce `frame.h`.
+
+Keep `OpenFrontMap` enabled. For clean story/meme footage Claude can disable
+`ConquestUi` at shoot time, then restore it for tips. Mute **Music** in Settings
+while retaining SFX; the filming endpoint deliberately does not touch audio.
+OBS must record only the actual portrait game view, with matching 9:16 output
+and no capture of Studio chrome. Changing ScreenOrientation alone does not
+create a portrait desktop viewport.
+
+Tests in `OpenFrontFilmCamera` cover aspect/resize and safe-frame coordinates,
+height/width box fits, interpolation, page aspect, label scaling/LOD and
+restoration (including unchanged name em with changing troop geometry).
+These are headless property checks, not native font/layout/GPU evidence.
+Official Studio inventory was available, but the first Edit `execute_luau`
+sync check was rejected because approval policy is `never`; no Play,
+orientation change or portrait screenshot was obtained. Gate results and
+tested base commit are in STATUS.
+
 ## Capped warship health bars, 2026-11-13
 
 Bruno approved the smaller close-zoom bar. `RenderPolicy.capWarshipHealthBars`

@@ -25,6 +25,7 @@ function Controller.new(renderer: any, player: Player, onPlay: () -> ()): any
 				if renderer.input then renderer.input:cancel(true) end
 				self.onPlay()
 				self.shot, self.started, self.playing = prepared, os.clock(), true
+				if renderer.scene then renderer.scene:setFilmLabelPixels(prepared.labelPixels) end
 				self:apply(0)
 				return true
 			elseif command == "stop" then
@@ -44,13 +45,16 @@ function Controller.new(renderer: any, player: Player, onPlay: () -> ()): any
 end
 
 function Controller.apply(self: any, elapsed: number)
-	local pose = Film.sample(self.shot, elapsed)
 	local view: any = table.clone(self.renderer.camera)
+	local pose = Film.sample(self.shot, elapsed, view.viewportWidth, view.viewportHeight)
 	view.scale = pose.zoom
+	local f = self.shot.frame
+	local centreX = view.viewportWidth * (if f then f.x + f.w / 2 else .5)
+	local centreY = view.viewportHeight * (if f then f.y + f.h / 2 else .5)
 	-- Exact float centre, including inset/non-square viewports. No clamping:
 	-- the normal free camera and shots beyond map edges remain available.
-	view.offsetX = pose.x - view.width / 2 - (view.viewportWidth - view.width) / (2 * view.scale)
-	view.offsetY = pose.y - view.height / 2 - (view.viewportHeight - view.height) / (2 * view.scale)
+	view.offsetX = pose.x - view.width / 2 - (centreX - view.width / 2) / view.scale
+	view.offsetY = pose.y - view.height / 2 - (centreY - view.height / 2) / view.scale
 	assert(math.abs(view.offsetX) < math.huge and math.abs(view.offsetY) < math.huge, "film pose exceeds camera precision")
 	local old = self.renderer.camera
 	if old.scale ~= view.scale or old.offsetX ~= view.offsetX or old.offsetY ~= view.offsetY then
@@ -68,6 +72,7 @@ end
 
 function Controller.stop(self: any)
 	self.playing, self.shot, self.started = false, nil, nil
+	if self.renderer.scene then self.renderer.scene:setFilmLabelPixels(nil) end
 	if self.renderer.input then self.renderer.input:cancel(true) end
 end
 

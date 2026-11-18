@@ -1005,4 +1005,27 @@ function HudModel.quickChat(): { { name: string, label: string, entries: { { key
 	return out
 end
 
+-- Why a Sabotage aim has no target, for the hint bar (Player.sabotageAim's
+-- reasons; `tick` is the preview's tick, 10 a second). Nil: no reason given.
+function HudModel.sabotageReason(aim: { reason: string?, reach: number?, readyAt: number? }, tick: number?): string?
+	local reason = aim.reason
+	if reason == "out_of_reach" then
+		return `Out of reach: Sabotage works within {aim.reach or 60} tiles of your border`
+	elseif reason == "cooldown" then
+		local left = math.max(1, math.ceil(((aim.readyAt or 0) - (tick or 0)) / 10))
+		return `Sabotage is recharging: ready in {left} s`
+	elseif reason == "busy" then
+		return "A Sabotage is already under way"
+	elseif reason == "immunity" then
+		return "No Sabotage while spawn protection lasts"
+	elseif reason == "ally" then
+		return "You can't sabotage an ally or a protected nation"
+	elseif reason == "dark" then
+		return "That building is already switched off"
+	elseif reason == "no_building" then
+		return "Tap an enemy building to sabotage it"
+	end
+	return nil
+end
+
 return HudModel

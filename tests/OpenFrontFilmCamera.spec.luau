@@ -184,4 +184,96 @@ return function(t)
 		r:goTo(10, 20, 3); t.ok(r.goToTarget)
 		r.root:Destroy(); t.eq(r.destroyed, true)
 	end)
+
+	t.test("box fitting uses height and width in portrait and landscape and copies inputs", function()
+		local box = {x = 40, y = 50, w = 100, h = 1000}
+		local input = {duration = 3, keyframes = {{t = 0, box = box, fit = .9}}}
+		local s = Film.prepare(input)
+		box.h = 1
+		local p = Film.sample(s, 0, 1080, 1920)
+		t.near(p.zoom, 1920 / 1000 * .9, 1e-12)
+		t.eq(p.x, 40); t.eq(p.y, 50)
+		t.near(Film.sample(s, 3, 1920, 1080).zoom, 1080 / 1000 * .9, 1e-12)
+		local wide = Film.prepare({duration = 1, keyframes = {{t = 0, box = {x = 0, y = 0, w = 1000, h = 100}}}})
+		t.near(Film.sample(wide, 0, 1080, 1920).zoom, 1.08, 1e-12)
+		t.errors(function() Film.sample(s, 0) end)
+	end)
+
+	t.test("box interpolation and safe frame fit are recomputed at the current viewport", function()
+		local frame = {x = 60/1080, y = 310/1920, w = 820/1080, h = 940/1920}
+		local s = Film.prepare({duration = 4, frame = frame, keyframes = {
+			{t = 0, box = {x = 10, y = 20, w = 100, h = 100}},
+			{t = 4, box = {x = 90, y = 60, w = 100, h = 1000}},
+		}})
+		frame.w = 1
+		local p = Film.sample(s, 2, 1080, 1920)
+		t.eq(p.x, 50); t.eq(p.y, 40); t.near(p.zoom, math.sqrt(8.2 * .94), 1e-12)
+		t.near(Film.sample(s, 2, 540, 960).zoom, p.zoom / 2, 1e-12)
+	end)
+
+	t.test("portrait resize centres the box in the safe frame without stretching map pages", function()
+		local e, r, c = setup()
+		local rb = require("@lune/roblox")
+		c.endpoint.OnInvoke("play", {duration = 5, frame = {x = 60/1080, y = 310/1920, w = 820/1080, h = 940/1920},
+			keyframes = {{t = 0, box = {x = 32, y = 32, w = 20, h = 40}, fit = .9}}})
+		for _, dimensions in {{1080,1920},{540,960},{1920,1080}} do
+			r.parent.AbsoluteSize = rb.Vector2.new(dimensions[1], dimensions[2])
+			r.parent.AbsolutePosition = rb.Vector2.new(24,36)
+			r.parent:GetPropertyChangedSignal("AbsoluteSize"):Fire()
+			local x,y = r:worldToScreen(32,32)
+			t.near(x,24+dimensions[1]*470/1080,1e-9)
+			t.near(y,36+dimensions[2]*780/1920,1e-9)
+			r:step(1e9,1e9)
+			local x1,y1 = r:worldToScreen(33,33)
+			t.near(x1-x,y1-y,1e-9,"uniform map scale")
+			for _,d in r.displays do
+				t.near(d.label.Size.X.Offset/d.page.width,d.label.Size.Y.Offset/d.page.height, .04,"page aspect")
+			end
+		end
+		r:destroy()
+	end)
+
+	t.test("filming labels resize with export height and restore source sizing on stop and errors", function()
+		local e,r,c = setup()
+		local s = r.scene
+		s:setNameAnchors({[1]={x=20,y=20,size=300},[2]={x=40,y=40,size=1}})
+		local view = table.clone(r.camera); view.viewportWidth,view.viewportHeight=1080,1920; r:setCamera(view)
+		local input = {duration=5,labelPixels=60,keyframes={{t=0,x=32,y=32,zoom=4}}}
+		c.endpoint.OnInvoke("play",input)
+		for _=1,4 do r:step(1e9,1e9) end
+		local v=s.nameViews[1]
+		local function pixels(line) return line.TextSize*v.scale.Scale*s.worldScale.Scale end
+		t.near(pixels(v.name),60,1e-6);t.near(pixels(v.troops),42,1e-6)
+		t.ok(not s.nameViews[2] or not s.nameViews[2].sourceVisible,"film override revived source-culled name")
+		view=table.clone(r.camera);view.viewportWidth,view.viewportHeight=540,960;r:setCamera(view)
+		r:step(1e9,1e9)
+		t.near(pixels(v.name),30,1e-6);t.near(pixels(v.troops),21,1e-6)
+		c.endpoint.OnInvoke("stop");r:step(1e9,1e9)
+		t.eq(s.filmLabelPixels,nil);t.near(pixels(v.name),960*.08,1e-5)
+		-- Same name em on both sides still needs troop spacing/size restored.
+		input.keyframes[1].zoom=30/(v.sourceSizing.nameWorldScale*48)
+		c.endpoint.OnInvoke("play",input);r:step(1e9,1e9)
+		t.near(pixels(v.name),30,1e-5);t.near(pixels(v.troops),21,1e-5)
+		t.near(v.name.Size.X.Offset*v.scale.Scale*s.worldScale.Scale,300,1e-5,"wide film shot clipped the fixed-size name container")
+		c.endpoint.OnInvoke("stop");r:step(1e9,1e9)
+		t.near(pixels(v.name),30,1e-5);t.near(pixels(v.troops),18,1e-5)
+		c.endpoint.OnInvoke("play",input)
+		t.errors(function() c.endpoint.OnInvoke("play",{}) end)
+		t.eq(s.filmLabelPixels,nil)
+		r:destroy()
+	end)
+
+	t.test("invalid boxes, safe frames and label overrides release film ownership", function()
+		for _,box in {{x=0,y=0,w=0,h=10},{x=0,y=0,w=1,h=math.huge},{x=0/0,y=0,w=1,h=1}} do
+			t.errors(function() Film.prepare({duration=1,keyframes={{t=0,box=box}}}) end)
+		end
+		for _,frame in {{x=0,y=0,w=1.1,h=1},{x=-.1,y=0,w=1,h=1},{x=0,y=0,w=1,h=0}} do
+			local input=shot();input.frame=frame;t.errors(function() Film.prepare(input) end)
+		end
+		for _,pixels in {0,-1,201,math.huge,0/0} do
+			local input=shot();input.labelPixels=pixels;t.errors(function() Film.prepare(input) end)
+		end
+		t.errors(function() Film.prepare({duration=1,keyframes={{t=0,box={x=0,y=0,w=1,h=1},fit=2}}}) end)
+		t.errors(function() Film.prepare({duration=1,keyframes={{t=0,box={x=0,y=0,w=1,h=1},zoom=2}}}) end)
+	end)
 end

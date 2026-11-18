@@ -248,7 +248,8 @@ function Renderer.new(parent: GuiObject, terrain: buffer, width: number, height:
 		if parent.AbsoluteSize.X <= 0 or parent.AbsoluteSize.Y <= 0 then return end
 		s.camera.viewportWidth, s.camera.viewportHeight = parent.AbsoluteSize.X, parent.AbsoluteSize.Y
 		s.camera.left, s.camera.top = parent.AbsolutePosition.X, parent.AbsolutePosition.Y
-		if s.fitPending then Camera.centerAll(s.camera); s.fitPending = false else Camera.clampOffsets(s.camera) end
+		if s.filmCamera and s.filmCamera.playing then s.filmCamera:step()
+		elseif s.fitPending then Camera.centerAll(s.camera); s.fitPending = false else Camera.clampOffsets(s.camera) end
 		s.guiLayers:layout(s.camera)
 		for _, d in s.displays do place(s, d) end
 		if s.scene then s.scene:setCamera() end
@@ -283,6 +284,13 @@ function Renderer.step(s: Renderer, budgetMs: number?, pixelBudget: number?): an
 		if s.coasts then s.coasts:build(loading) end
 		local prepareStarted = s.profiler:begin()
 		local atlasUpload = s.scene ~= nil and s.scene:prepareFrame()
+		-- Optional aim work starts after first paint; it must not compete with
+		-- initial terrain/coast/ship preparation, including late snapshots.
+		if not loading and s.scene and s.scene.sabotageReach then
+			local reachUpload=s.scene.sabotageReach:prepare(not atlasUpload
+				and (not Core.hasPending(s.core) or s.core.frames%4==0))
+			atlasUpload=atlasUpload or reachUpload
+		end
 		-- Geometry is static. Coastal paint only consumes a shared image slot
 		-- after changed source rows; retain three of four backlog frames for core.
 		if not atlasUpload and s.coasts and (loading or not Core.hasPending(s.core) or s.core.frames%4==0) then
@@ -401,7 +409,7 @@ end
 -- Original GameView.update confirmed tile-state dispatch.
 function Renderer.applyTileStates(s: Renderer, stateBuffer: buffer, changedTiles: {number}?)
 	local own,fallout={},{}
-	Core.applyTileStates(s.core, stateBuffer, changedTiles,if s.scene and changedTiles then {own=own,fallout=fallout} else nil)
+	Core.applyTileStates(s.core, stateBuffer, changedTiles,if s.scene and changedTiles then {own=own,fallout=fallout} else nil,s.ready)
 	if s.scene then
 		s.scene:tilesChanged(if changedTiles then own else nil)
 		s.scene.effects:falloutTilesChanged(if changedTiles then fallout else nil)
@@ -511,6 +519,7 @@ function Renderer.metrics(s: Renderer): {[string]: number}
 	local m = Core.metrics(s.core); m.allocatedImagePixelBytes, m.allocatedImages = 0, 0
 	for _, d in s.displays do m.allocatedImages += 1; m.allocatedImagePixelBytes += d.page.width * d.page.height * 4 end
 	if s.scene then for key, value in s.scene:metrics() do m[key] = value end end
+	if s.scene and s.scene.sabotageReach then for key,value in s.scene.sabotageReach:metrics() do m[key]=value end end
 	if s.coasts then for key,value in s.coasts:metrics() do m[key]=value end end
 	-- firstPaintBuffers aliases RasterCore page backing; counted there.
 	m.rasterBudgetMs,m.rasterMaxMs=s.rasterBudgetMs,s.rasterMaxMs
@@ -711,6 +720,9 @@ end
 -- Source GhostPreviewData is supplied by the action/buildability controller.
 -- This API renders its result only; it never invents placement validity/cost.
 function Renderer.setBuildPreview(s:Renderer,data:any?) if s.scene then s.scene:setBuildPreview(data) end end
+function Renderer.setSabotageReach(s:Renderer,reach:number?)
+	if s.scene and s.scene.sabotageReach then s.scene.sabotageReach:setAim(s.core.localPlayer,reach) end
+end
 function Renderer.setHighlightStructureTypes(s:Renderer,types:{string}?)
 	if s.scene then s.scene:setHighlightStructureTypes(types) end
 end

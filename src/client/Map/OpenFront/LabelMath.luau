@@ -80,6 +80,15 @@ function Label.limitHeight(sizing: Sizing, zoom: number, height: number, fractio
 	return out
 end
 
+-- Studio filming override. Source LOD stays authoritative; scale the complete
+-- visible annotation to an export-sized em without modifying the source cache.
+function Label.filmHeight(sizing: Sizing, zoom: number, height: number, pixels: number): Sizing
+	local factor = pixels * height / 1920 / math.max(sizing.nameWorldScale * math.abs(zoom) * Label.fontSize, 1e-9)
+	local out = table.clone(sizing)
+	out.nameWorldScale *= factor; out.worldScale *= factor; out.lineOffsetY *= factor
+	return out
+end
+
 -- Original: Format.renderNumber's Number.toFixed boundary. Decimal limbs
 -- round the exact IEEE-754 value, ties upward (C printf uses ties-to-even).
 local function toFixed(value: number, digits: number): string
