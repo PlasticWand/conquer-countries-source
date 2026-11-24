@@ -115,7 +115,10 @@ return function(t)
 		end
 	end)
 
-	t.test("the launch gift is off by default", function()
-		t.eq(Profile.giftState(Profile.new(), os.time()), if Catalog.LAUNCH_GIFT.startsAt > 0 then "claimable" else nil)
+	t.test("the launch gift is claimable only inside its window", function()
+		local g = Catalog.LAUNCH_GIFT
+		local now = os.time()
+		local on = g.startsAt > 0 and now >= g.startsAt and now < g.startsAt + g.durationS
+		t.eq(Profile.giftState(Profile.new(), now), if on then "claimable" else nil)
 	end)
 end

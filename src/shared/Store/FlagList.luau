@@ -329,4 +329,9 @@ return {
 	{ id = "o_pumpkin_patch", name = "Pumpkin Patch", rarity = "rare", set = "thanksgiving" },
 	{ id = "o_golden_sheaf", name = "Golden Sheaf", rarity = "rare", set = "thanksgiving" },
 	{ id = "o_acorn_fall", name = "Acorn Fall", rarity = "rare", set = "thanksgiving" },
+	-- The Campaign Pass's exclusive flags (Store/Pass.ITEMS; premium tiers
+	-- 5, 15, 25 of season 1); sold nowhere else.
+	{ id = "o_campaign1_a", name = "Field Marshal", rarity = "epic", set = "campaign" },
+	{ id = "o_campaign1_b", name = "Siege Standard", rarity = "epic", set = "campaign" },
+	{ id = "o_campaign1_c", name = "Iron Banner", rarity = "legendary", set = "campaign" },
 }

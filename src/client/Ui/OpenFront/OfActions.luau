@@ -33,26 +33,43 @@ local HudModel = require(OF.HudModel)
 local Lang = require(OF.Lang)
 
 local Dossier = require(script.Parent.Parent.Dossier)
+local HudStyle = require(script.Parent.Parent.HudStyle)
 local Kit = require(script.Parent.Parent.Kit)
 local Theme = require(script.Parent.Parent.Theme)
-local UiAssets = require(script.Parent.Parent.UiAssets)
 
 -- The dossier's ink on paper, under the names this module was written with.
 local T = Theme.color
+-- Style B (Bruno, 2026-11-24): the match's cards are dark panels with light
+-- words, like the HUD (HudStyle).
 local C = setmetatable({
-	fg = T.inkBlack,
-	fgSoft = T.inkFaded,
-	fgMuted = Color3.fromHex("#8A8170"),
-	creamSoft = T.inkFaded,
-	gold = Color3.fromHex("#B07A0E"),
-	star = Color3.fromHex("#B07A0E"),
-	coral = T.stamp,
-	red = T.stamp,
+	fg = HudStyle.TEXT,
+	fgSoft = HudStyle.SOFT,
+	fgMuted = HudStyle.MUTED,
+	creamSoft = HudStyle.SOFT,
+	gold = HudStyle.GOLD,
+	star = HudStyle.GOLD,
+	coral = HudStyle.BAD,
+	red = HudStyle.BAD,
 	amber = T.hazard,
-	line = T.sheetLine,
-	surface = T.sheet,
+	line = HudStyle.EDGE,
+	surface = HudStyle.BG,
 }, { __index = T }) :: any
-local A = UiAssets.dossier
+-- Ink, for the light tiles that stay (the wheel's).
+local PAPER_GOLD = Color3.fromHex("#B07A0E")
+
+-- Condensed caps and typewriter lines, light by default.
+local function stencil(props: { [string]: any }): TextLabel
+	if props.TextColor3 == nil then
+		props.TextColor3 = HudStyle.TEXT
+	end
+	return Dossier.stencil(props)
+end
+local function typed(props: { [string]: any }): TextLabel
+	if props.TextColor3 == nil then
+		props.TextColor3 = HudStyle.SOFT
+	end
+	return Dossier.typed(props)
+end
 
 local OfActions = {}
 
@@ -75,6 +92,8 @@ local function overlaps(ax: number, ay: number, aw: number, ah: number, r: Scree
 end
 
 export type Actions = {
+	-- A boost offered at the moment it helps (OfHud.offerBoost, 2026-11-23).
+	offerBoost: ((which: string, line: string) -> ())?,
 	sendIntent: (intent: { [string]: any }) -> (),
 	-- A HUD sound by sound board key (Ui/OpenFront/SoundPicks).
 	sound: ((key: string) -> ())?,
@@ -133,6 +152,15 @@ local KEYCODES = {
 	Enum.KeyCode.Minus, -- the ARSENAL slot (Conquest's Arsenal)
 }
 -- UnitDisplay shows no count for bombs (not "countable").
+-- Style B's build tiles (Bruno, 2026-11-24).
+local SLOT_BG = Color3.fromHex("#18251E")
+local SLOT_HOVER = Color3.fromHex("#24382D")
+-- How tall a host's slots are: its SlotH (the desktop bar), else 104.
+local function slotHeight(host: Instance): number
+	local h = host:GetAttribute("SlotH")
+	return if type(h) == "number" then h else 104
+end
+
 local UNCOUNTED = { ["Atom Bomb"] = true, ["Hydrogen Bomb"] = true, MIRV = true, ["Mega Nuke"] = true, Scattershot = true, ["Air Strike"] = true, ["Railgun Shot"] = true, Paratroopers = true, Sabotage = true }
 local SLOT_ICON = {
 	City = "city",
@@ -187,10 +215,10 @@ local SLOT_ART = {
 -- dims them.
 local BUTTON: { [string]: { bg: Color3, text: Color3, stroke: Color3 } } = {
 	primary = { bg = T.hazard, text = T.inkBlack, stroke = Color3.fromHex("#8A6A12") },
-	danger = { bg = T.stamp, text = T.sheet, stroke = Color3.fromHex("#6E1A14") },
-	secondary = { bg = T.manila, text = T.inkBlack, stroke = T.manilaLine },
-	chip = { bg = T.manila, text = T.inkBlack, stroke = T.manilaLine },
-	dark = { bg = T.manila, text = T.inkBlack, stroke = T.manilaLine },
+	danger = { bg = Color3.fromHex("#B8301C"), text = HudStyle.TEXT, stroke = Color3.fromHex("#6E1A14") },
+	secondary = { bg = HudStyle.INSET, text = HudStyle.CHIP_TEXT, stroke = HudStyle.EDGE },
+	chip = { bg = HudStyle.INSET, text = HudStyle.CHIP_TEXT, stroke = HudStyle.EDGE },
+	dark = { bg = HudStyle.INSET, text = HudStyle.CHIP_TEXT, stroke = HudStyle.EDGE },
 }
 local function button(kind: string, props: { [string]: any }): TextButton
 	local style = BUTTON[kind] or BUTTON.dark
@@ -211,7 +239,7 @@ local function button(kind: string, props: { [string]: any }): TextButton
 	end
 	local corner = b:FindFirstChildOfClass("UICorner")
 	if corner then
-		corner.CornerRadius = UDim.new(0, 4)
+		corner.CornerRadius = UDim.new(0, 8)
 	end
 	b.Activated:Connect(Dossier.thud)
 	return b
@@ -219,18 +247,19 @@ end
 
 -- A chip that is chosen fills yellow.
 local function setChipSelected(b: TextButton, selected: boolean)
-	local bg = if selected then T.hazard else T.manila
+	local bg = if selected then T.hazard else HudStyle.INSET
 	b:SetAttribute("BaseColor", bg)
 	b.BackgroundColor3 = bg
-	b.TextColor3 = T.inkBlack
+	b.TextColor3 = if selected then T.inkBlack else HudStyle.CHIP_TEXT
 end
 
--- A sheet of paper (the action sheet, player panel, pickers, cards).
+-- A dark panel (the action sheet, player panel, pickers, cards).
 local function panel(props: { [string]: any }): Frame
-	local frame = Dossier.surface("ImageLabel", "tex_paper", T.sheet, props)
+	local frame = Kit.new("ImageLabel", Dossier.merge({ BackgroundColor3 = HudStyle.BG, BorderSizePixel = 0, Image = "" }, props)) :: any
 	-- Takes clicks, so nothing under the sheet reacts.
 	frame.Active = true
-	Kit.stroke(T.sheetLine, 1.5, 0).Parent = frame
+	Kit.corner(12).Parent = frame
+	Kit.stroke(HudStyle.EDGE, 2, 0).Parent = frame
 	return frame
 end
 
@@ -255,17 +284,20 @@ end
 local function plate(parent: Instance, kind: "yellow" | "pale" | "red", pic: string?, glyph: string?, label: string, props: { [string]: any }): (GuiButton, TextLabel?)
 	local b: any
 	if kind == "red" then
-		b = Kit.new("TextButton", Dossier.merge({ Text = "", AutoButtonColor = false, BackgroundColor3 = T.stamp, BorderSizePixel = 0 }, props))
-		Kit.corner(5).Parent = b
+		b = Kit.new("TextButton", Dossier.merge({ Text = "", AutoButtonColor = false, BackgroundColor3 = Color3.fromHex("#B8301C"), BorderSizePixel = 0 }, props))
+		Kit.corner(10).Parent = b
 		Kit.stroke(Color3.fromHex("#6E1A14"), 2, 0).Parent = b
 		b.Activated:Connect(Dossier.click)
-		Dossier.clicky(b, 1.05)
+	elseif kind == "yellow" then
+		b = HudStyle.goldPlate(Dossier.merge({ AnchorPoint = Vector2.new(0, 0) }, props), 10)
 	else
-		b = Dossier.rivetPlate(parent, "", 20, kind == "yellow", Dossier.merge({ AnchorPoint = Vector2.new(0, 0) }, props))
+		b = HudStyle.panel("ImageButton", Dossier.merge({ Image = "", BackgroundColor3 = HudStyle.INSET, AnchorPoint = Vector2.new(0, 0) }, props), 10)
+		b.Activated:Connect(Dossier.click)
 	end
+	Dossier.clicky(b, 1.05)
 	local row = Kit.new("Frame", { Name = "Row", BackgroundTransparency = 1, Size = UDim2.fromScale(1, 1), Parent = b })
 	Kit.list(Enum.FillDirection.Horizontal, 8, Enum.HorizontalAlignment.Center, Enum.VerticalAlignment.Center).Parent = row
-	local ink = if kind == "red" then T.sheet else T.inkBlack
+	local ink = if kind == "yellow" then HudStyle.BROWN else HudStyle.TEXT
 	local h = (props.Size :: UDim2).Y.Offset
 	local iconProps = { Size = UDim2.fromOffset(h - 16, h - 16), LayoutOrder = 1, Parent = row }
 	if not (pic and Dossier.art(pic, iconProps)) and glyph then
@@ -273,7 +305,7 @@ local function plate(parent: Instance, kind: "yellow" | "pale" | "red", pic: str
 	end
 	local text: TextLabel? = nil
 	if label ~= "" then
-		text = Dossier.stencil({ Name = "Label", Text = label, TextSize = 20, TextColor3 = ink, LayoutOrder = 2, Parent = row })
+		text = stencil({ Name = "Label", Text = label, TextSize = 20, TextColor3 = ink, LayoutOrder = 2, Parent = row })
 	end
 	b.Parent = parent
 	return b, text
@@ -293,20 +325,16 @@ local function setUsable(b: GuiButton, usable: boolean)
 		end
 	end
 	-- Greyed, so a plate you can't use never reads as ready.
-	if b:IsA("ImageButton") then
-		b.ImageColor3 = if usable then Color3.new(1, 1, 1) else Color3.fromRGB(150, 146, 138)
-	elseif b:IsA("TextButton") then
-		b.BackgroundTransparency = if usable then 0 else 0.45
-	end
+	b.BackgroundTransparency = if usable then 0 else 0.45
 end
 
 -- A pinned paper slip (mockup A), scaled up on desktop.
 local function slip(self: any, name: string, w: number, h: number): ImageLabel
-	local s = Dossier.surface("ImageLabel", "tex_paper", T.sheet, { Name = name, Size = UDim2.fromOffset(w, h), Visible = false, ZIndex = 6, Parent = self.parent })
+	local s = Kit.new("ImageLabel", { Name = name, BackgroundColor3 = HudStyle.BG, BorderSizePixel = 0, Image = "", Size = UDim2.fromOffset(w, h), Visible = false, ZIndex = 6, Parent = self.parent }) :: ImageLabel
 	s.Active = true
-	Kit.stroke(T.sheetLine, 1, 0.2).Parent = s
+	Kit.corner(12).Parent = s
+	Kit.stroke(HudStyle.EDGE, 2, 0).Parent = s
 	Kit.new("UIScale", { Scale = if self.phone then 1 else 1.4, Parent = s })
-	Dossier.art("pin", { Position = UDim2.new(0.5, -12, 0, -14), Size = UDim2.fromOffset(24, 30), ZIndex = 8, Parent = s })
 	return s
 end
 
@@ -407,9 +435,9 @@ function OfActions.new(state: any, parent: Frame, actions: Actions, slotsHost: F
 	local phone = Kit.root ~= nil and Kit.root.compact == true
 	self.phone = phone
 	local function sideSheet(name: string, z: number): any
-		local s = Kit.scroll({ Name = name, BackgroundColor3 = T.sheet, BackgroundTransparency = 0, AnchorPoint = Vector2.new(1, 0), Position = UDim2.new(1, -8, 0, 8), Size = UDim2.new(0.5 / SHEET_SCALE, 0, 1 / SHEET_SCALE, -16 / SHEET_SCALE), ScrollBarThickness = 6, ScrollBarImageColor3 = T.inkBlack, Visible = false, ZIndex = z, Parent = parent })
+		local s = Kit.scroll({ Name = name, BackgroundColor3 = HudStyle.BG, BackgroundTransparency = 0, AnchorPoint = Vector2.new(1, 0), Position = UDim2.new(1, -8, 0, 8), Size = UDim2.new(0.5 / SHEET_SCALE, 0, 1 / SHEET_SCALE, -16 / SHEET_SCALE), ScrollBarThickness = 6, ScrollBarImageColor3 = T.inkBlack, Visible = false, ZIndex = z, Parent = parent })
 		s.Active = true
-		Kit.stroke(T.sheetLine, 1.5, 0).Parent = s
+		Kit.stroke(HudStyle.EDGE, 2, 0).Parent = s
 		Kit.new("UIScale", { Scale = SHEET_SCALE, Parent = s })
 		return s
 	end
@@ -556,20 +584,22 @@ end
 -- One build slot (UnitDisplay's): key, count, icon, price, tooltip.
 function OfActions._slot(self: any, item: any, width: number, order: number, parent: Instance): any
 	local state = self.state
-	-- A dark key tile (the slot_tile art, else charcoal).
-	local tileArt = A.slot_tile or ""
-	local b = Kit.new("ImageButton", { Name = item.type, AutoButtonColor = false, BackgroundColor3 = Color3.fromHex("#23241C"), BackgroundTransparency = if tileArt ~= "" then 1 else 0, BorderSizePixel = 0, Image = tileArt, ScaleType = Enum.ScaleType.Stretch, Size = UDim2.fromOffset(width, 104), LayoutOrder = order, Parent = parent }) :: any
-	Kit.corner(4).Parent = b
+	-- A dark key tile (style B, 2026-11-24: flat, rounded), as tall as its
+	-- host asks (the desktop bar's SlotH), else 104.
+	local h = slotHeight(parent)
+	local b = Kit.new("ImageButton", { Name = item.type, AutoButtonColor = false, BackgroundColor3 = SLOT_BG, BorderSizePixel = 0, Image = "", Size = UDim2.fromOffset(width, h), LayoutOrder = order, Parent = parent }) :: any
+	Kit.corner(10).Parent = b
 	local stroke = Kit.stroke(T.hazard, 3, 0)
 	stroke.Enabled = false
 	stroke.Parent = b
 	Kit.label({ Name = "Key", Text = item.key, FontFace = Theme.font.stencil, TextSize = 17, TextColor3 = T.sheetLine, Position = UDim2.fromOffset(6, 3), Parent = b })
 	Kit.label({ Name = "Count", Text = "", FontFace = Theme.font.stencil, TextSize = 17, TextColor3 = T.sheet, AnchorPoint = Vector2.new(1, 0), Position = UDim2.new(1, -6, 0, 3), Parent = b })
-	local iconProps = { Name = "Icon", AnchorPoint = Vector2.new(0.5, 0), Position = UDim2.new(0.5, 0, 0, 24), Size = UDim2.fromOffset(50, 50), Parent = b }
+	local iconSize = if h < 104 then 44 else 50
+	local iconProps = { Name = "Icon", AnchorPoint = Vector2.new(0.5, 0), Position = UDim2.new(0.5, 0, 0, if h < 104 then 20 else 24), Size = UDim2.fromOffset(iconSize, iconSize), Parent = b }
 	if Dossier.art(SLOT_ART[item.type] or "", iconProps) == nil then
 		Kit.glyph(SLOT_ICON[item.type] or "build", Dossier.merge({ ImageColor3 = T.sheet }, iconProps))
 	end
-	Kit.label({ Name = "Cost", Text = "", FontFace = Theme.font.stencil, TextSize = 23, TextColor3 = T.hazard, AnchorPoint = Vector2.new(0.5, 1), Position = UDim2.new(0.5, 0, 1, -3), Parent = b })
+	Kit.label({ Name = "Cost", Text = "", FontFace = Theme.font.stencil, TextSize = if h < 104 then 20 else 23, TextColor3 = T.hazard, AnchorPoint = Vector2.new(0.5, 1), Position = UDim2.new(0.5, 0, 1, -3), Parent = b })
 	b.Activated:Connect(function()
 		Dossier.thud()
 		self:_pressItem(item.type)
@@ -578,12 +608,10 @@ function OfActions._slot(self: any, item: any, width: number, order: number, par
 		if Kit.covered(b) then
 			return
 		end
-		b.ImageColor3 = Color3.fromRGB(255, 240, 200)
-		b.BackgroundColor3 = Color3.fromHex("#33352A")
+		b.BackgroundColor3 = SLOT_HOVER
 	end)
 	b.MouseLeave:Connect(function()
-		b.ImageColor3 = Color3.new(1, 1, 1)
-		b.BackgroundColor3 = Color3.fromHex("#23241C")
+		b.BackgroundColor3 = SLOT_BG
 	end)
 	Kit.tip(b, function(card)
 		for _, it in HudModel.buildItems(state) do
@@ -618,10 +646,9 @@ end
 -- match"): its icon dimmed under a lock, UNLOCK under it; a tap opens the
 -- unlock card (stars progress, Robux price).
 function OfActions._lockedSlot(self: any, l: HudModel.LockedWeapon, width: number, order: number, parent: Instance): any
-	local tileArt = A.slot_tile or ""
-	local b = Kit.new("ImageButton", { Name = "Locked_" .. l.id, AutoButtonColor = false, BackgroundColor3 = Color3.fromHex("#23241C"), BackgroundTransparency = if tileArt ~= "" then 1 else 0, BorderSizePixel = 0, Image = tileArt, ImageTransparency = 0.35, ScaleType = Enum.ScaleType.Stretch, Size = UDim2.fromOffset(width, 104), LayoutOrder = order, Parent = parent }) :: any
+	local b = Kit.new("ImageButton", { Name = "Locked_" .. l.id, AutoButtonColor = false, BackgroundColor3 = SLOT_BG, BackgroundTransparency = 0.3, BorderSizePixel = 0, Image = "", Size = UDim2.fromOffset(width, slotHeight(parent)), LayoutOrder = order, Parent = parent }) :: any
 	b:SetAttribute("keepDrawer", true)
-	Kit.corner(4).Parent = b
+	Kit.corner(10).Parent = b
 	local iconProps = { Name = "Icon", AnchorPoint = Vector2.new(0.5, 0), Position = UDim2.new(0.5, 0, 0, 24), Size = UDim2.fromOffset(50, 50), ImageTransparency = 0.6, Parent = b }
 	if Dossier.art(SLOT_ART[l.type] or "", iconProps) == nil then
 		Kit.glyph(SLOT_ICON[l.type] or "build", Dossier.merge({ ImageColor3 = T.sheet }, iconProps))
@@ -674,7 +701,7 @@ function OfActions._buildSlots(self: any)
 	end
 	self.arsenalOpen = false
 	if bar:FindFirstChild("Gap") == nil then
-		Kit.new("Frame", { Name = "Gap", BackgroundTransparency = 1, Size = UDim2.fromOffset(6, 104), LayoutOrder = 15, Parent = bar })
+		Kit.new("Frame", { Name = "Gap", BackgroundTransparency = 1, Size = UDim2.fromOffset(6, slotHeight(bar)), LayoutOrder = 15, Parent = bar })
 	end
 	local base: { HudModel.BuildItem }, extra: { HudModel.BuildItem } = {}, {}
 	for _, item in HudModel.buildItems(state) do
@@ -685,7 +712,14 @@ function OfActions._buildSlots(self: any)
 	-- ARSENAL shows whenever the match has the Arsenal.
 	local locked = HudModel.lockedArsenal(state)
 	-- Ten slots at 73; with ARSENAL, eleven at 66 so it never runs under SHOP.
-	local width = if #extra == 0 and #locked == 0 then 73 else 66
+	-- A host that says how wide it is (the desktop bar's SlotsW) shares that
+	-- out instead: the slots, ARSENAL, the gap and 4 between each.
+	local count = if #extra == 0 and #locked == 0 then 10 else 11
+	local width = if count == 10 then 73 else 66
+	local room = bar:GetAttribute("SlotsW")
+	if type(room) == "number" then
+		width = math.floor((room - 6 - 4 * count) / count)
+	end
 	for i, item in base do
 		self:_slot(item, width, i * 2, bar)
 	end
@@ -693,17 +727,19 @@ function OfActions._buildSlots(self: any)
 		return
 	end
 
-	local slot = Kit.new("ImageButton", { Name = "Arsenal", AutoButtonColor = false, BackgroundColor3 = Color3.fromHex("#4A3A12"), BorderSizePixel = 0, Size = UDim2.fromOffset(width, 104), LayoutOrder = 22, Parent = bar }) :: any
+	-- Purple, the Locker's and the Arsenal's colour (style B).
+	local slot = Kit.new("ImageButton", { Name = "Arsenal", AutoButtonColor = false, BackgroundColor3 = Color3.new(1, 1, 1), BorderSizePixel = 0, Image = "", Size = UDim2.fromOffset(width, slotHeight(bar)), LayoutOrder = 22, Parent = bar }) :: any
 	-- The phone's build drawer stays open for the fly-out (OfHud).
 	slot:SetAttribute("keepDrawer", true)
-	Kit.corner(4).Parent = slot
+	Kit.corner(10).Parent = slot
+	Kit.new("UIGradient", { Rotation = 70, Color = ColorSequence.new(Color3.fromHex("#8A4FE0"), Color3.fromHex("#2A1650")), Parent = slot })
 	local stroke = Kit.stroke(T.hazard, 3, 0)
 	stroke.Enabled = false
 	stroke.Parent = slot
 	Kit.label({ Name = "Key", Text = "-", FontFace = Theme.font.stencil, TextSize = 17, TextColor3 = T.sheetLine, Position = UDim2.fromOffset(6, 3), Parent = slot })
-	Kit.label({ Name = "Count", Text = if #extra > 0 then tostring(#extra) else "", FontFace = Theme.font.stencil, TextSize = 17, TextColor3 = T.sheet, AnchorPoint = Vector2.new(1, 0), Position = UDim2.new(1, -6, 0, 3), Parent = slot })
-	Kit.glyph("shield", { Name = "Icon", ImageColor3 = T.hazard, AnchorPoint = Vector2.new(0.5, 0), Position = UDim2.new(0.5, 0, 0, 24), Size = UDim2.fromOffset(46, 46), Parent = slot })
-	Kit.label({ Name = "Cost", Text = "ARSENAL", FontFace = Theme.font.stencil, TextSize = 15, TextColor3 = T.hazard, AnchorPoint = Vector2.new(0.5, 1), Position = UDim2.new(0.5, 0, 1, -6), Parent = slot })
+	Kit.label({ Name = "Count", Text = if #extra > 0 then tostring(#extra) else "", FontFace = Theme.font.stencil, TextSize = 17, TextColor3 = Color3.fromHex("#E4CFFF"), AnchorPoint = Vector2.new(1, 0), Position = UDim2.new(1, -6, 0, 3), Parent = slot })
+	Kit.glyph("shield", { Name = "Icon", ImageColor3 = Color3.new(1, 1, 1), AnchorPoint = Vector2.new(0.5, 0), Position = UDim2.new(0.5, 0, 0, 22), Size = UDim2.fromOffset(40, 40), Parent = slot })
+	Kit.label({ Name = "Cost", Text = "ARSENAL", FontFace = Theme.font.stencil, TextSize = 15, TextColor3 = Color3.new(1, 1, 1), AnchorPoint = Vector2.new(0.5, 1), Position = UDim2.new(0.5, 0, 1, -6), Parent = slot })
 	Kit.tip(slot, function(card)
 		Kit.text({ Text = "Arsenal", FontFace = Theme.font.uiHeavy, TextSize = 19, LayoutOrder = 1, Parent = card })
 		Kit.text({ Text = "Your Arsenal weapons", TextSize = 16, TextColor3 = C.fgSoft, LayoutOrder = 2, Parent = card })
@@ -918,20 +954,20 @@ function OfActions._buildAttackCard(self: any)
 	card.AnchorPoint = Vector2.new(0, 1)
 	self.attackCard = card
 	self.attackSwatch = Kit.new("Frame", { BackgroundColor3 = T.sheetLine, BorderSizePixel = 0, Position = UDim2.fromOffset(14, 14), Size = UDim2.fromOffset(12, 12), Parent = card })
-	Kit.stroke(T.inkBlack, 1, 0.4).Parent = self.attackSwatch
-	self.attackName = Dossier.stencil({ Text = "", TextSize = 24, AutomaticSize = Enum.AutomaticSize.None, Position = UDim2.fromOffset(32, 6), Size = UDim2.fromOffset(150, 28), TextTruncate = Enum.TextTruncate.AtEnd, Parent = card })
+	Kit.stroke(HudStyle.EDGE, 1, 0).Parent = self.attackSwatch
+	self.attackName = stencil({ Text = "", TextSize = 24, AutomaticSize = Enum.AutomaticSize.None, Position = UDim2.fromOffset(32, 6), Size = UDim2.fromOffset(150, 28), TextTruncate = Enum.TextTruncate.AtEnd, Parent = card })
 	local stamp = Kit.new("Frame", { BackgroundTransparency = 1, AnchorPoint = Vector2.new(1, 0), Position = UDim2.new(1, -44, 0, 9), Size = UDim2.fromOffset(0, 24), AutomaticSize = Enum.AutomaticSize.X, Rotation = -5, Parent = card })
 	Kit.padding(0, 6).Parent = stamp
-	self.attackStampLine = Kit.stroke(T.stamp, 2.5, 0.05)
+	self.attackStampLine = Kit.stroke(HudStyle.BAD, 2.5, 0.05)
 	self.attackStampLine.Parent = stamp
-	self.attackStamp = Dossier.stencil({ Text = "", TextSize = 16, TextColor3 = T.stamp, Size = UDim2.fromScale(0, 1), AutomaticSize = Enum.AutomaticSize.X, Parent = stamp })
+	self.attackStamp = stencil({ Text = "", TextSize = 16, TextColor3 = HudStyle.BAD, Size = UDim2.fromScale(0, 1), AutomaticSize = Enum.AutomaticSize.X, Parent = stamp })
 	local close = Kit.new("TextButton", { Name = "Close", Text = "", AutoButtonColor = false, BackgroundTransparency = 1, AnchorPoint = Vector2.new(1, 0), Position = UDim2.new(1, -6, 0, 4), Size = UDim2.fromOffset(32, 32), Parent = card })
-	Kit.glyph("close", { ImageColor3 = T.inkBlack, AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromScale(0.5, 0.5), Size = UDim2.fromOffset(18, 18), Parent = close })
+	Kit.glyph("close", { ImageColor3 = HudStyle.TEXT, AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromScale(0.5, 0.5), Size = UDim2.fromOffset(18, 18), Parent = close })
 	close.Activated:Connect(function()
 		Dossier.click()
 		self:closeAttack()
 	end)
-	self.attackInfo = Dossier.typed({ Text = "", TextSize = 15, Position = UDim2.fromOffset(14, 42), Parent = card })
+	self.attackInfo = typed({ Text = "", TextSize = 15, Position = UDim2.fromOffset(14, 42), Parent = card })
 	self.attackMain, self.attackMainLabel = plate(card, "yellow", nil, "sword", "ATTACK", { Name = "Main", Position = UDim2.fromOffset(12, 80), Size = UDim2.fromOffset(176, 50) })
 	self.attackMainIcon = (self.attackMain:FindFirstChild("Row") :: Frame):FindFirstChildWhichIsA("ImageLabel")
 	self.attackAlly, self.attackAllyLabel = plate(card, "pale", nil, "alliance", "ALLY", { Name = "Ally", Position = UDim2.fromOffset(196, 80), Size = UDim2.fromOffset(92, 50) })
@@ -1082,27 +1118,27 @@ function OfActions._buildWarshipCard(self: any)
 	local dark = Kit.new("Frame", { Name = "Print", BackgroundColor3 = Color3.fromHex("#3B4146"), BorderSizePixel = 0, Position = UDim2.fromOffset(5, 5), Size = UDim2.new(1, -10, 1, -10), ZIndex = 6, Parent = frame })
 	Dossier.art("bld_warship", { ImageColor3 = Color3.fromHex("#E8DFC8"), Position = UDim2.fromScale(0.08, 0.1), Size = UDim2.fromScale(0.84, 0.8), ZIndex = 6, Parent = dark })
 	Dossier.age(dark)
-	Dossier.art("paperclip", { AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromOffset(30, 22), Size = UDim2.fromOffset(12, 42), Rotation = 8, ZIndex = 8, Parent = card })
+	-- (No paperclip on a dark card.)
 	local stamp = Kit.new("Frame", { BackgroundTransparency = 1, AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromOffset(104, 100), Size = UDim2.fromOffset(0, 24), AutomaticSize = Enum.AutomaticSize.X, Rotation = -12, ZIndex = 8, Parent = card })
 	Kit.padding(0, 6).Parent = stamp
-	self.warshipStampLine = Kit.stroke(T.stamp, 2.5, 0.05)
+	self.warshipStampLine = Kit.stroke(HudStyle.BAD, 2.5, 0.05)
 	self.warshipStampLine.Parent = stamp
-	self.warshipStamp = Dossier.stencil({ Text = "", TextSize = 16, TextColor3 = T.stamp, Size = UDim2.fromScale(0, 1), AutomaticSize = Enum.AutomaticSize.X, ZIndex = 8, Parent = stamp })
+	self.warshipStamp = stencil({ Text = "", TextSize = 16, TextColor3 = HudStyle.BAD, Size = UDim2.fromScale(0, 1), AutomaticSize = Enum.AutomaticSize.X, ZIndex = 8, Parent = stamp })
 	-- The typed column beside the photo.
 	local x = 152
 	self.warshipSwatch = Kit.new("Frame", { BackgroundColor3 = T.sheetLine, BorderSizePixel = 0, Position = UDim2.fromOffset(x, 16), Size = UDim2.fromOffset(12, 12), Parent = card })
-	Kit.stroke(T.inkBlack, 1, 0.4).Parent = self.warshipSwatch
-	Dossier.stencil({ Text = "WARSHIP", TextSize = 22, AutomaticSize = Enum.AutomaticSize.None, Position = UDim2.fromOffset(x + 18, 8), Size = UDim2.fromOffset(110, 26), Parent = card })
-	self.warshipHealth = Dossier.typed({ Text = "", TextSize = 14, TextColor3 = T.inkBlack, Position = UDim2.fromOffset(x, 40), Parent = card })
+	Kit.stroke(HudStyle.EDGE, 1, 0).Parent = self.warshipSwatch
+	stencil({ Text = "WARSHIP", TextSize = 22, AutomaticSize = Enum.AutomaticSize.None, Position = UDim2.fromOffset(x + 18, 8), Size = UDim2.fromOffset(110, 26), Parent = card })
+	self.warshipHealth = typed({ Text = "", TextSize = 14, TextColor3 = HudStyle.TEXT, Position = UDim2.fromOffset(x, 40), Parent = card })
 	local bar = Kit.new("Frame", { Name = "Health", BackgroundColor3 = T.sheetLine, BackgroundTransparency = 0.6, BorderSizePixel = 0, Position = UDim2.fromOffset(x, 60), Size = UDim2.fromOffset(WARSHIP_W - x - 16, 8), Parent = card })
-	Kit.stroke(T.inkBlack, 1, 0.5).Parent = bar
+	Kit.stroke(HudStyle.EDGE, 1, 0).Parent = bar
 	self.warshipFill = Kit.new("Frame", { BackgroundColor3 = Color3.fromHex("#2E8A3E"), BorderSizePixel = 0, Size = UDim2.fromScale(1, 1), Parent = bar })
 	local stars = Kit.new("Frame", { Name = "Veterancy", BackgroundTransparency = 1, Position = UDim2.fromOffset(x - 2, 74), Size = UDim2.fromOffset(120, 22), Parent = card })
 	Kit.list(Enum.FillDirection.Horizontal, 4, Enum.HorizontalAlignment.Left, Enum.VerticalAlignment.Center).Parent = stars
 	self.warshipStars = stars
-	Dossier.typed({ Text = "Tap the sea to move it", TextSize = 12, TextColor3 = T.inkFaded, AutomaticSize = Enum.AutomaticSize.None, TextWrapped = true, Position = UDim2.fromOffset(x, 98), Size = UDim2.fromOffset(WARSHIP_W - x - 12, 30), Parent = card })
+	typed({ Text = "Tap the sea to move it", TextSize = 12, TextColor3 = HudStyle.MUTED, AutomaticSize = Enum.AutomaticSize.None, TextWrapped = true, Position = UDim2.fromOffset(x, 98), Size = UDim2.fromOffset(WARSHIP_W - x - 12, 30), Parent = card })
 	local close = Kit.new("TextButton", { Name = "Close", Text = "", AutoButtonColor = false, BackgroundTransparency = 1, AnchorPoint = Vector2.new(1, 0), Position = UDim2.new(1, -6, 0, 4), Size = UDim2.fromOffset(32, 32), Parent = card })
-	Kit.glyph("close", { ImageColor3 = T.inkBlack, AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromScale(0.5, 0.5), Size = UDim2.fromOffset(18, 18), Parent = close })
+	Kit.glyph("close", { ImageColor3 = HudStyle.TEXT, AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromScale(0.5, 0.5), Size = UDim2.fromOffset(18, 18), Parent = close })
 	close.Activated:Connect(function()
 		Dossier.click()
 		if self.actions.deselectWarship then
@@ -1146,7 +1182,7 @@ function OfActions._showWarship(self: any)
 		clear(self.warshipStars)
 		for i = 1, card.maxVeterancy do
 			local earned = i <= card.veterancy
-			Kit.glyph("star", { ImageColor3 = if earned then C.star else T.inkFaded, ImageTransparency = if earned then 0 else 0.65, Size = UDim2.fromOffset(20, 20), LayoutOrder = i, Parent = self.warshipStars })
+			Kit.glyph("star", { ImageColor3 = if earned then C.star else HudStyle.MUTED, ImageTransparency = if earned then 0 else 0.65, Size = UDim2.fromOffset(20, 20), LayoutOrder = i, Parent = self.warshipStars })
 		end
 	end
 	self.warshipCard.Visible = true
@@ -1198,7 +1234,7 @@ end
 function OfActions._buildConfirm(self: any)
 	local card = slip(self, "ConfirmCard", CONFIRM_W, CONFIRM_H)
 	self.confirmCard = card
-	self.confirmTitle = Dossier.stencil({ Text = "", TextSize = 20, AutomaticSize = Enum.AutomaticSize.None, Position = UDim2.fromOffset(6, 4), Size = UDim2.new(1, -12, 0, 32), TextXAlignment = Enum.TextXAlignment.Center, TextTruncate = Enum.TextTruncate.AtEnd, Parent = card })
+	self.confirmTitle = stencil({ Text = "", TextSize = 20, AutomaticSize = Enum.AutomaticSize.None, Position = UDim2.fromOffset(6, 4), Size = UDim2.new(1, -12, 0, 32), TextXAlignment = Enum.TextXAlignment.Center, TextTruncate = Enum.TextTruncate.AtEnd, Parent = card })
 	-- ✕ and ✓ stay centred when the card widens for a long title.
 	local no = plate(card, "pale", nil, "close", "", { Name = "Cancel", Position = UDim2.new(0.5, -78, 0, 42), Size = UDim2.fromOffset(72, 58) })
 	-- ✕ cancels the build altogether (Bruno, 2026-10-28): choose again to build.
@@ -1617,7 +1653,7 @@ function OfActions._toast(self: any, text: string, anchor: () -> Vector2?, dy: n
 		local oldest = table.remove(self.toasts, 1)
 		oldest.stop()
 	end
-	local label = Dossier.stencil({ Name = "Toast", Text = text, TextSize = if self.phone then 22 else 30, TextColor3 = T.sheet, AnchorPoint = Vector2.new(0.5, 0.5), ZIndex = 4, Visible = false, Parent = parent })
+	local label = stencil({ Name = "Toast", Text = text, TextSize = if self.phone then 22 else 30, TextColor3 = T.sheet, AnchorPoint = Vector2.new(0.5, 0.5), ZIndex = 4, Visible = false, Parent = parent })
 	-- (Map ink, not a panel: the map's labels mustn't move away from it.)
 	label:SetAttribute("MapInk", true)
 	-- Pops in from its centre before the rise (Bruno, 2026-11-08).
@@ -1760,7 +1796,7 @@ end
 -- Build-mode banner (Bruno, 2026-10-28, after RoWorld): what to tap while a
 -- type is chosen, and Cancel.
 function OfActions._buildBanner(self: any)
-	local b = Dossier.surface("ImageLabel", "tex_paper", T.sheet, { Name = "BuildBanner", AnchorPoint = Vector2.new(0.5, 0), Position = UDim2.new(0.5, 0, 0, if self.phone then 100 else 140), Size = UDim2.fromOffset(0, 50), AutomaticSize = Enum.AutomaticSize.X, Visible = false, ZIndex = 6, Parent = self.parent })
+	local b = Kit.new("ImageLabel", { Image = "", BackgroundColor3 = HudStyle.BG, BorderSizePixel = 0, Name = "BuildBanner", AnchorPoint = Vector2.new(0.5, 0), Position = UDim2.new(0.5, 0, 0, if self.phone then 100 else 140), Size = UDim2.fromOffset(0, 50), AutomaticSize = Enum.AutomaticSize.X, Visible = false, ZIndex = 6, Parent = self.parent })
 	-- A desktop's sits 12 under the top rail's real bottom (OfHud's RailBottom),
 	-- which grows with the HUD; a fixed 140 nearly touched it (2026-11-10 review).
 	if not self.phone then
@@ -1775,12 +1811,13 @@ function OfActions._buildBanner(self: any)
 		table.insert(self.connections, parent:GetAttributeChangedSignal("RailBottom"):Connect(place))
 	end
 	b.Active = true
-	Kit.stroke(T.sheetLine, 1, 0.2).Parent = b
+	Kit.corner(12).Parent = b
+	Kit.stroke(HudStyle.EDGE, 2, 0).Parent = b
 	Kit.new("UIScale", { Scale = if self.phone then 1 else 1.4, Parent = b })
 	Kit.padding(0, 12).Parent = b
 	Kit.list(Enum.FillDirection.Horizontal, 10, Enum.HorizontalAlignment.Center, Enum.VerticalAlignment.Center).Parent = b
-	Kit.glyph("target", { ImageColor3 = T.stamp, Size = UDim2.fromOffset(22, 22), LayoutOrder = 1, Parent = b })
-	self.bannerText = Dossier.typed({ Text = "", TextSize = 16, TextColor3 = T.inkBlack, LayoutOrder = 2, Parent = b })
+	Kit.glyph("target", { ImageColor3 = HudStyle.BAD, Size = UDim2.fromOffset(22, 22), LayoutOrder = 1, Parent = b })
+	self.bannerText = typed({ Text = "", TextSize = 16, TextColor3 = HudStyle.TEXT, LayoutOrder = 2, Parent = b })
 	local cancel = plate(b, "pale", nil, "close", "CANCEL", { Name = "Cancel", Size = UDim2.fromOffset(118, 38), LayoutOrder = 3 })
 	cancel.Activated:Connect(function()
 		self:choose(nil)
@@ -1805,6 +1842,9 @@ function OfActions._refreshBanner(self: any)
 		else `Tap your land, then ✓ to build the {name}`
 end
 
+-- The bombs a silo launches (Instant Rearm is offered when none is loaded).
+local REARM_NUKES = { ["Atom Bomb"] = true, ["Hydrogen Bomb"] = true, MIRV = true, ["Mega Nuke"] = true, Scattershot = true }
+
 -- UnitDisplay's click: a chosen item always deselects; another one selects
 -- only if it can be used now.
 function OfActions._pressItem(self: any, unitType: string)
@@ -1813,8 +1853,17 @@ function OfActions._pressItem(self: any, unitType: string)
 		return
 	end
 	for _, item in HudModel.buildItems(self.state) do
-		if item.type == unitType and item.enabled then
-			self:choose(unitType)
+		if item.type == unitType then
+			if item.enabled then
+				self:choose(unitType)
+				-- (Every silo reloading: Instant Rearm, 2026-11-23.)
+				if REARM_NUKES[unitType] and HudModel.readyMissileCount(self.state) == 0 and self.actions.offerBoost then
+					self.actions.offerBoost("rearm", "Every silo of yours is reloading. Reload them all now.")
+				end
+			elseif item.cost < math.huge and item.cost > self.state.gold and self.actions.offerBoost then
+				-- Short of gold for it: War Chest (2026-11-23).
+				self.actions.offerBoost("warChest", "Short of gold? Three minutes of your income, right now.")
+			end
 		end
 	end
 end
@@ -1868,10 +1917,10 @@ function OfActions._refreshBar(self: any)
 			-- when it can't be used, the price red when you can't afford it.
 			b.Active = true
 			local cost = b:FindFirstChild("Cost") :: TextLabel
-			cost.TextColor3 = if item.cost > state.gold then Color3.fromHex("#F0574A") else T.hazard
+			cost.TextColor3 = if item.cost > state.gold then Color3.fromHex("#FF6B5A") else T.hazard
 			local icon = b:FindFirstChild("Icon") :: ImageLabel
 			icon.ImageTransparency = if item.enabled then 0 else 0.55
-			b.ImageTransparency = if item.enabled then 0 else 0.25
+			b.BackgroundTransparency = if item.enabled then 0 else 0.3
 		end
 	end
 end
@@ -2356,10 +2405,11 @@ function OfActions._showMenu(self: any, menu: any, stack: { { title: string?, it
 	end
 
 	-- The title on a paper strip above the ring.
-	local strip = Dossier.surface("ImageLabel", "tex_paper", T.sheet, { Name = "Title", AnchorPoint = Vector2.new(0.5, 1), Position = UDim2.new(0.5, 0, 0, -6), Size = UDim2.fromOffset(0, 34), AutomaticSize = Enum.AutomaticSize.X, ZIndex = 5, Parent = wheel })
-	Kit.stroke(T.sheetLine, 1, 0.2).Parent = strip
+	local strip = Kit.new("ImageLabel", { Image = "", BackgroundColor3 = HudStyle.BG, BorderSizePixel = 0, Name = "Title", AnchorPoint = Vector2.new(0.5, 1), Position = UDim2.new(0.5, 0, 0, -6), Size = UDim2.fromOffset(0, 34), AutomaticSize = Enum.AutomaticSize.X, ZIndex = 5, Parent = wheel })
+	Kit.corner(10).Parent = strip
+	Kit.stroke(HudStyle.EDGE, 2, 0).Parent = strip
 	Kit.padding(0, 16).Parent = strip
-	Dossier.stencil({ Text = level.title or "", TextSize = 20, Size = UDim2.fromScale(0, 1), AutomaticSize = Enum.AutomaticSize.X, ZIndex = 5, Parent = strip })
+	stencil({ Text = level.title or "", TextSize = 20, Size = UDim2.fromScale(0, 1), AutomaticSize = Enum.AutomaticSize.X, ZIndex = 5, Parent = strip })
 
 	-- The red centre: close, or back from a deeper ring.
 	local centre = Kit.new("TextButton", { Name = "Centre", Text = "", AutoButtonColor = false, BackgroundColor3 = T.stamp, AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromScale(0.5, 0.5), Size = UDim2.fromOffset(60, 60), ZIndex = 6, Parent = wheel })
@@ -2375,7 +2425,7 @@ function OfActions._showMenu(self: any, menu: any, stack: { { title: string?, it
 		for _, turn in { -45, 45 } do
 			Kit.new("Frame", { BackgroundColor3 = T.sheet, BorderSizePixel = 0, AnchorPoint = Vector2.new(0, 0.5), Position = UDim2.new(0, 1, 0.5, if turn < 0 then -4 else 4), Size = UDim2.fromOffset(12, 4), Rotation = turn, ZIndex = 6, Parent = arrow })
 		end
-		Dossier.stencil({ Text = "BACK", TextSize = 13, TextColor3 = T.sheet, AutomaticSize = Enum.AutomaticSize.None, AnchorPoint = Vector2.new(0.5, 0), Position = UDim2.new(0.5, 0, 0.5, 5), Size = UDim2.fromOffset(50, 14), TextXAlignment = Enum.TextXAlignment.Center, ZIndex = 6, Parent = centre })
+		stencil({ Text = "BACK", TextSize = 13, TextColor3 = T.sheet, AutomaticSize = Enum.AutomaticSize.None, AnchorPoint = Vector2.new(0.5, 0), Position = UDim2.new(0.5, 0, 0.5, 5), Size = UDim2.fromOffset(50, 14), TextXAlignment = Enum.TextXAlignment.Center, ZIndex = 6, Parent = centre })
 	end
 	Dossier.clicky(centre, 1.08)
 	centre.Activated:Connect(function()
@@ -2408,9 +2458,9 @@ function OfActions._showMenu(self: any, menu: any, stack: { { title: string?, it
 			if item.timerFraction then
 				label = `{label} {math.ceil(item.timerFraction * 100)}%`
 			end
-			Dossier.stencil({ Text = label, TextSize = 14, TextColor3 = T.inkBlack, AutomaticSize = Enum.AutomaticSize.None, TextXAlignment = Enum.TextXAlignment.Center, TextTruncate = Enum.TextTruncate.AtEnd, Position = UDim2.fromOffset(4, if item.cost then 40 else 46), Size = UDim2.new(1, -8, 0, 18), ZIndex = 6, Parent = tile })
+			stencil({ Text = label, TextSize = 14, TextColor3 = T.inkBlack, AutomaticSize = Enum.AutomaticSize.None, TextXAlignment = Enum.TextXAlignment.Center, TextTruncate = Enum.TextTruncate.AtEnd, Position = UDim2.fromOffset(4, if item.cost then 40 else 46), Size = UDim2.new(1, -8, 0, 18), ZIndex = 6, Parent = tile })
 			if item.cost and item.cost > 0 then
-				Dossier.typed({ Text = Format.renderNumber(item.cost), TextSize = 12, TextColor3 = if self.state.gold >= item.cost then C.gold else T.stamp, AutomaticSize = Enum.AutomaticSize.None, TextXAlignment = Enum.TextXAlignment.Center, Position = UDim2.fromOffset(4, 58), Size = UDim2.new(1, -8, 0, 14), ZIndex = 6, Parent = tile })
+				typed({ Text = Format.renderNumber(item.cost), TextSize = 12, TextColor3 = if self.state.gold >= item.cost then PAPER_GOLD else T.stamp, AutomaticSize = Enum.AutomaticSize.None, TextXAlignment = Enum.TextXAlignment.Center, Position = UDim2.fromOffset(4, 58), Size = UDim2.new(1, -8, 0, 14), ZIndex = 6, Parent = tile })
 			end
 		end
 		setUsable(tile, item.enabled)

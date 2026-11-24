@@ -3,6 +3,7 @@
 local Atlas = require(script.Parent.FxAtlas)
 local Defaults = require(script.Parent.RenderDefaults)
 local ShipArt = require(script.Parent.ShipArt)
+local Cosmetics = require(script.Parent.MatchCosmetics)
 local Fx = {}
 Fx.__index = Fx
 local radii = {['Atom Bomb'] = 70, ['Mega Nuke'] = 70, ['Hydrogen Bomb'] = 160, ['MIRV Warhead'] = 70, Scattershot = 70}
@@ -47,11 +48,13 @@ end
 -- Original: FxPass.spawnUnit / FxSpritePass.spawnFxForUnit / spawnNukeSprites.
 -- Removal alone is deliberately insufficient: reachedTarget from the final
 -- confirmed inactive record distinguishes impact from SAM interception.
-function Fx.deadUnit(self: any, unit: any, now: number, heading: number?)
+function Fx.deadUnit(self: any, unit: any, now: number, heading: number?, style:string?)
 	local kind, tile = unit.type, unit.tile
 	local x, y = tile % self.width, math.floor(tile / self.width)
 	local radius = radii[kind]
 	if radius then
+		local first=#self.sprites+1
+		local tint=if unit.reachedTarget then Cosmetics.blast(style) else nil
 		if unit.reachedTarget then
 			sprite(self,x,y,0,now)
 			local debrisIndex = 0
@@ -63,7 +66,8 @@ function Fx.deadUnit(self: any, unit: any, now: number, heading: number?)
 					sprite(self,x + math.floor(math.cos(angle)*distance),y + math.floor(math.sin(angle)*distance),plan[1],now,true)
 				end
 			end
-			if self.options then
+			if tint then for i=first,#self.sprites do self.sprites[i].tint=tint end end
+			if self.options and not unit.cosmeticPreview then
 				if #self.impacts>=self.options.maskCap then table.remove(self.impacts,1) end
 				table.insert(self.impacts,{tile=tile,kind=kind,start=now})
 				aftermath(self,x,y,now,self.options.falloutLifetimeMs,radius*.1,true)
@@ -73,7 +77,7 @@ function Fx.deadUnit(self: any, unit: any, now: number, heading: number?)
 		table.insert(self.shockwaves,{x = x,y = y,start = now,
 			lifetime = if unit.reachedTarget then 1500 else 800,
 			radius = if unit.reachedTarget then radius * 1.5 else 40,
-			sam = not unit.reachedTarget})
+			sam = not unit.reachedTarget,tint=tint})
 	elseif kind == 'Warship' then
 		sprite(self,x,y,3,now)
 		local e=sprite(self,x,y,5,now)
@@ -93,10 +97,10 @@ function Fx.deadUnit(self: any, unit: any, now: number, heading: number?)
 end
 
 -- Source GameView.buildFrameEvents consumes inactive updates, never snapshots.
-function Fx.unitUpdates(self: any, updates: {any}, removed: {number}, now: number, headings: {[number]: number}?)
+function Fx.unitUpdates(self: any, updates: {any}, removed: {number}, now: number, headings: {[number]: number}?, styles:{[number]:string}?)
 	for _, u in updates do
 		if u.active == false then
-			if not self.dead[u.id] then self:deadUnit(u,now,if headings then headings[u.id] else nil); self.dead[u.id] = true end
+			if not self.dead[u.id] then self:deadUnit(u,now,if headings then headings[u.id] else nil,if styles then styles[u.owner] else nil); self.dead[u.id] = true end
 		else self.dead[u.id] = nil end
 	end
 	for _, id in removed do self.dead[id] = nil end
@@ -160,9 +164,35 @@ end
 
 function Fx.clearConquests(self:any)
 	for _,pool in {self.sprites,self.popups} do
-		for i=#pool,1,-1 do if pool[i].conquest or pool[i].conquestMark then table.remove(pool,i) end end
+		for i=#pool,1,-1 do if (pool[i].conquest or pool[i].conquestMark) and not pool[i].publicConquest then table.remove(pool,i) end end
 	end
 	self.conquestMoment=nil
+end
+
+-- Public cosmetic marks contain no private gold/stamp. Four concurrent marks,
+-- a bounded recent-event cache, and source lifetime; snapshots never emit them.
+function Fx.publicConquests(self:any,events:{any},now:number)
+	self.publicSeen=self.publicSeen or {}
+	for key,expires in self.publicSeen do if now>=expires then self.publicSeen[key]=nil end end
+	local count=0
+	for _ in self.publicSeen do count+=1 end
+	for _,e in events do
+		local tint=Cosmetics.conquest(e.conquestFx)
+		local age=math.max(0,(e.tickAge or 0)*100)
+		local key=`{e.conquerorId}:{e.conqueredId}:{e.tick}`
+		if not tint or age>=900 or self.publicSeen[key] or count>=64 then continue end
+		self.publicSeen[key]=now+2500; count+=1
+		local marks=0
+		for _,s in self.sprites do if s.publicConquest then marks+=1 end end
+		if marks>=Cosmetics.publicCap then continue end
+		table.insert(self.sprites,{x=e.x,y=e.y,kind=11,start=now-age,lifetime=900,fadeIn=0,fadeOut=.6,
+			conquestMark=true,publicConquest=true,tint=tint})
+	end
+end
+
+function Fx.clearPublicConquests(self:any)
+	for i=#self.sprites,1,-1 do if self.sprites[i].publicConquest then table.remove(self.sprites,i) end end
+	if self.publicSeen then table.clear(self.publicSeen) end
 end
 
 -- One bounded moment: existing atlas mark, neutral stencil stamp, then gold.
@@ -186,11 +216,12 @@ function Fx.stagedConquests(self:any,events:{any},now:number)
 	end
 	self:clearConquests()
 	local start=now-age
-	local mark={x=first.x,y=first.y,kind=11,start=start,lifetime=900,fadeIn=0,fadeOut=.6,conquestMark=true}
+	local tint=Cosmetics.conquest(first.conquestFx)
+	local mark={x=first.x,y=first.y,kind=11,start=start,lifetime=900,fadeIn=0,fadeOut=.6,conquestMark=true,tint=tint}
 	if age<mark.lifetime then table.insert(self.sprites,mark) end
-	local popup={x=first.x,y=first.y+8,text='+ '..Fx.formatGold(gold),start=start+650,lifetime=1850,riseSpeed=0,conquest=true}
+	local popup={x=first.x,y=first.y+8,text='+ '..Fx.formatGold(gold),start=start+650,lifetime=1850,riseSpeed=0,conquest=true,tint=tint}
 	table.insert(self.popups,popup)
-	self.conquestMoment={x=first.x,y=first.y,start=start,received=now,gold=gold,count=count,popup=popup}
+	self.conquestMoment={x=first.x,y=first.y,start=start,received=now,gold=gold,count=count,popup=popup,tint=tint}
 end
 
 -- Original: FxSpritePass.rebuildInstances alpha/frame rules and WorldTextPass.tick.
@@ -219,5 +250,6 @@ function Fx.clear(self: any)
 	table.clear(self.sprites); table.clear(self.shockwaves); table.clear(self.popups); table.clear(self.dead); table.clear(self.impacts)
 	self.smokeCount=0
 	self.conquestMoment=nil
+	if self.publicSeen then table.clear(self.publicSeen) end
 end
 return Fx

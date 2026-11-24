@@ -60,6 +60,7 @@ local FOLDER_TOP = 72
 function HowToPlay.open(host: Instance, config: any?): Kit.Modal
 	config = config or EngineConfig.new({ difficulty = "Medium", gameType = "Public" } :: any, false)
 	local phone = Dossier.phone()
+	Dossier.style = { wash = Color3.fromHex("#3E9A4E"), art = "banner_howto" }
 	local w = if phone then Dossier.phoneWindow(host, "HOW TO PLAY") else Dossier.window(host, 1483, 1061, WINDOW_H, 36)
 	local at, sz = w.at, w.sz
 	local head = w.header

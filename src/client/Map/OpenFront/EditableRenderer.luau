@@ -28,6 +28,7 @@ export type Renderer = typeof(setmetatable({} :: {
 	labelOccluders: {LabelPlacement.Rect},
 	connections: {RBXScriptConnection}, options: Options, destroyed: boolean, lastError: string?, fitPending: boolean,
 	scene: any?, input: any?, filmCamera: any?, ownSpawnRing: boolean, territoryLabelsVisible: boolean,
+	cosmeticsPreview: BindableFunction?,
 	goToConnection: RBXScriptConnection?, goToTarget: {x: number, y: number, scale: number?, elapsed: number, first: boolean}?,
 	ready: boolean, readyPending: boolean, readyListeners: {ReadyListener}, stateAttached: boolean, progress: number,
 	firstPaintBaseReady: boolean, firstPaintRefreshed: boolean,
@@ -592,6 +593,7 @@ function Renderer.attachState(s: Renderer, state: any)
 	table.insert(s.connections,state.AttacksChanged:Connect(function() scene:setAttacks(state.attacks) end))
 	table.insert(s.connections,state.DiplomacyEvents:Connect(function(events: {any}) scene:diplomacyEvents(events, state.tick) end))
 	table.insert(s.connections,state.Snapshot:Connect(function()
+		if scene.setCosmeticPreview then scene:setCosmeticPreview(nil) end
 		scene.feel:reset(state.units)
 		scene.artillery:reset(state.units)
 		scene.effects:clearConquests()
@@ -602,6 +604,7 @@ function Renderer.attachState(s: Renderer, state: any)
 	-- continuing effects stay.
 	if state.Rebound then
 		table.insert(s.connections,state.Rebound:Connect(function()
+			if scene.setCosmeticPreview then scene:setCosmeticPreview(nil) end
 			scene.effects:clearConquests()
 			scene:clearStatusEvents(); scene:setDiplomacy(state.diplomacy)
 		end))
@@ -639,11 +642,56 @@ function Renderer.attachState(s: Renderer, state: any)
 			local id=byID[e.conqueredId]
 			local anchor=if id then state.names[id] else nil
 			if e.conquerorId==me.id and anchor then
-				table.insert(visible,{x=anchor.x,y=anchor.y,gold=e.gold,tickAge=e.tickAge})
+				local cosmetic=scene.cosmeticOverrides and scene.cosmeticOverrides[me.smallID] or me
+				table.insert(visible,{x=anchor.x,y=anchor.y,gold=e.gold,tickAge=e.tickAge,conquestFx=if cosmetic.type=='HUMAN' then cosmetic.conquestFx else nil})
 			end
 		end
 		scene:conquests(visible)
 	end))
+	-- Separate public cosmetic event: never infer an elimination from ownership
+	-- patches or send/derive the private conquest-gold amount for observers.
+	table.insert(s.connections,state.DiplomacyEvents:Connect(function(events:{any})
+		local visible={}
+		local me=state:me()
+		for _,e in events do if e.type=='ConquestCosmeticEvent' and (not me or e.conquerorId~=me.id) then
+			if e.conquestFx~='x_conquest_gold' or type(e.conqueredId)~='string' or type(e.x)~='number' or type(e.y)~='number'
+				or not (e.x>=0 and e.x<s.core.width and e.y>=0 and e.y<s.core.height)
+				or type(e.tick)~='number' or e.tick%1~=0
+				or (e.tickAge~=nil and (type(e.tickAge)~='number' or not (e.tickAge>=0 and e.tickAge<9))) then continue end
+			local known=false
+			for _,p in state.players do if p.id==e.conquerorId and p.type=='HUMAN' then known=true;break end end
+			if known then table.insert(visible,e) end
+		end end
+		if #visible>0 then scene:publicConquests(visible) end
+	end))
+	local run=game:GetService('RunService')
+	if run.IsStudio and run:IsStudio() then
+		local player=game:GetService('Players').LocalPlayer
+		local endpoint=Instance.new('BindableFunction')
+		endpoint.Name='OpenFrontCosmetics';s.cosmeticsPreview=endpoint
+		endpoint.OnInvoke=function(command:string,args:any):any
+			assert(not s.destroyed,'renderer destroyed')
+			args=args or {}
+			if command=='clear' then scene:setCosmeticPreview(nil);return true end
+			local id=args.player or state.you
+			assert(state.players[id],'unknown player smallID')
+			if command=='set' then scene:setCosmeticPreview(id,args);return true end
+			local p=scene.cosmeticOverrides[id] or state.players[id]
+			if command=='conquest' then
+				local anchor=state.names[id];assert(anchor,'player has no confirmed name anchor')
+				scene:conquests({{x=anchor.x,y=anchor.y,gold=125000,conquestFx=p.conquestFx}});return true
+			elseif command=='blast' then
+				local tile=args.tile or state.players[id].spawnTile
+				assert(type(tile)=='number' and tile%1==0 and tile>=0 and tile<s.core.width*s.core.height,'invalid preview tile')
+				local kind=args.unit or 'Atom Bomb'
+				assert(kind=='Atom Bomb' or kind=='Hydrogen Bomb' or kind=='MIRV Warhead' or kind=='Mega Nuke' or kind=='Scattershot','invalid preview nuke')
+				scene.effects.state:deadUnit({type=kind,tile=tile,reachedTarget=true,cosmeticPreview=true},os.clock()*1000,nil,p.blastFx)
+				return true
+			end
+			error('unknown cosmetic preview command')
+		end
+		endpoint.Parent=player
+	end
 	table.insert(s.connections, state.UnitsMoved:Connect(function(ids: {number}) scene:setMoved(ids, state.tick) end))
 	table.insert(s.connections, state.RailroadsChanged:Connect(function() scene:setRailroads(state.railroads) end))
 	table.insert(s.connections, state.TickApplied:Connect(function(tick: number)
@@ -731,6 +779,10 @@ end
 function Renderer.destroy(s: Renderer)
 	if s.destroyed then return end
 	s.destroyed = true
+	if s.cosmeticsPreview then
+		local endpoint:any=s.cosmeticsPreview
+		endpoint.OnInvoke=nil;endpoint:Destroy();s.cosmeticsPreview=nil
+	end
 	if s.filmCamera then s.filmCamera:destroy() end
 	if s.scene then s.scene.selection:clear(); s.scene.selection.onSingleChanged=nil end
 	for listener in s.warshipListeners do listener.connected=false end

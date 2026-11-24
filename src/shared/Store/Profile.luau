@@ -5,6 +5,7 @@
 -- server's Store adapter saves it (ProfileStore, session-locked) and calls it.
 -- Tuning values are Prototype defaults; docs/design/store-items.md lists them.
 
+local Pass = require(script.Parent.Pass)
 local Catalog = require(script.Parent.Catalog)
 local FlagShop = require(script.Parent.FlagShop)
 local PlayerSettings = require(script.Parent.Parent.PlayerSettings)
@@ -39,7 +40,7 @@ export type Record = {
 	matches: number,
 	wins: number,
 	owned: { [string]: boolean },
-	equipped: { skin: string?, flag: string? },
+	equipped: { [string]: string }, -- Catalog.SLOTS -> item id
 	settings: PlayerSettings.Settings,
 	firstCrateUsed: boolean,
 	receipts: { string },
@@ -75,6 +76,30 @@ export type Record = {
 	-- The free crate (Bruno, 2026-11-16: one per player, new or returning,
 	-- after their first match) was opened.
 	freeCrateUsed: boolean,
+	-- In-match boosts bought and not yet used (Bruno, 2026-11-23): War Chest,
+	-- Instant Rearm and Second Spawn credits, by Profile.BOOSTS key.
+	boosts: { [string]: number },
+	-- Star Boost: seconds of play left at double stars (an hour a purchase).
+	starBoostLeft: number,
+	-- The Campaign Pass (Store/Pass) for the season it was last touched in.
+	pass: PassState?,
+	-- Gifts (2026-11-23): whom the player picked before the gift's prompt,
+	-- and gifts bought but not yet in the friend's mailbox (the server
+	-- delivers them, then removes them here).
+	pendingGift: { to: number, product: string, at: number }?,
+	giftsOut: { { to: number, product: string, id: string } },
+}
+
+export type PassState = {
+	season: number,
+	xp: number,
+	premium: boolean,
+	free: { [number]: boolean }, -- tiers claimed on the free track
+	paid: { [number]: boolean }, -- and on the premium track
+	day: number, -- the UTC day the daily counters are for
+	daily: { [string]: number }, -- mission id -> progress
+	week: number,
+	weekly: { [string]: number },
 }
 
 export type MatchResult = {
@@ -110,8 +135,69 @@ function Profile.new(): Record
 		referralsToday = 0,
 		dealDay = 0,
 		freeCrateUsed = false,
+		boosts = {},
+		starBoostLeft = 0,
+		pass = nil,
+		pendingGift = nil,
+		giftsOut = {},
 	}
 end
+
+-- Gift products and what the friend gets (Profile.receiveGift).
+Profile.GIFTS = table.freeze({
+	giftCrate3 = { crates = 3 },
+	giftCrate5 = { crates = 5 },
+	giftPass = { pass = true },
+})
+-- A pick older than this no longer names the friend (the gift goes to the
+-- buyer instead).
+Profile.GIFT_PICK_S = 30 * 60
+
+-- The player picks whom their next gift is for, just before its prompt.
+function Profile.pickGift(p: Record, product: string, to: number, now: number): boolean
+	if Profile.GIFTS[product] == nil or type(to) ~= "number" or to <= 0 then
+		return false
+	end
+	p.pendingGift = { to = to, product = product, at = now }
+	return true
+end
+
+-- What a gift gives its receiver: crates, or the season's pass premium
+-- (five crates instead for someone who has it).
+function Profile.receiveGift(p: Record, product: string, roll: () -> number, now: number): Grant
+	local grant: Grant = { kind = "gift", items = {}, stars = 0 }
+	local g = Profile.GIFTS[product]
+	if g == nil then
+		return grant
+	end
+	local crates = g.crates or 0
+	if g.pass then
+		local s = Profile.passOf(p, now)
+		if s and not s.premium then
+			s.premium = true
+			grant.kind = "giftPass"
+		else
+			crates = 5
+		end
+	end
+	for _ = 1, crates do
+		local item = Profile.openCrate(p, roll)
+		if item then
+			table.insert(grant.items, item.id)
+		else
+			p.stars += Profile.DUPLICATE_STARS
+			grant.stars += Profile.DUPLICATE_STARS
+		end
+	end
+	return grant
+end
+
+-- The in-match boosts (2026-11-23): product key -> what a credit is called.
+-- Each purchase saves one credit, spent when the match applies it.
+Profile.BOOSTS = table.freeze({ warChest = true, rearm = true, secondSpawn = true })
+-- Star Boost: an hour of play at double stars a purchase (stacking; on top
+-- of 2x Stars, so 4x with both).
+Profile.STAR_BOOST_S = 3600
 
 function Profile.starsFor(result: MatchResult, double: boolean): number
 	local minutes = math.clamp(result.minutes, 0, Profile.MAX_MINUTES)
@@ -132,6 +218,14 @@ end
 -- Applies a finished match; returns the stars it paid.
 function Profile.applyMatch(p: Record, result: MatchResult, double: boolean, general: boolean?): number
 	local stars = Profile.starsFor(result, double)
+	-- Star Boost doubles again the stars of the minutes it covers, and those
+	-- minutes come off it.
+	if stars > 0 and p.starBoostLeft > 0 then
+		local seconds = math.clamp(result.minutes, 0, Profile.MAX_MINUTES) * 60
+		local boosted = math.min(seconds, p.starBoostLeft)
+		stars += math.floor(stars * boosted / seconds)
+		p.starBoostLeft = math.max(0, math.floor(p.starBoostLeft - boosted))
+	end
 	-- A General gets half again (of the stars before 2x Stars).
 	if general then
 		stars += math.floor(Profile.starsFor(result, false) * Catalog.SUBSCRIPTION.starsBonus)
@@ -233,7 +327,7 @@ function Profile.crateWithStars(p: Record, roll: () -> number): (Catalog.Cosmeti
 end
 
 function Profile.equip(p: Record, kind: string, id: string?): boolean
-	if kind ~= "skin" and kind ~= "flag" then
+	if not table.find(Catalog.SLOTS, kind) then
 		return false
 	end
 	if id ~= nil then
@@ -289,6 +383,28 @@ function Profile.grant(p: Record, productKey: string, purchaseId: string, roll: 
 		local s: { started: number, ends: number, used: boolean? } = p.starter or { started = now, ends = now, used = nil }
 		s.used = true
 		p.starter = s
+	elseif Profile.BOOSTS[productKey] then
+		p.boosts[productKey] = (p.boosts[productKey] or 0) + 1
+	elseif productKey == "starBoost" then
+		p.starBoostLeft += Profile.STAR_BOOST_S
+	elseif Profile.GIFTS[productKey] then
+		-- A gift: into the outbox for the friend picked, or, with no fresh
+		-- pick for this product, to the buyer.
+		local pick = p.pendingGift
+		p.pendingGift = nil
+		if pick and pick.product == productKey and now - pick.at <= Profile.GIFT_PICK_S then
+			table.insert(p.giftsOut, { to = pick.to, product = productKey, id = purchaseId })
+			grant.kind = "giftSent"
+		else
+			local own = Profile.receiveGift(p, productKey, roll, now)
+			grant.items, grant.stars = own.items, own.stars
+		end
+	elseif productKey == "campaignPass" then
+		-- The premium track for the season it was bought in.
+		local s = Profile.passOf(p, now)
+		if s then
+			s.premium = true
+		end
 	elseif productKey == "takeover" then
 		-- One use, saved until a nation next eliminates the player.
 		p.takeovers += 1
@@ -301,6 +417,11 @@ function Profile.grant(p: Record, productKey: string, purchaseId: string, roll: 
 		crate()
 		crate()
 		crate()
+	elseif productKey == "crate5" then
+		-- Bruno, 2026-11-23: a 5-pack at 179 (the single crate is hidden).
+		for _ = 1, 5 do
+			crate()
+		end
 	elseif productKey == "flagRare" or productKey == "flagEpic" or productKey == "flagLegendary" then
 		-- The flag chosen in the shop; if it no longer fits (sold out, owned,
 		-- another rarity), another unowned flag of that tier on sale; else stars.
@@ -406,7 +527,7 @@ export type View = {
 	matches: number,
 	wins: number,
 	owned: { string },
-	equipped: { skin: string?, flag: string? },
+	equipped: { [string]: string },
 	settings: PlayerSettings.Settings,
 	cratePrice: number, -- Robux: 15 for the first crate, then 49
 	crateKey: string,
@@ -422,6 +543,9 @@ export type View = {
 	tipsSeen: { string },
 	dealDay: number?, -- the UTC day a daily deal was last bought
 	freeCrate: boolean?, -- the free crate is waiting to be opened
+	boosts: { [string]: number }, -- in-match boost credits
+	starBoostLeft: number, -- seconds of double-star play left
+	pass: { [string]: any }?, -- the Campaign Pass (passView)
 }
 
 local function tipList(p: Record): { string }
@@ -464,6 +588,9 @@ function Profile.view(p: Record, saved: boolean, doubleStars: boolean, general: 
 		tipsSeen = tipList(p),
 		dealDay = if p.dealDay > 0 then p.dealDay else nil,
 		freeCrate = if Profile.freeCrateReady(p) then true else nil,
+		boosts = table.clone(p.boosts),
+		starBoostLeft = p.starBoostLeft,
+		pass = Profile.passView(p, now or os.time()),
 	}
 end
 
@@ -504,6 +631,33 @@ function Profile.encode(p: Record): { [string]: any }
 		referralsToday = if p.referralsToday > 0 then p.referralsToday else nil,
 		dealDay = if p.dealDay > 0 then p.dealDay else nil,
 		freeCrateUsed = if p.freeCrateUsed then true else nil,
+		boosts = if next(p.boosts) then table.clone(p.boosts) else nil,
+		starBoostLeft = if p.starBoostLeft > 0 then p.starBoostLeft else nil,
+		pendingGift = if p.pendingGift then table.clone(p.pendingGift) else nil,
+		giftsOut = if #p.giftsOut > 0 then table.clone(p.giftsOut) else nil,
+		pass = if p.pass then {
+			season = p.pass.season,
+			xp = p.pass.xp,
+			premium = if p.pass.premium then true else nil,
+			free = (function()
+				local out = {}
+				for t in p.pass.free do
+					table.insert(out, t)
+				end
+				return out
+			end)(),
+			paid = (function()
+				local out = {}
+				for t in p.pass.paid do
+					table.insert(out, t)
+				end
+				return out
+			end)(),
+			day = p.pass.day,
+			daily = table.clone(p.pass.daily),
+			week = p.pass.week,
+			weekly = table.clone(p.pass.weekly),
+		} else nil,
 	}
 end
 
@@ -536,7 +690,7 @@ function Profile.decode(record: any): (Record?, string?)
 		end
 	end
 	if type(record.equipped) == "table" then
-		for _, kind in { "skin", "flag" } do
+		for _, kind in Catalog.SLOTS do
 			local id = record.equipped[kind]
 			if type(id) == "string" then
 				Profile.equip(p, kind, id)
@@ -547,6 +701,49 @@ function Profile.decode(record: any): (Record?, string?)
 	p.firstCrateUsed = record.firstCrateUsed == true
 	p.pendingFlag = if type(record.pendingFlag) == "string" then record.pendingFlag else nil
 	p.takeovers = if isCount(record.takeovers) then record.takeovers else 0
+	if type(record.boosts) == "table" then
+		for key: string in Profile.BOOSTS :: any do
+			local n = record.boosts[key]
+			if isCount(n) and n > 0 then
+				p.boosts[key] = n
+			end
+		end
+	end
+	p.starBoostLeft = if isCount(record.starBoostLeft) then record.starBoostLeft else 0
+	local pg = record.pendingGift
+	if type(pg) == "table" and isCount(pg.to) and isCount(pg.at) and type(pg.product) == "string" and Profile.GIFTS[pg.product] then
+		p.pendingGift = { to = pg.to, product = pg.product, at = pg.at }
+	end
+	if type(record.giftsOut) == "table" then
+		for _, g in record.giftsOut do
+			if type(g) == "table" and isCount(g.to) and type(g.product) == "string" and Profile.GIFTS[g.product] and type(g.id) == "string" and #g.id <= 128 then
+				table.insert(p.giftsOut, { to = g.to, product = g.product, id = g.id })
+			end
+		end
+	end
+	local ps = record.pass
+	if type(ps) == "table" and isCount(ps.season) and isCount(ps.xp) and isCount(ps.day) and isCount(ps.week) then
+		local s: PassState = { season = ps.season, xp = ps.xp, premium = ps.premium == true, free = {}, paid = {}, day = ps.day, daily = {}, week = ps.week, weekly = {} }
+		for _, field in { "free", "paid" } do
+			if type(ps[field]) == "table" then
+				for _, t in ps[field] do
+					if isCount(t) and t >= 1 and t <= Pass.TIERS then
+						(s :: any)[field][t] = true
+					end
+				end
+			end
+		end
+		for _, field in { "daily", "weekly" } do
+			if type(ps[field]) == "table" then
+				for id, n in ps[field] do
+					if type(id) == "string" and #id <= 32 and isCount(n) then
+						(s :: any)[field][id] = n
+					end
+				end
+			end
+		end
+		p.pass = s
+	end
 	-- Records from before `paid` count any receipt.
 	p.paid = record.paid == true or #p.receipts > 0
 	local s = record.starter
@@ -734,6 +931,172 @@ function Profile.payReferrals(p: Record, pending: number, day: number): (number,
 	local stars = n * Catalog.REFERRAL.stars
 	p.stars += stars
 	return stars, pending - n
+end
+
+-- The Campaign Pass ----------------------------------------------------------------------
+
+-- The player's pass for the season `now` falls in: a fresh one when the
+-- season changed; the daily and weekly counters start over with their
+-- period. Nil before the first season.
+function Profile.passOf(p: Record, now: number): PassState?
+	local season = Pass.season(now)
+	if season == nil then
+		return nil
+	end
+	local s = p.pass
+	if s == nil or s.season ~= season then
+		s = { season = season, xp = 0, premium = false, free = {}, paid = {}, day = Pass.day(now), daily = {}, week = Pass.week(now), weekly = {} }
+		p.pass = s
+	end
+	assert(s)
+	if s.day ~= Pass.day(now) then
+		s.day, s.daily = Pass.day(now), {}
+	end
+	if s.week ~= Pass.week(now) then
+		s.week, s.weekly = Pass.week(now), {}
+	end
+	return s
+end
+
+-- A finished match's XP: the match itself, and every mission it completes
+-- (each pays once). Returns the XP gained and the missions done.
+function Profile.passMatch(p: Record, result: MatchResult, now: number): (number, { string })
+	local s = Profile.passOf(p, now)
+	if s == nil then
+		return 0, {}
+	end
+	local stats: Pass.MatchStats = {
+		minutes = result.minutes,
+		won = result.won,
+		top = result.placement <= math.max(1, math.ceil(result.players / 10)),
+		public = result.difficulty == nil,
+	}
+	local gained = Pass.xpForMatch(stats)
+	local done = {}
+	local function count(missions: { Pass.Mission }, progress: { [string]: number })
+		for _, m in missions do
+			local before = progress[m.id] or 0
+			if before < m.goal then
+				local after = math.min(m.goal, before + Pass.statOf(stats, m.stat))
+				progress[m.id] = after
+				if after >= m.goal then
+					gained += m.xp
+					table.insert(done, m.id)
+				end
+			end
+		end
+	end
+	count(Pass.dailyMissions(now), s.daily)
+	count(Pass.weeklyMissions(now), s.weekly)
+	s.xp += gained
+	return gained, done
+end
+
+-- Claims tier `tier` of `track` ("free" or "premium"): reached, not yet
+-- claimed, premium bought for the premium track. Returns what it gave, or
+-- nil and a reason ("season", "tier", "locked", "premium", "claimed").
+function Profile.passClaim(p: Record, track: string, tier: number, roll: () -> number, now: number): (Grant?, string?)
+	local s = Profile.passOf(p, now)
+	if s == nil then
+		return nil, "season"
+	end
+	local reward = Pass.reward(track, tier)
+	if reward == nil then
+		return nil, "tier"
+	end
+	if Pass.tier(s.xp) < tier then
+		return nil, "locked"
+	end
+	if track == "premium" and not s.premium then
+		return nil, "premium"
+	end
+	local claimed = if track == "premium" then s.paid else s.free
+	if claimed[tier] then
+		return nil, "claimed"
+	end
+	claimed[tier] = true
+	local grant: Grant = { kind = "pass", items = {}, stars = 0 }
+	if reward.stars then
+		p.stars += reward.stars
+		grant.stars += reward.stars
+	end
+	local items: { string } = reward.items or {}
+	for _, id in items do
+		if p.owned[id] then
+			p.stars += Profile.DUPLICATE_STARS
+			grant.stars += Profile.DUPLICATE_STARS
+		else
+			p.owned[id] = true
+			table.insert(grant.items, id)
+		end
+	end
+	for _ = 1, reward.crates or 0 do
+		local item = Profile.openCrate(p, roll)
+		if item then
+			table.insert(grant.items, item.id)
+		else
+			p.stars += Profile.DUPLICATE_STARS
+			grant.stars += Profile.DUPLICATE_STARS
+		end
+	end
+	return grant
+end
+
+-- What the client shows of the pass: progress, tiers claimed, today's and
+-- this week's missions with their progress.
+function Profile.passView(p: Record, now: number): { [string]: any }?
+	local s = Profile.passOf(p, now)
+	if s == nil then
+		return nil
+	end
+	local _, _, ends = Pass.season(now)
+	local function list(claimed: { [number]: boolean }): { number }
+		local out = {}
+		for t in claimed do
+			table.insert(out, t)
+		end
+		table.sort(out)
+		return out
+	end
+	local function missions(ms: { Pass.Mission }, progress: { [string]: number }): { { [string]: any } }
+		local out = {}
+		for _, m in ms do
+			table.insert(out, { id = m.id, text = m.text, goal = m.goal, xp = m.xp, progress = progress[m.id] or 0 })
+		end
+		return out
+	end
+	return {
+		season = s.season,
+		endsAt = ends,
+		xp = s.xp,
+		premium = s.premium,
+		free = list(s.free),
+		paid = list(s.paid),
+		daily = missions(Pass.dailyMissions(now), s.daily),
+		weekly = missions(Pass.weeklyMissions(now), s.weekly),
+		dailyEndsAt = (Pass.day(now) + 1) * 86400,
+	}
+end
+
+-- Spends one saved in-match boost credit (Profile.BOOSTS); false when there's none.
+function Profile.spendBoost(p: Record, key: string): boolean
+	local n = p.boosts[key] or 0
+	if not Profile.BOOSTS[key] or n <= 0 then
+		return false
+	end
+	if n > 1 then
+		p.boosts[key] = n - 1
+	else
+		p.boosts[key] = nil :: any
+	end
+	return true
+end
+
+-- Puts a spent boost credit back (applying it failed).
+function Profile.refundBoost(p: Record, key: string)
+	if Profile.BOOSTS[key] then
+		p.boosts[key] = (p.boosts[key] or 0) + 1
+	end
 end
 
 -- Spends one saved Takeover; false when there's none.

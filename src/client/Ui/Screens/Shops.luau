@@ -23,6 +23,7 @@ local FlagShop = require(Shared.Store.FlagShop)
 local Profile = require(Shared.Store.Profile)
 
 local Art = require(script.Parent.Parent.Art)
+local DarkWindow = require(script.Parent.Parent.DarkWindow)
 local Dossier = require(script.Parent.Parent.Dossier)
 local Kit = require(script.Parent.Parent.Kit)
 local Theme = require(script.Parent.Parent.Theme)
@@ -49,6 +50,8 @@ export type Ctx = {
 	-- Kept by the controller while the shop is open, across redraws: the
 	-- Locker's tab and scroll, whether its crate has dropped in.
 	memo: { [string]: any }?,
+	-- Opens the Shop on a shelf (the Locker's GET CRATES, 2026-11-23).
+	openShop: ((tab: string) -> ())?,
 }
 
 -- Every window is this tall on the 1920x1080 canvas.
@@ -71,6 +74,15 @@ local RARITY_SWATCH: { [string]: Color3 } = {
 local GREEN = Color3.fromHex("#3F9B4F")
 local GOLD_INK = Color3.fromHex("#D29A12")
 local ROBUX_DARK = Color3.fromHex("#3A3A36")
+
+-- The Locker's EXTRAS tab (2026-11-23): Campaign Pass cosmetics.
+local EXTRA_KINDS: { [string]: boolean } = { title = true, name = true, conquest = true, blast = true }
+local EXTRA_WHAT: { [string]: string } = {
+	title = "A title under your name on the map",
+	name = "Your name in gold on the map",
+	conquest = "What others see when you take a nation",
+	blast = "How your nukes explode for everyone",
+}
 
 local function owned(view: any): { [string]: boolean }
 	local out = {}
@@ -241,6 +253,7 @@ end
 local function arsenalPhone(host: Instance, ctx: Ctx): Kit.Modal
 	local view = ctx.view
 	local mine = owned(view)
+	Dossier.style = { wash = Color3.fromHex("#D8452B"), art = "banner_arsenal" }
 	local w = Dossier.phoneWindow(host, "ARSENAL")
 	local at, sz = w.at, w.sz
 	phoneStars(w, view.stars or 0, w.width - 84)
@@ -358,6 +371,7 @@ function Shops.arsenal(host: Instance, ctx: Ctx): Kit.Modal
 	end
 	local view = ctx.view
 	local mine = owned(view)
+	Dossier.style = { wash = Color3.fromHex("#D8452B"), art = "banner_arsenal" }
 	local w = Dossier.window(host, 1409, 1116, WINDOW_H, 36)
 	local at, sz = w.at, w.sz
 	local head = w.header
@@ -507,6 +521,7 @@ function Shops.unlock(host: Instance, ctx: Ctx, weaponId: string): Kit.Modal?
 	end
 	local view = ctx.view
 	local mine = owned(view)
+	Dossier.style = { wash = Color3.fromHex("#D8452B"), art = "banner_arsenal" }
 	local w = Dossier.window(host, 520, 620, math.min(620, Kit.root.height - 24), 36)
 	local at, sz = w.at, w.sz
 	stencil({ Text = "ARSENAL", TextSize = capSize(w, 16), AnchorPoint = Vector2.new(0, 0.5), Position = at(26, 20), Parent = w.header })
@@ -664,6 +679,30 @@ local function freeCratePlate(w: Dossier.Window, ctx: Ctx, parent: Instance, cx:
 	return p
 end
 
+-- The Locker's way to more crates (2026-11-23): the crates are sold in the
+-- Shop now, on one ladder; this plate opens it there.
+local function getCratesPlate(w: Dossier.Window, ctx: Ctx, parent: Instance, cx: number, cy: number, ww: number, hh: number, cap: number, primary: boolean)
+	local open = function()
+		if ctx.openShop then
+			ctx.openShop("crates")
+		end
+	end
+	if primary then
+		local p = Dossier.plate(parent, "", { Name = "GetCrates", AnchorPoint = Vector2.new(0.5, 0.5), Position = w.at(cx, cy), Size = w.sz(ww, hh), Parent = parent }, 0)
+		local r = row(p, math.round(12 * w.k))
+		local size = capSize(w, cap)
+		Kit.glyph("chest", { ImageColor3 = C.inkBlack, Size = UDim2.fromOffset(math.round(size * 0.75), math.round(size * 0.75)), LayoutOrder = 1, Parent = r })
+		stencil({ Text = "GET CRATES", TextSize = size, LayoutOrder = 2, Parent = r })
+		Dossier.clicky(p, 1.04)
+		p.Activated:Connect(open)
+	else
+		local b, r = manilaButton(w, parent, cx, cy, ww, hh)
+		b.Name = "GetCrates"
+		stencil({ Text = "MORE CRATES IN THE SHOP", TextSize = capSize(w, cap), LayoutOrder = 1, Parent = r })
+		b.Activated:Connect(open)
+	end
+end
+
 -- The crate folder's width on a phone.
 local PHONE_CRATE_W = 300
 
@@ -674,7 +713,7 @@ local function lockerCratePhone(w: Dossier.Window, ctx: Ctx, memo: { [string]: a
 	local at, sz = w.at, w.sz
 	-- The count, left of the tabs, where the screen leaves it room after the
 	-- title (about 210 wide).
-	local noteRight = w.width - 84 - 316
+	local noteRight = w.width - 84 - 464
 	if noteRight - 250 > Kit.root.topLeft + 220 then
 		local note = Dossier.surface("ImageLabel", "tex_paper", C.sheet, { Name = "Count", AnchorPoint = Vector2.new(1, 0.5), Position = at(noteRight, 39), Size = sz(0, 50), AutomaticSize = Enum.AutomaticSize.X, Rotation = -1, Parent = w.header })
 		Kit.stroke(C.sheetLine, 1, 0.2).Parent = note
@@ -698,35 +737,11 @@ local function lockerCratePhone(w: Dossier.Window, ctx: Ctx, memo: { [string]: a
 	if view.freeCrate then
 		typed({ Text = "One crate on us", TextColor3 = C.inkBlack, TextSize = 17, AnchorPoint = Vector2.new(0.5, 0.5), Position = at(cw / 2, 266), Parent = crate })
 		freeCratePlate(w, ctx, crate, cw / 2, 306, cw - 36, 54, 24)
+		getCratesPlate(w, ctx, crate, cw / 2, 368, cw - 36, 46, 15, false)
 	else
-		if view.crateKey == "crateFirst" then
-			local regular = Catalog.product("crate1") :: Catalog.Product
-			typed({ Text = `First crate: {view.cratePrice} instead of {regular.price}`, TextColor3 = C.inkBlack, TextSize = 17, AnchorPoint = Vector2.new(0.5, 0.5), Position = at(cw / 2, 266), Parent = crate })
-		end
-		local single = pricePlate(w, crate, cw / 2, 306, cw - 36, 54, view.cratePrice or 49, 24)
-		single.Activated:Connect(function()
-			ctx.prompt(view.crateKey or "crate1")
-		end)
+		typed({ Text = "3 for 119 · 5 for 179 · or stars", TextColor3 = C.inkBlack, TextSize = 17, AnchorPoint = Vector2.new(0.5, 0.5), Position = at(cw / 2, 266), Parent = crate })
+		getCratesPlate(w, ctx, crate, cw / 2, 306, cw - 36, 54, 24, true)
 	end
-	local three = Catalog.product("crate3") :: Catalog.Product
-	local pack, pr = manilaButton(w, crate, cw / 2, 362, cw - 36, 46)
-	Kit.new("ImageLabel", { BackgroundTransparency = 1, Image = UiAssets.robux, ImageColor3 = ROBUX_DARK, Size = UDim2.fromOffset(28, 28), LayoutOrder = 1, Parent = pr })
-	stencil({ Text = `{three.price}  ·  3 CRATES`, TextSize = 36, LayoutOrder = 2, Parent = pr })
-	pack.Activated:Connect(function()
-		ctx.prompt("crate3")
-	end)
-	local canStars = (view.stars or 0) >= Profile.CRATE_STARS
-	local starsBtn, sr = manilaButton(w, crate, cw / 2, 416, cw - 36, 46)
-	Kit.glyph("star", { ImageColor3 = C.inkBlack, Size = UDim2.fromOffset(28, 28), LayoutOrder = 1, Parent = sr })
-	stencil({ Text = if canStars then `OR {Kit.commas(Profile.CRATE_STARS)}` else `{Kit.commas(Profile.CRATE_STARS)} STARS`, TextSize = 36, TextTransparency = if canStars then 0 else 0.45, LayoutOrder = 2, Parent = sr })
-	starsBtn.Activated:Connect(function()
-		if canStars then
-			local r = ctx.request({ op = "crate" })
-			if r and r.ok and r.item then
-				ctx.crate(r.item)
-			end
-		end
-	end)
 end
 
 -- Reference: locker-reference.png, 1496 x 1051.
@@ -747,6 +762,7 @@ function Shops.locker(host: Instance, ctx: Ctx): Kit.Modal
 	-- On a phone (Bruno, 2026-10-27): full screen, the crate folder at the left,
 	-- the tabs in the header and the grid filling the rest.
 	local phone = Dossier.phone()
+	Dossier.style = { wash = Color3.fromHex("#8A4FE0"), art = "banner_locker" }
 	local w = if phone then Dossier.phoneWindow(host, "LOCKER") else Dossier.window(host, 1496, 1051, WINDOW_H, 36)
 	local at, sz = w.at, w.sz
 	local head = w.header
@@ -758,7 +774,7 @@ function Shops.locker(host: Instance, ctx: Ctx): Kit.Modal
 		headerPaper(w, 15, 40, 650, 178, -1)
 		clip(head, w, 52, 95, 88, -4)
 		bigCaps(w, 88, { Text = "LOCKER", AnchorPoint = Vector2.new(0, 0.5), Position = at(92, 108), Rotation = -1, Parent = head })
-		stencil({ Text = `{have} OF {total} UNLOCKED`, TextSize = capSize(w, 25), AnchorPoint = Vector2.new(0, 0.5), Position = at(97, 180), Rotation = -1, Parent = head })
+		stencil({ Text = `{have} OF {total} UNLOCKED`, TextSize = capSize(w, 25), AnchorPoint = Vector2.new(0, 0.5), Position = at(97, 192), Rotation = -1, Parent = head })
 		starStamp(head, w, 555, 128, 112, 0.72)
 		art("stamp_secret", { AnchorPoint = Vector2.new(0.5, 0.5), Position = at(1135, 125), Size = sz(440, 110), Rotation = -8, Parent = head })
 		Dossier.closeRed(head, at(1417, 80), sz(88, 88), w.close)
@@ -793,39 +809,11 @@ function Shops.locker(host: Instance, ctx: Ctx): Kit.Modal
 		end
 		if view.freeCrate then
 			freeCratePlate(w, ctx, crate, 261 - 30, 767 - 212, 393, 75, 30)
+			getCratesPlate(w, ctx, crate, 261 - 30, 848 - 212, 393, 60, 20, false)
+			typed({ Text = "One crate on us: open it free", TextColor3 = C.inkBlack, TextSize = math.round(21 * w.k), AnchorPoint = Vector2.new(0.5, 0.5), Position = c(261, 970), Parent = crate })
 		else
-			local single = pricePlate(w, crate, 261 - 30, 767 - 212, 393, 75, view.cratePrice or 49, 30)
-			single.Activated:Connect(function()
-				ctx.prompt(view.crateKey or "crate1")
-			end)
-		end
-		local three = Catalog.product("crate3") :: Catalog.Product
-		local pack, pr = manilaButton(w, crate, 261 - 30, 848 - 212, 393, 60)
-		Kit.new("ImageLabel", { BackgroundTransparency = 1, Image = UiAssets.robux, ImageColor3 = ROBUX_DARK, Size = UDim2.fromOffset(math.round(34 * w.k), math.round(34 * w.k)), LayoutOrder = 1, Parent = pr })
-		stencil({ Text = `{three.price}  ·  3 CRATES`, TextSize = capSize(w, 22), LayoutOrder = 2, Parent = pr })
-		pack.Activated:Connect(function()
-			ctx.prompt("crate3")
-		end)
-		local canStars = (view.stars or 0) >= Profile.CRATE_STARS
-		local starsBtn, sr = manilaButton(w, crate, 261 - 30, 916 - 212, 393, 58)
-		Kit.glyph("star", { ImageColor3 = C.inkBlack, Size = UDim2.fromOffset(math.round(34 * w.k), math.round(34 * w.k)), LayoutOrder = 1, Parent = sr })
-		stencil({ Text = `OR {Kit.commas(Profile.CRATE_STARS)}`, TextSize = capSize(w, 22), TextTransparency = if canStars then 0 else 0.45, LayoutOrder = 2, Parent = sr })
-		starsBtn.Activated:Connect(function()
-			if canStars then
-				local r = ctx.request({ op = "crate" })
-				if r and r.ok and r.item then
-					ctx.crate(r.item)
-				end
-			end
-		end)
-		Kit.tip(starsBtn, function(tip)
-			Kit.text({ Text = if canStars then "Open a crate with stars" else `{Kit.commas(Profile.CRATE_STARS - (view.stars or 0))} more stars`, FontFace = F.uiBold, Parent = tip })
-		end)
-		if view.freeCrate then
-			typed({ Text = "One crate on us: open it free", TextColor3 = C.inkBlack, TextSize = math.round(21 * w.k), AnchorPoint = Vector2.new(0.5, 0.5), Position = c(232, 970), Parent = crate })
-		elseif view.crateKey == "crateFirst" then
-			local regular = Catalog.product("crate1") :: Catalog.Product
-			typed({ Text = `Your first crate: {view.cratePrice} instead of {regular.price}`, TextColor3 = C.inkBlack, TextSize = math.round(21 * w.k), AnchorPoint = Vector2.new(0.5, 0.5), Position = c(232, 970), Parent = crate })
+			getCratesPlate(w, ctx, crate, 261 - 30, 767 - 212, 393, 75, 30, true)
+			typed({ Text = "3 for 119 · 5 for 179 · or 2,500 stars", TextColor3 = C.inkBlack, TextSize = math.round(21 * w.k), AnchorPoint = Vector2.new(0.5, 0.5), Position = c(261, 832), Parent = crate })
 		end
 	end
 
@@ -844,8 +832,9 @@ function Shops.locker(host: Instance, ctx: Ctx): Kit.Modal
 	end
 	local area, cellW, cellH, gap
 	if phone then
-		tabButton("skin", "SKINS", w.width - 84 - 228)
-		tabButton("flag", "FLAGS", w.width - 84 - 80)
+		tabButton("skin", "SKINS", w.width - 84 - 376)
+		tabButton("flag", "FLAGS", w.width - 84 - 228)
+		tabButton("extra", "EXTRAS", w.width - 84 - 80)
 		-- As many columns as fit, cards about 160 wide.
 		local areaW = w.width - PHONE_CRATE_W - 34
 		area = Kit.new("Frame", { Name = "GridArea", BackgroundTransparency = 1, ClipsDescendants = true, Position = at(PHONE_CRATE_W + 24, 0), Size = sz(areaW, w.height - 4), Parent = w.body })
@@ -856,6 +845,7 @@ function Shops.locker(host: Instance, ctx: Ctx): Kit.Modal
 	else
 		tabButton("skin", "SKINS", 580)
 		tabButton("flag", "FLAGS", 742)
+		tabButton("extra", "EXTRAS", 904)
 		clip(head, w, 652, 222, 72, 8)
 		area = Kit.new("Frame", { Name = "GridArea", BackgroundTransparency = 1, ClipsDescendants = true, Position = at(498, 278), Size = sz(962, 742), Parent = w.body })
 		cellW, cellH = math.round(213 * w.k), math.round(220 * w.k)
@@ -863,17 +853,32 @@ function Shops.locker(host: Instance, ctx: Ctx): Kit.Modal
 	end
 	local grid: ScrollingFrame? = nil
 
-	local function tile(parent: Instance, order: number, name: string, status: string, statusColor: Color3, worn: boolean, picture: (face: GuiObject) -> (), onClick: (() -> ())?, tipFill: ((card: Frame) -> ())?)
+	-- In the dark style each tile wears its rarity's colours (2026-11-23),
+	-- with white text and brighter status inks.
+	local dark = Dossier.inDark(w.window)
+	local DARK_STATUS: { [string]: Color3 } = { WEARING = Color3.fromHex("#FFD75E"), EQUIP = Color3.fromHex("#8CF09A"), LOCKED = Color3.fromHex("#FF9A8A"), ["TAKE OFF"] = Color3.fromHex("#E6E2D6") }
+	local function tile(parent: Instance, order: number, name: string, status: string, statusColor: Color3, worn: boolean, picture: (face: GuiObject) -> (), onClick: (() -> ())?, tipFill: ((card: Frame) -> ())?, rarity: string?)
 		local cell = Kit.new("TextButton", { Name = name, Text = "", AutoButtonColor = false, BackgroundTransparency = 1, LayoutOrder = order, Parent = parent })
 		local shade = Kit.new("Frame", { Name = "Shadow", BackgroundColor3 = Color3.new(0, 0, 0), BackgroundTransparency = 0.68, BorderSizePixel = 0, AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.new(0.5, 3, 0.5, 5), Size = UDim2.new(1, -8, 1, -8), Parent = cell })
 		Kit.corner(8).Parent = shade
-		local face = cardArt("ImageLabel", "tile_card", { Name = "Face", AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromScale(0.5, 0.5), Size = UDim2.new(1, -6, 1, -6), Parent = cell })
-		if worn then
-			Kit.stroke(C.hazard, 4, 0).Parent = face
+		local face: GuiObject
+		if dark then
+			face = Kit.new("Frame", { Name = "Face", BackgroundTransparency = 1, AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromScale(0.5, 0.5), Size = UDim2.new(1, -6, 1, -6), Parent = cell })
+			local tone = DarkWindow.TONES[rarity or "common"] or DarkWindow.TONES.common
+			DarkWindow.tile(face, tone[1], tone[2], if worn then C.hazard else DarkWindow.GLOW[rarity or ""], w.k)
+		else
+			face = cardArt("ImageLabel", "tile_card", { Name = "Face", AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromScale(0.5, 0.5), Size = UDim2.new(1, -6, 1, -6), Parent = cell })
+			if worn then
+				Kit.stroke(C.hazard, 4, 0).Parent = face
+			end
 		end
 		picture(face)
-		Dossier.typed({ Text = name, TextColor3 = C.inkBlack, TextSize = if phone then 20 else math.round(25 * w.k), AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.new(0.5, 0, 0, math.round(cellH * 162 / 220)), Size = UDim2.new(1, -12, 0, math.round(cellH * 30 / 220)), AutomaticSize = Enum.AutomaticSize.None, TextXAlignment = Enum.TextXAlignment.Center, TextTruncate = Enum.TextTruncate.AtEnd, Parent = face })
-		stencil({ Text = status, TextSize = if phone then 30 else capSize(w, 17), TextColor3 = statusColor, AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.new(0.5, 0, 0, math.round(cellH * 192 / 220)), Parent = face })
+		local nameLabel = Dossier.typed({ Text = name, TextColor3 = if dark then Color3.new(1, 1, 1) else C.inkBlack, TextSize = if phone then 20 else math.round(25 * w.k), AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.new(0.5, 0, 0, math.round(cellH * 162 / 220)), Size = UDim2.new(1, -12, 0, math.round(cellH * 30 / 220)), AutomaticSize = Enum.AutomaticSize.None, TextXAlignment = Enum.TextXAlignment.Center, TextTruncate = Enum.TextTruncate.AtEnd, Parent = face })
+		local statusLabel = stencil({ Text = status, TextSize = if phone then 30 else capSize(w, 17), TextColor3 = if dark then DARK_STATUS[status] or statusColor else statusColor, AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.new(0.5, 0, 0, math.round(cellH * 192 / 220)), Parent = face })
+		if dark then
+			Dossier.outline(nameLabel)
+			Dossier.outline(statusLabel)
+		end
 		Dossier.liftTile(cell, face, shade, 8)
 		if onClick then
 			cell.Activated:Connect(onClick)
@@ -909,7 +914,8 @@ function Shops.locker(host: Instance, ctx: Ctx): Kit.Modal
 		for _, item in Catalog.cosmetics() do
 			-- (A General skin shows from its month on: they're lined up a year ahead.)
 			local early = item.set == "general" and not mine[item.id] and not Catalog.generalReleased(item.id, os.time())
-			if item.kind == kind and not early and (Catalog.crateable(item) or mine[item.id] or item.set ~= "country") then
+			local fits = if kind == "extra" then EXTRA_KINDS[item.kind] == true else item.kind == kind
+			if fits and not early and (Catalog.crateable(item) or mine[item.id] or item.set ~= "country") then
 				table.insert(list, item)
 			end
 		end
@@ -925,37 +931,48 @@ function Shops.locker(host: Instance, ctx: Ctx): Kit.Modal
 			end
 			return a.name < b.name
 		end)
-		local wearing = view.equipped and view.equipped[kind]
+		local equipped = view.equipped or {}
+		local wearing = equipped[kind]
 		local edge = math.round(cellW * 16 / 213)
 		local picBox = { Position = UDim2.fromOffset(edge, edge), Size = UDim2.new(1, -2 * edge, 0, math.round(cellH * 122 / 220)) }
-		tile(g, 0, "None", if wearing == nil then "WEARING" else "TAKE OFF", if wearing == nil then GOLD_INK else C.inkFaded, wearing == nil, function(face)
-			local blank = Kit.new("Frame", { BackgroundColor3 = Color3.fromHex("#3C3D2C"), BorderSizePixel = 0, Position = picBox.Position, Size = picBox.Size, Parent = face })
-			art("star_stamp", { AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromScale(0.5, 0.5), Size = UDim2.fromScale(0.62, 0.9), ImageTransparency = 0.55, Parent = blank })
-		end, if wearing ~= nil
-			then function()
-				ctx.request({ op = "equip", kind = kind, id = nil })
-			end
-			else nil)
+		-- (Skins and flags have a "None" tile; an extra comes off with a tap.)
+		if kind ~= "extra" then
+			tile(g, 0, "None", if wearing == nil then "WEARING" else "TAKE OFF", if wearing == nil then GOLD_INK else C.inkFaded, wearing == nil, function(face)
+				local blank = Kit.new("Frame", { BackgroundColor3 = Color3.fromHex("#3C3D2C"), BorderSizePixel = 0, Position = picBox.Position, Size = picBox.Size, Parent = face })
+				art("star_stamp", { AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromScale(0.5, 0.5), Size = UDim2.fromScale(0.62, 0.9), ImageTransparency = 0.55, Parent = blank })
+			end, if wearing ~= nil
+				then function()
+					ctx.request({ op = "equip", kind = kind, id = nil })
+				end
+				else nil)
+		end
 		for i, item in list do
 			local has = mine[item.id]
-			local worn = wearing == item.id
+			local worn = equipped[item.kind] == item.id
 			local status = if worn then "WEARING" elseif has then "EQUIP" else "LOCKED"
 			local color = if worn then GOLD_INK elseif has then Color3.fromHex("#2E8A3E") else C.stamp
 			tile(g, i, item.name, status, color, worn, function(face)
-				local pic = if kind == "skin" then Art.skin(item.id, merge({ Parent = face }, picBox)) else Art.flag(item.id, merge({ Parent = face }, picBox))
+				local pic = Art.cosmetic(item :: any, merge({ Parent = face }, picBox))
 				if not has then
 					pic.ImageTransparency = 0.25
 				end
 				age(pic)
 			end, if has and not worn
 				then function()
-					ctx.request({ op = "equip", kind = kind, id = item.id })
+					ctx.request({ op = "equip", kind = item.kind, id = item.id })
+				end
+				elseif worn and kind == "extra" then function()
+					-- (An extra comes off with another tap: its slot has no "None".)
+					ctx.request({ op = "equip", kind = item.kind, id = nil })
 				end
 				else nil, function(card)
 				Kit.text({ Text = item.name, FontFace = F.uiHeavy, TextSize = 18, Parent = card })
 				Kit.text({ Text = Catalog.RARITY_NAME[item.rarity], FontFace = F.uiBold, TextSize = 15, TextColor3 = RARITY_SWATCH[item.rarity], Parent = card })
-				Kit.text({ Text = if has then "Click to wear it" elseif item.set == "country" or kind == "skin" then "From crates" else "From the Flag Shop", TextSize = 15, TextColor3 = C.fgSoft, Parent = card })
-			end)
+				Kit.text({ Text = if worn and kind == "extra" then "Click to take it off" elseif has then "Click to wear it" elseif item.set == "campaign" then "From the Campaign Pass" elseif item.set == "country" or kind == "skin" then "From crates" else "From the Flag Shop", TextSize = 15, TextColor3 = C.fgSoft, Parent = card })
+				if EXTRA_KINDS[item.kind] then
+					Kit.text({ Text = EXTRA_WHAT[item.kind] or "", TextSize = 14, TextColor3 = C.fgSoft, Parent = card })
+				end
+			end, item.rarity)
 		end
 		-- A redraw (say, after equipping) keeps the page where it was.
 		local saved = memo.scroll[kind]
@@ -980,6 +997,9 @@ function Shops.locker(host: Instance, ctx: Ctx): Kit.Modal
 	tabs.flag.Activated:Connect(function()
 		show("flag")
 	end)
+	tabs.extra.Activated:Connect(function()
+		show("extra")
+	end)
 	show(memo.tab or "skin")
 
 	if not phone then
@@ -997,6 +1017,7 @@ local function flagShopPhone(host: Instance, ctx: Ctx): Kit.Modal
 	local view = ctx.view
 	local mine = owned(view)
 	local offers = FlagShop.offers(os.time())
+	Dossier.style = { wash = Color3.fromHex("#E06A1F"), art = "banner_flags" }
 	local w = Dossier.phoneWindow(host, "FLAG SHOP")
 	local at, sz = w.at, w.sz
 	local timers: { { label: TextLabel, at: number, prefix: string } } = {}
@@ -1086,20 +1107,44 @@ end
 
 -- The "You got" card on a phone: the print at the left; the name, what it
 -- is and NICE at the right.
+-- The reveal in the dark style (2026-11-23): the banner and the folder wear
+-- the item's rarity (a weapon: strike red), its words in white.
+local REVEAL_WASH: { [string]: string } = { legendary = "#E6A817", epic = "#8A4FE0", rare = "#2F7FE0", common = "#8C8C80", strike = "#D8452B" }
+local function revealKey(c: any): string
+	return if c and REVEAL_WASH[c.rarity] then c.rarity else "strike"
+end
+local function revealFolder(w: Dossier.Window, key: string, pos: UDim2, size: UDim2): GuiObject
+	if not Dossier.inDark(w.window) then
+		return cardArt("ImageLabel", "folder_card", { Name = "Folder", Position = pos, Size = size, Parent = w.body })
+	end
+	local folder = Kit.new("Frame", { Name = "Folder", BackgroundTransparency = 1, Position = pos, Size = size, Parent = w.body })
+	local tone = DarkWindow.TONES[key] or DarkWindow.TONES.common
+	DarkWindow.tile(folder, tone[1], tone[2], DarkWindow.GLOW[key], w.k)
+	return folder
+end
+-- Words on the folder: white and outlined in the dark style.
+local function onFolder(w: Dossier.Window, label: TextLabel)
+	if Dossier.inDark(w.window) then
+		label.TextColor3 = Color3.new(1, 1, 1)
+		Dossier.outline(label)
+	end
+end
+
 local function revealPhone(host: Instance, itemId: string): Kit.Modal
 	local c = Catalog.get(itemId)
 	local wpn = Catalog.weapon(itemId)
+	Dossier.style = { wash = Color3.fromHex(REVEAL_WASH[revealKey(c)]), art = "banner_reveal" }
 	local w = Dossier.phoneWindow(host, "YOU GOT")
 	local at, sz = w.at, w.sz
 	local W, H = w.width, w.height
 	local half = W / 2
-	cardArt("ImageLabel", "folder_card", { Name = "Folder", Position = at(16, 10), Size = sz(W - 32, H - 26), Parent = w.body })
+	revealFolder(w, revealKey(c), at(16, 10), sz(W - 32, H - 26))
 	local printW = math.min(half - 40, (H - 80) * 1.5)
 	local print_ = Kit.new("Frame", { Name = "Print", BackgroundColor3 = C.sheet, BorderSizePixel = 0, AnchorPoint = Vector2.new(0.5, 0.5), Position = at(half / 2 + 16, H / 2 + 4), Size = sz(printW, printW / 1.5), Rotation = -1.5, Parent = w.body })
 	local inner = { Position = UDim2.fromOffset(10, 10), Size = UDim2.new(1, -20, 1, -20) }
 	local pic
 	if c then
-		pic = if c.kind == "skin" then Art.skin(itemId, merge({ Parent = print_ }, inner)) else Art.flag(itemId, merge({ Parent = print_ }, inner))
+		pic = Art.cosmetic(c :: any, merge({ Parent = print_ }, inner))
 	elseif wpn then
 		pic = Art.card(itemId, merge({ Parent = print_ }, inner))
 	end
@@ -1115,13 +1160,13 @@ local function revealPhone(host: Instance, itemId: string): Kit.Modal
 	local name = if c then c.name elseif wpn then wpn.name else itemId
 	stencil({ Text = string.upper(name), TextSize = 64, TextScaled = false, TextWrapped = true, AutomaticSize = Enum.AutomaticSize.None, Size = UDim2.new(1, -24, 1, 0), Position = UDim2.fromOffset(12, 0), TextXAlignment = Enum.TextXAlignment.Center, TextYAlignment = Enum.TextYAlignment.Center, Parent = label })
 	if c then
-		stencil({ Text = string.upper(Catalog.RARITY_NAME[c.rarity]), TextSize = 48, TextColor3 = RARITY_INK[c.rarity], AnchorPoint = Vector2.new(0.5, 0.5), Position = at(rx, H * 0.26 + 82), Parent = w.body })
+		onFolder(w, stencil({ Text = string.upper(Catalog.RARITY_NAME[c.rarity]), TextSize = 48, TextColor3 = RARITY_INK[c.rarity], AnchorPoint = Vector2.new(0.5, 0.5), Position = at(rx, H * 0.26 + 82), Parent = w.body }))
 	elseif wpn then
 		local where = if wpn.weapon == "reinforcements"
 			then "Unlocked for good. In a match, tap the Reinforce button."
 			elseif wpn.weapon then "Unlocked for good. It's the last slot in your build drawer in every match."
 			else "Yours for good."
-		typed({ Text = where, TextColor3 = C.inkBlack, TextSize = 22, TextWrapped = true, TextXAlignment = Enum.TextXAlignment.Center, AutomaticSize = Enum.AutomaticSize.None, AnchorPoint = Vector2.new(0.5, 0), Position = at(rx, H * 0.26 + 62), Size = sz(half - 90, 80), Parent = w.body })
+		onFolder(w, typed({ Text = where, TextColor3 = C.inkBlack, TextSize = 22, TextWrapped = true, TextXAlignment = Enum.TextXAlignment.Center, AutomaticSize = Enum.AutomaticSize.None, AnchorPoint = Vector2.new(0.5, 0), Position = at(rx, H * 0.26 + 62), Size = sz(half - 90, 80), Parent = w.body }))
 	end
 	local nice = Dossier.rivetPlate(w.body, "NICE", 64, true, { Name = "Nice", Position = at(rx, H - 86), Size = sz(half - 90, 90), Parent = w.body })
 	nice.Activated:Connect(w.close)
@@ -1137,6 +1182,7 @@ function Shops.flagShop(host: Instance, ctx: Ctx): Kit.Modal
 	local view = ctx.view
 	local mine = owned(view)
 	local offers = FlagShop.offers(os.time())
+	Dossier.style = { wash = Color3.fromHex("#E06A1F"), art = "banner_flags" }
 	local w = Dossier.window(host, 1312, 1199, WINDOW_H, 36)
 	local at, sz = w.at, w.sz
 	local head = w.header
@@ -1263,35 +1309,38 @@ function Shops.reveal(host: Instance, itemId: string): Kit.Modal
 	end
 	local c = Catalog.get(itemId)
 	local wpn = Catalog.weapon(itemId)
+	Dossier.style = { wash = Color3.fromHex(REVEAL_WASH[revealKey(c)]), art = "banner_reveal", bannerH = 280 }
 	local w = Dossier.window(host, 1329, 1183, 820, 36)
 	local at, sz = w.at, w.sz
 	local head = w.header
+	local dark = Dossier.inDark(w.window)
+	local headInk = if dark then Color3.new(1, 1, 1) else C.inkBlack
 
 	-- Header.
 	headerPaper(w, 75, 62, 1215, 178, 0)
-	Kit.glyph("gift", { ImageColor3 = C.inkBlack, AnchorPoint = Vector2.new(0.5, 0.5), Position = at(170, 152), Size = sz(104, 104), Parent = head })
+	Kit.glyph("gift", { ImageColor3 = headInk, AnchorPoint = Vector2.new(0.5, 0.5), Position = at(170, 152), Size = sz(104, 104), Parent = head })
 	bigCaps(w, 82, { Text = "YOU GOT", AnchorPoint = Vector2.new(0, 0.5), Position = at(245, 150), Parent = head })
-	Kit.new("Frame", { BackgroundColor3 = C.inkBlack, BackgroundTransparency = 0.2, BorderSizePixel = 0, Position = at(130, 228), Size = UDim2.fromOffset(math.round(690 * w.k), 3), Parent = head })
+	Kit.new("Frame", { BackgroundColor3 = headInk, BackgroundTransparency = 0.2, BorderSizePixel = 0, Position = at(130, 228), Size = UDim2.fromOffset(math.round(690 * w.k), 3), Parent = head })
 	starStamp(head, w, 955, 150, 140, 0.7)
-	for i = 0, 1 do
+	for i = 0, if dark then -1 else 1 do
 		local stripe = art("red_tape", { AnchorPoint = Vector2.new(0.5, 0.5), Position = at(1120 + i * 60, 150), Size = sz(210, 26), Rotation = 60, ScaleType = Enum.ScaleType.Stretch, Parent = head })
 		if stripe == nil then
 			Kit.new("Frame", { BackgroundColor3 = C.stamp, BorderSizePixel = 0, AnchorPoint = Vector2.new(0.5, 0.5), Position = at(1120 + i * 60, 150), Size = sz(200, 18), Rotation = 60, Parent = head })
 		end
 	end
 	local x = Kit.new("TextButton", { Name = "Close", Text = "", AutoButtonColor = false, BackgroundTransparency = 1, AnchorPoint = Vector2.new(0.5, 0.5), Position = at(1240, 155), Size = sz(84, 84), Parent = head })
-	Kit.glyph("close", { ImageColor3 = C.inkBlack, AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromScale(0.5, 0.5), Size = UDim2.fromScale(0.62, 0.62), Parent = x })
+	Kit.glyph("close", { ImageColor3 = headInk, AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromScale(0.5, 0.5), Size = UDim2.fromScale(0.62, 0.62), Parent = x })
 	Dossier.clicky(x, 1.1)
 	x.Activated:Connect(w.close)
 
 	-- The folder, the print, the name.
-	cardArt("ImageLabel", "folder_card", { Name = "Folder", Position = at(55, 300), Size = sz(1200, 690), Parent = w.body })
+	revealFolder(w, revealKey(c), at(55, 300), sz(1200, 690))
 	starStamp(w.body, w, 200, 770, 230, 0.72)
 	local print_ = Kit.new("Frame", { Name = "Print", BackgroundColor3 = C.sheet, BorderSizePixel = 0, Position = at(345, 312), Size = sz(642, 418), Parent = w.body })
 	local inner = { Position = UDim2.fromOffset(math.round(12 * w.k), math.round(12 * w.k)), Size = UDim2.new(1, -math.round(24 * w.k), 1, -math.round(24 * w.k)) }
 	local pic
 	if c then
-		pic = if c.kind == "skin" then Art.skin(itemId, merge({ Parent = print_ }, inner)) else Art.flag(itemId, merge({ Parent = print_ }, inner))
+		pic = Art.cosmetic(c :: any, merge({ Parent = print_ }, inner))
 	elseif wpn then
 		pic = Art.card(itemId, merge({ Parent = print_ }, inner))
 	end
@@ -1307,17 +1356,34 @@ function Shops.reveal(host: Instance, itemId: string): Kit.Modal
 	local name = if c then c.name elseif wpn then wpn.name else itemId
 	stencil({ Text = string.upper(name), TextSize = capSize(w, 50), AutomaticSize = Enum.AutomaticSize.None, Size = UDim2.fromScale(1, 1), TextXAlignment = Enum.TextXAlignment.Center, TextYAlignment = Enum.TextYAlignment.Center, Parent = label })
 	if c then
-		stencil({ Text = string.upper(Catalog.RARITY_NAME[c.rarity]), TextSize = capSize(w, 26), TextColor3 = RARITY_INK[c.rarity], AnchorPoint = Vector2.new(0.5, 0.5), Position = at(664, 882), Parent = w.body })
+		onFolder(w, stencil({ Text = string.upper(Catalog.RARITY_NAME[c.rarity]), TextSize = capSize(w, 26), TextColor3 = RARITY_INK[c.rarity], AnchorPoint = Vector2.new(0.5, 0.5), Position = at(664, 882), Parent = w.body }))
 	elseif wpn then
 		local where = if wpn.weapon == "reinforcements"
 			then "Unlocked for good. In a match, press R or the Reinforce button."
 			elseif wpn.weapon then "Unlocked for good. It's in your build bar in every match, after the bombs."
 			else "Yours for good."
-		typed({ Text = where, TextColor3 = C.inkBlack, TextSize = math.round(26 * w.k), TextWrapped = true, TextXAlignment = Enum.TextXAlignment.Center, AutomaticSize = Enum.AutomaticSize.None, AnchorPoint = Vector2.new(0.5, 0.5), Position = at(664, 892), Size = sz(900, 70), Parent = w.body })
+		onFolder(w, typed({ Text = where, TextColor3 = C.inkBlack, TextSize = math.round(26 * w.k), TextWrapped = true, TextXAlignment = Enum.TextXAlignment.Center, AutomaticSize = Enum.AutomaticSize.None, AnchorPoint = Vector2.new(0.5, 0.5), Position = at(664, 892), Size = sz(900, 70), Parent = w.body }))
 	end
 	local nice = Dossier.rivetPlate(w.body, "NICE", capSize(w, 52), true, { Name = "Nice", Position = at(670, 1003), Size = sz(1110, 140), Parent = w.body })
 	nice.Activated:Connect(w.close)
 	return (w :: any) :: Kit.Modal
 end
+
+-- Pieces the Shop window (Screens/Shop, 2026-11-23) shares with these.
+Shops.parts = {
+	robuxMark = robuxMark,
+	row = row,
+	pricePlate = pricePlate,
+	manilaButton = manilaButton,
+	freeCratePlate = freeCratePlate,
+	dealStamp = dealStamp,
+	tickDeal = tickDeal,
+	hoursMinutes = hoursMinutes,
+	owned = owned,
+	RARITY_INK = RARITY_INK,
+	RARITY_SWATCH = RARITY_SWATCH,
+	GREEN = GREEN,
+	ROBUX_DARK = ROBUX_DARK,
+}
 
 return Shops

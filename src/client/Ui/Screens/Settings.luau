@@ -39,6 +39,7 @@ function Settings.open(host: Instance, current: PlayerSettings.Settings, onChang
 	-- Reference pixels the rows move by (they start at the scrolling page's top).
 	local ox, oy = 0, 0
 	if Dossier.phone() then
+		Dossier.style = { wash = Color3.fromHex("#3A78C2"), art = "banner_settings" }
 		local pw = Dossier.phoneWindow(host, "SETTINGS")
 		local k = (pw.width - 36) / 1395
 		local page = Kit.scroll({ Name = "Rows", Size = UDim2.fromScale(1, 1), AutomaticCanvasSize = Enum.AutomaticSize.None, CanvasSize = UDim2.fromOffset(0, math.round((doneY + 62 - FIRST_ROW + 24) * k)), ScrollBarThickness = 8, ScrollBarImageColor3 = Color3.fromHex("#1E2019"), Parent = pw.body })
@@ -46,6 +47,7 @@ function Settings.open(host: Instance, current: PlayerSettings.Settings, onChang
 		frame = w
 		ox, oy = 12 / k - 45, 8 / k - FIRST_ROW
 	else
+		Dossier.style = { wash = Color3.fromHex("#3A78C2"), art = "banner_settings" }
 		frame = Dossier.window(host, 1493, 1053, WINDOW_H, 36)
 		-- The folders scroll between the header and DONE.
 		local k = frame.k

@@ -26,6 +26,8 @@ local MapPicker = require(script.Parent.Screens.MapPicker)
 local Party = require(script.Parent.Screens.Party)
 local Settings = require(script.Parent.Screens.Settings)
 local Shops = require(script.Parent.Screens.Shops)
+local Shop = require(script.Parent.Screens.Shop)
+local CampaignPass = require(script.Parent.Screens.CampaignPass)
 local StarterOffer = require(script.Parent.Screens.StarterOffer)
 local GiftOffer = require(script.Parent.Screens.GiftOffer)
 local GeneralOffer = require(script.Parent.Screens.GeneralOffer)
@@ -38,7 +40,7 @@ local MenuController = {}
 
 -- Robux products that are crates (Store/Catalog): they play the crate opening.
 -- (general: Conquest General's crate of the day.)
-local CRATE_PRODUCTS: { [string]: boolean } = { crate1 = true, crate3 = true, crateFirst = true, general = true }
+local CRATE_PRODUCTS: { [string]: boolean } = { crate1 = true, crate3 = true, crate5 = true, crateFirst = true, general = true, gift = true, giftCrate3 = true, giftCrate5 = true, giftPass = true }
 MenuController.__index = MenuController
 
 export type Hooks = {
@@ -73,6 +75,8 @@ function MenuController.new(root: any, remotes: Instance, hooks: Hooks)
 		shopRemote = Shop,
 		-- Set by the client: the stars a match just paid.
 		starsGained = nil :: ((number) -> ())?,
+		-- Campaign Pass XP a match paid, and the pass view (result card).
+		passGained = nil :: ((number, any) -> ())?,
 		-- A menu sound by sound board key; OpenFrontClient sets it.
 		sound = nil :: ((string) -> ())?,
 		-- the waiting room (Screens/WaitingRoom), on a match server only
@@ -92,6 +96,9 @@ function MenuController.new(root: any, remotes: Instance, hooks: Hooks)
 	self.openModal = openModal
 
 	local menu = MainMenu.new(root.menu, root, {
+		startPrivate = function(mapFolder: string, kind: string)
+			Start:FireServer({ mode = "private", map = mapFolder, kind = kind })
+		end,
 		startSolo = function(mapFolder: string, difficulty: string)
 			Start:FireServer({ mode = "solo", map = mapFolder, difficulty = difficulty })
 		end,
@@ -134,17 +141,25 @@ function MenuController.new(root: any, remotes: Instance, hooks: Hooks)
 			s.music = not s.music
 			self:_applySettings(s)
 		end,
+		-- The Shop (2026-11-23) opens on a shelf: the menu's SHOP folder on
+		-- Featured; the Flag Shop folder on Flags.
+		openShop = function(tab: string?)
+			self:openShop(tab)
+		end,
 		openArsenal = function()
-			self:_shop("arsenal")
-			self:_funnel({ op = "shopOpened", where = "arsenal" })
+			self:openShop("weapons")
 		end,
 		openLocker = function()
 			self:_shop("locker")
 			self:_funnel({ op = "shopOpened", where = "locker" })
 		end,
 		openFlagShop = function()
-			self:_shop("flags")
-			self:_funnel({ op = "shopOpened", where = "flags" })
+			self:openShop("flags")
+		end,
+		-- The Campaign Pass window (2026-11-23).
+		openPass = function()
+			self:_shop("pass")
+			self:_funnel({ op = "shopOpened", where = "pass" })
 		end,
 		openStarter = function()
 			self:openStarter()
@@ -222,12 +237,20 @@ function MenuController.new(root: any, remotes: Instance, hooks: Hooks)
 			menu.partyText.Text = ""
 		end
 	end))
+	-- A private server's owner: PLAY sets up a match for everyone here.
+	local function privateCheck()
+		local owner = ReplicatedStorage:GetAttribute("PrivateOwner")
+		menu:setPrivateMode(type(owner) == "number" and owner == Players.LocalPlayer.UserId)
+	end
+	privateCheck()
+	table.insert(self.connections, ReplicatedStorage:GetAttributeChangedSignal("PrivateOwner"):Connect(privateCheck))
 	local function onView(view: any)
 		if type(view) ~= "table" then
 			return
 		end
 		local first = self.view == nil
 		local before = if self.view then self.view.stars else nil
+		local xpBefore = if self.view and self.view.pass then self.view.pass.xp else nil
 		self.view = view
 		-- A profile that couldn't load plays unsaved (Store.luau): say so once
 		-- (audit F13; the old menu's "PROGRESS NOT SAVED" line went with it).
@@ -237,6 +260,10 @@ function MenuController.new(root: any, remotes: Instance, hooks: Hooks)
 		-- Stars a match just paid (the result card shows them).
 		if before and view.stars > before and self.starsGained then
 			self.starsGained(view.stars - before)
+		end
+		-- Campaign Pass XP a match paid (the result card shows it).
+		if xpBefore and view.pass and view.pass.xp > xpBefore and self.passGained then
+			self.passGained(view.pass.xp - xpBefore, view.pass)
 		end
 		menu:setProfile(view)
 		if first then
@@ -293,6 +320,15 @@ function MenuController.new(root: any, remotes: Instance, hooks: Hooks)
 		if type(grant) == "table" and grant.product == "referral" and type(grant.stars) == "number" then
 			self:notice(`+{grant.stars} stars: friends you invited played their first match!`, "menu.stars")
 			return
+		end
+		-- Gifts (2026-11-23): one sent, or one arriving from a friend.
+		if type(grant) == "table" and grant.sent then
+			self:notice("Gift sent! Your friend gets it next time they play.", "menu.purchase")
+			return
+		end
+		if type(grant) == "table" and grant.product == "gift" then
+			local from = if type(grant.from) == "string" then grant.from else "A friend"
+			self:notice(if grant.gift == "giftPass" and #(grant.items or {}) == 0 then `{from} gave you the Campaign Pass!` else `{from} sent you a gift!`, "menu.purchase")
 		end
 		if type(grant) == "table" and type(grant.items) == "table" and grant.items[1] then
 			if self.sound then
@@ -499,6 +535,25 @@ function MenuController.openUnlock(self: any, weaponId: string)
 	self:_funnel({ op = "shopOpened", where = "unlock" })
 end
 
+-- The Shop on shelf `tab` (Screens/Shop). Asks Roblox whether a rewarded ad
+-- is ready for the Crates shelf's free crate, and redraws when it is.
+function MenuController.openShop(self: any, tab: string?)
+	self:_shop("shop:" .. (tab or "featured"))
+	self:_funnel({ op = "shopOpened", where = "shop" })
+	task.spawn(function()
+		local ok, res = pcall(function(): any
+			return game:GetService("AdService"):GetAdAvailabilityNowAsync(Enum.AdFormat.RewardedVideo)
+		end)
+		local ready = ok and type(res) == "table" and res.AdAvailabilityResult == Enum.AdAvailabilityResult.IsAvailable
+		if ready ~= (self.adReady == true) then
+			self.adReady = ready
+			if self.shop and string.sub(self.shop, 1, 5) == "shop:" and self.modal then
+				self:_shop(self.shop)
+			end
+		end
+	end)
+end
+
 function MenuController._shop(self: any, which: string)
 	if self.view == nil then
 		return -- the profile hasn't arrived yet
@@ -553,12 +608,62 @@ function MenuController._shop(self: any, which: string)
 		self.shopMemo = { tab = self.shopTab }
 	end
 	ctx.memo = self.shopMemo
+	-- What the Shop adds (Screens/Shop).
+	ctx.adReady = self.adReady == true
+	ctx.openShop = function(tab: string)
+		task.defer(function()
+			self:openShop(tab)
+		end)
+	end
+	ctx.openStarter = function()
+		task.defer(function()
+			self:openStarter()
+		end)
+	end
+	ctx.openGeneral = function()
+		task.defer(function()
+			self:openGeneral()
+		end)
+	end
+	ctx.openLocker = function()
+		task.defer(function()
+			self:_shop("locker")
+			self:_funnel({ op = "shopOpened", where = "locker" })
+		end)
+	end
+	ctx.shelf = function(tab: string)
+		local sub = "shop:" .. tab
+		self.shop = sub
+		self:_funnel({ op = "shopShelf", shelf = tab })
+	end
+	-- "shop:<tab>": the Shop on that shelf (a redraw keeps the shelf shown).
+	local shopTab = if string.sub(which, 1, 5) == "shop:" then string.sub(which, 6) else nil
+	if shopTab then
+		ctx.tab = shopTab
+	end
 	-- "unlock:<weapon id>": the in-match unlock card (Shops.unlock).
 	local unlockId = if string.sub(which, 1, 7) == "unlock:" then string.sub(which, 8) else nil
 	self.openModal(function()
 		local modal
 		if unlockId then
 			modal = Shops.unlock(root.modal, ctx, unlockId) :: Kit.Modal
+		elseif shopTab then
+			modal = Shop.open(root.modal, ctx :: any)
+		elseif which == "pass" then
+			local passCtx = ctx :: any
+			passCtx.got = function(items: { string }, fromCrate: boolean)
+				if self.sound then
+					self.sound("menu.purchase")
+				end
+				task.defer(function()
+					if fromCrate then
+						self:_openCrate(items)
+					else
+						self:_reveal(items[1])
+					end
+				end)
+			end
+			modal = CampaignPass.open(root.modal, passCtx)
 		elseif which == "arsenal" then
 			modal = Shops.arsenal(root.modal, ctx)
 		elseif which == "locker" then

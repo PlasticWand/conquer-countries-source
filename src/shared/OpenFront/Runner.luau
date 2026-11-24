@@ -98,7 +98,7 @@ export type Runner = typeof(setmetatable(
 		mapFolder: any,
 		gameConfig: { [string]: any },
 		mapData: MapLoader.TerrainMapData?,
-		lobby: { { clientID: string, username: string, friends: { string }?, cosmetics: { flag: string?, skin: string?, weapons: { [string]: boolean }? }? } },
+		lobby: { { clientID: string, username: string, friends: { string }?, cosmetics: { flag: string?, skin: string?, weapons: { [string]: boolean }?, title: string?, nameStyle: string?, conquestFx: string?, blastFx: string? }? } },
 		game: any,
 		queued: { { clientID: string, intent: Intent } },
 		started: boolean,
@@ -132,7 +132,7 @@ end
 -- put friends on one team (Conquest passes the player's party).
 -- `cosmetics` is what the player wears and has unlocked (Conquest's store:
 -- flag and skin ids, Arsenal weapons).
-function Runner.addHuman(self: Runner, clientID: string, username: string, friends: { string }?, cosmetics: { flag: string?, skin: string?, weapons: { [string]: boolean }? }?): boolean
+function Runner.addHuman(self: Runner, clientID: string, username: string, friends: { string }?, cosmetics: { flag: string?, skin: string?, weapons: { [string]: boolean }?, title: string?, nameStyle: string?, conquestFx: string?, blastFx: string? }?): boolean
 	if self.started then
 		return false
 	end
@@ -165,6 +165,11 @@ function Runner.start(self: Runner)
 			flag = if p.cosmetics then p.cosmetics.flag else nil,
 			skin = if p.cosmetics then p.cosmetics.skin else nil,
 			weapons = if p.cosmetics then p.cosmetics.weapons else nil,
+			-- Campaign Pass cosmetics (2026-11-23): drawn by the map.
+			title = if p.cosmetics then p.cosmetics.title else nil,
+			nameStyle = if p.cosmetics then p.cosmetics.nameStyle else nil,
+			conquestFx = if p.cosmetics then p.cosmetics.conquestFx else nil,
+			blastFx = if p.cosmetics then p.cosmetics.blastFx else nil,
 		})
 	end
 	local nations = NationCreation.createNationsForGame(gameConfig, data.nations, data.additionalNations, #humans, random)
@@ -177,6 +182,17 @@ function Runner.start(self: Runner)
 	-- The map's folder (OpenFrontMaps child), which clients load by name.
 	;(game :: any).mapFolder = if self.mapFolder then (self.mapFolder :: any).Name else nil
 	self.game = game
+	-- A human's equipped gold conquest (Pass cosmetic, 2026-11-24) is public:
+	-- every viewer gets a mark at the beaten player's last name anchor (still
+	-- there: the names update runs after the tick), with no gold. The gold
+	-- ConquestEvent stays the conqueror's (Replication.eventsFor).
+	;(game :: any).onConquest = function(winner: any, loser: any)
+		local fx = if winner:type() == PlayerType.Human then winner:info().conquestFx else nil
+		local anchor = self.names.anchors[loser:id()]
+		if fx == "x_conquest_gold" and anchor then
+			game:addUpdate({ type = "ConquestCosmeticEvent", conquerorId = winner:id(), conqueredId = loser:id(), x = anchor.x, y = anchor.y, tick = game:ticks(), tickAge = 0, conquestFx = fx })
+		end
+	end
 	-- Conquest: the rail areas are built while the match loads, not in the
 	-- tick of the first station (GameMap.railComponents).
 	if data.miniGameMap then
@@ -771,11 +787,143 @@ function Runner.takeOver(self: Runner, clientID: string): boolean
 	info.nationFlag = nil
 	info.skin = mine.skin
 	info.weapons = mine.weapons
+	info.title, info.nameStyle, info.conquestFx, info.blastFx = mine.title, mine.nameStyle, mine.conquestFx, mine.blastFx
 	target.playerInfo = info
 	local gone = table.clone(mine)
 	gone.clientID = nil
 	old.playerInfo = gone
 	game:displayMessage("events_display.took_over", "CONQUERED_PLAYER", target:id(), nil, { name = was })
+	return true
+end
+
+-- In-match boosts (Bruno, 2026-11-23; Conquest additions, not OpenFront's,
+-- allowed in solo and public): each is a paid credit the server spends only
+-- when `boostCheck` says it applies, then `useBoost` applies it.
+--   warChest     gold: WAR_CHEST_MINUTES of the player's income, at least
+--                WAR_CHEST_MIN; once every WAR_CHEST_EVERY seconds
+--   rearm        every launcher of theirs (silo, SAM, Artillery, Airfield,
+--                Railgun) reloads at once; once every REARM_EVERY seconds
+--   secondSpawn  wiped out within SECOND_SPAWN_WINDOW seconds of the spawn
+--                phase's end: spawn again on a free tile with starting
+--                troops; once a match
+Runner.WAR_CHEST_MIN = 500_000
+Runner.WAR_CHEST_MINUTES = 3
+Runner.WAR_CHEST_EVERY = 120
+Runner.REARM_EVERY = 60
+Runner.SECOND_SPAWN_WINDOW = 300
+local REARM_TYPES = { "Missile Silo", "SAM Launcher", "Artillery", "Airfield", "Railgun" }
+
+-- When each boost was last used, by client (match ticks).
+local function boostsUsed(self: Runner, clientID: string): { [string]: number }
+	local all = (self :: any).boostAt
+	if all == nil then
+		all = {}
+		;(self :: any).boostAt = all
+	end
+	local used = all[clientID]
+	if used == nil then
+		used = {}
+		all[clientID] = used
+	end
+	return used
+end
+
+-- Ticks in `seconds` of match time.
+local function ticksIn(self: Runner, seconds: number): number
+	local ms = (self.game :: any):config():msPerTick()
+	return math.ceil(seconds * 1000 / ms)
+end
+
+-- Whether boost `which` applies for the player now; nil and a reason
+-- ("unknown", "spawning", "dead", "alive", "late", "used", "wait",
+-- "nothing") when not. `tile`: Second Spawn's chosen tile.
+function Runner.boostCheck(self: Runner, clientID: string, which: string, tile: number?): (boolean, string?)
+	local game = self.game :: any
+	if game == nil then
+		return false, "spawning"
+	end
+	local player = game:playerByClientID(clientID)
+	if player == nil then
+		return false, "unknown"
+	end
+	if game:inSpawnPhase() then
+		return false, "spawning"
+	end
+	local used = boostsUsed(self, clientID)
+	local now = game:ticks()
+	if which == "warChest" then
+		if not player:isAlive() then
+			return false, "dead"
+		end
+		if used.warChest and now - used.warChest < ticksIn(self, Runner.WAR_CHEST_EVERY) then
+			return false, "wait"
+		end
+		return true
+	elseif which == "rearm" then
+		if not player:isAlive() then
+			return false, "dead"
+		end
+		if used.rearm and now - used.rearm < ticksIn(self, Runner.REARM_EVERY) then
+			return false, "wait"
+		end
+		for _, unit in player:units(REARM_TYPES) do
+			if #unit:missileTimerQueue() > 0 then
+				return true
+			end
+		end
+		return false, "nothing"
+	elseif which == "secondSpawn" then
+		if player:isAlive() then
+			return false, "alive"
+		end
+		if used.secondSpawn then
+			return false, "used"
+		end
+		if game:_ticksSinceStart() > ticksIn(self, Runner.SECOND_SPAWN_WINDOW) then
+			return false, "late"
+		end
+		if tile ~= nil and (not game:isValidRef(tile) or not game:isLand(tile) or game:hasOwner(tile)) then
+			return false, "tile"
+		end
+		return true
+	end
+	return false, "unknown"
+end
+
+-- Applies boost `which` (its credit already spent); true when done.
+function Runner.useBoost(self: Runner, clientID: string, which: string, tile: number?): boolean
+	if not self:boostCheck(clientID, which, tile) then
+		return false
+	end
+	local game = self.game :: any
+	local player = game:playerByClientID(clientID)
+	local used = boostsUsed(self, clientID)
+	if which == "warChest" then
+		local perTick = game:config():goldAdditionRate(player)
+		player:addGold(math.max(Runner.WAR_CHEST_MIN, math.floor(perTick * ticksIn(self, Runner.WAR_CHEST_MINUTES * 60))))
+	elseif which == "rearm" then
+		for _, unit in player:units(REARM_TYPES) do
+			table.clear(unit:missileTimerQueue())
+		end
+	elseif which == "secondSpawn" then
+		if tile == nil then
+			return false
+		end
+		local ExecUtil = require(script.Parent.Executions.Util) :: any
+		local tiles = ExecUtil.getSpawnTiles(game, tile, false)
+		if #tiles == 0 then
+			return false
+		end
+		for _, t in tiles do
+			player:conquer(t)
+		end
+		player:setTroops(game:config():startManpower(player.playerInfo))
+		player:setSpawnTile(tile)
+		-- (Its PlayerExecution stopped when it died: troops and gold need one.)
+		local PlayerExecution = require(script.Parent.Executions.PlayerExecution) :: any
+		game:addExecution(PlayerExecution.new(player))
+	end
+	used[which] = game:ticks()
 	return true
 end
 

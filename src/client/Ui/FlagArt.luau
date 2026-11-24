@@ -7,8 +7,8 @@ return {
 	own = { w = 192, h = 144 },
 	card = { w = 256, h = 242, pageW = 1024, pageH = 968 },
 	COUNTRY_PAGES = { "rbxassetid://79184655388655", "rbxassetid://93829430651705" },
-	OWN_PAGES = { "rbxassetid://104213715216237", "rbxassetid://73073938516761", "rbxassetid://78429398905910" },
-	CARD_PAGES = { "rbxassetid://109864644037865", "rbxassetid://93928403639015", "rbxassetid://140295264719110", "rbxassetid://120917121693620", "rbxassetid://112052490078724", "rbxassetid://83215383506712", "rbxassetid://117861541221684", "rbxassetid://82252470935544", "rbxassetid://136540777698354", "rbxassetid://96400258381501", "rbxassetid://123404703812237", "rbxassetid://137063991271873", "rbxassetid://138494664006496", "rbxassetid://139420167928448", "rbxassetid://111687697472406", "rbxassetid://112295966380269", "rbxassetid://130126243533435", "rbxassetid://131701758401353", "rbxassetid://125928794225000", "rbxassetid://120787557832817", "rbxassetid://123778755044901" },
+	OWN_PAGES = { "rbxassetid://104213715216237", "rbxassetid://73073938516761", "rbxassetid://133091802623624" },
+	CARD_PAGES = { "rbxassetid://109864644037865", "rbxassetid://93928403639015", "rbxassetid://140295264719110", "rbxassetid://120917121693620", "rbxassetid://112052490078724", "rbxassetid://83215383506712", "rbxassetid://117861541221684", "rbxassetid://82252470935544", "rbxassetid://136540777698354", "rbxassetid://96400258381501", "rbxassetid://123404703812237", "rbxassetid://137063991271873", "rbxassetid://138494664006496", "rbxassetid://139420167928448", "rbxassetid://111687697472406", "rbxassetid://112295966380269", "rbxassetid://130126243533435", "rbxassetid://131701758401353", "rbxassetid://125928794225000", "rbxassetid://120787557832817", "rbxassetid://70992210692461" },
 	cells = {
 		["f_af"] = { 1, 0, 0 },
 		["f_ax"] = { 1, 1, 0 },
@@ -336,6 +336,9 @@ return {
 		["o_pumpkin_patch"] = { 2, 4, 6 },
 		["o_golden_sheaf"] = { 3, 0, 0 },
 		["o_acorn_fall"] = { 3, 1, 0 },
+		["o_campaign1_a"] = { 3, 2, 0 },
+		["o_campaign1_b"] = { 3, 3, 0 },
+		["o_campaign1_c"] = { 3, 4, 0 },
 	},
 	-- The crate cards' big pictures: page, column and row of a whole cell.
 	cardCells = {
@@ -665,5 +668,8 @@ return {
 		["o_pumpkin_patch"] = { 21, 3, 0 },
 		["o_golden_sheaf"] = { 21, 0, 1 },
 		["o_acorn_fall"] = { 21, 1, 1 },
+		["o_campaign1_a"] = { 21, 2, 1 },
+		["o_campaign1_b"] = { 21, 3, 1 },
+		["o_campaign1_c"] = { 21, 0, 2 },
 	},
 }

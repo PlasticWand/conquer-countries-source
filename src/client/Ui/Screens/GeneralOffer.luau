@@ -40,6 +40,7 @@ export type Handle = { root: Frame, close: () -> () }
 function GeneralOffer.open(host: Instance, subscribed: boolean, onPrompt: (() -> ())?): Handle
 	local w: Dossier.Window
 	if Dossier.phone() then
+		Dossier.style = { wash = Color3.fromHex("#E6A817"), art = "banner_general" }
 		local p = Dossier.phoneWindow(host, "GENERAL")
 		local k = math.min(p.width / REF_W, p.height / REF_H)
 		local page = Kit.new("Frame", { Name = "Page", BackgroundTransparency = 1, AnchorPoint = Vector2.new(0.5, 0), Position = UDim2.new(0.5, 0, 0, 0), Size = UDim2.fromOffset(math.round(REF_W * k), math.round(REF_H * k)), Parent = p.body })
@@ -47,11 +48,12 @@ function GeneralOffer.open(host: Instance, subscribed: boolean, onPrompt: (() ->
 	else
 		local root = Kit.root
 		local height = math.min(REF_H + 150, if root then root.height - 40 else REF_H + 150)
+		Dossier.style = { wash = Color3.fromHex("#E6A817"), art = "banner_general", bannerH = 170 }
 		w = Dossier.window(host, REF_W, REF_H + 150, height, 150)
 		-- (800 wide: at 700 the title ran into the torn right edge; Bruno, 2026-11-09.)
 		Dossier.headerPaper(w, 30, 34, 800, 116, -0.6)
-		typed({ Text = "M O N T H L Y   S U B S C R I P T I O N", TextColor3 = C.stamp, TextSize = math.round(20 * w.k), Position = w.at(150, 52), Parent = w.header })
-		Dossier.bigCaps(w, 50, { Text = "CONQUEST GENERAL", AnchorPoint = Vector2.new(0, 0.5), Position = w.at(146, 100), Parent = w.header }) -- (100: at 110 its letters dipped below the paper; Bruno, 2026-11-09)
+		typed({ Text = "M O N T H L Y   S U B S C R I P T I O N", TextColor3 = C.stamp, TextSize = math.round(20 * w.k), Position = w.at(150, 30), Parent = w.header })
+		Dossier.bigCaps(w, 50, { Text = "CONQUEST GENERAL", AnchorPoint = Vector2.new(0, 0.5), Position = w.at(146, 110), Parent = w.header }) -- (100: at 110 its letters dipped below the paper; Bruno, 2026-11-09)
 		Kit.new("ImageLabel", { BackgroundTransparency = 1, Image = GeneralOffer.ICON, Position = w.at(46, 46), Size = w.sz(90, 90), Parent = w.header })
 		Dossier.closeManila(w.header, w.at(REF_W - 70, 88), w.sz(90, 86), w.close)
 		local page = Kit.new("Frame", { Name = "Page", BackgroundTransparency = 1, Position = w.at(0, 150), Size = w.sz(REF_W, REF_H), Parent = w.body })

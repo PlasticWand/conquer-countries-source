@@ -36,6 +36,11 @@ export type PlayerInfo = {
 	flag: string?,
 	skin: string?,
 	weapons: { [string]: boolean }?,
+	-- Campaign Pass cosmetics (Catalog.EXTRAS ids; the map draws them).
+	title: string?,
+	nameStyle: string?,
+	conquestFx: string?,
+	blastFx: string?,
 }
 
 -- GameTypes.ts Relation

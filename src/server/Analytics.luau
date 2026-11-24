@@ -79,7 +79,9 @@ Analytics.STEPS = {
 Analytics.MATCH_FUNNEL = { "Match started", "Spawned", "First attack", "Played 3 min", "Played 10 min", "Match finished" }
 Analytics.STORE_FUNNEL = { "Opened", "Prompted", "Purchased" }
 -- The windows and in-match spots a Store visit can start from.
-Analytics.STORE_PLACES = { locker = true, arsenal = true, flags = true, general = true, starter = true }
+Analytics.STORE_PLACES = { locker = true, arsenal = true, flags = true, general = true, starter = true, unlock = true, shop = true, pass = true }
+-- The Shop's shelves (2026-11-23), logged as ShopShelf when one is opened.
+Analytics.SHOP_SHELVES = { featured = true, weapons = true, crates = true, flags = true, boosts = true }
 
 -- `matchStartedAt`: the os.clock() its current match started; nil outside one.
 type Session = { joinedAt: number, attacked: boolean, matchStartedAt: number? }
@@ -295,6 +297,71 @@ end
 -- Something bought with stars (Bruno, 2026-11-16: "Measure star buys"): an
 -- Arsenal unlock (`what` its id) or a crate ("crate"); value: the stars
 -- spent. Field 1: what; field 2: where the visit opened ("" outside one).
+-- Campaign Pass XP from a match (custom event PassXp = the XP, field 1 =
+-- missions it completed) and a tier claimed (PassClaimed = the tier,
+-- field 1 = the track).
+function Analytics.passXp(player: Player, xp: number, missions: number)
+	trace(`custom PassXp = {xp} ({missions} missions)`)
+	if not ENABLED then
+		return
+	end
+	pcall(function()
+		AnalyticsService:LogCustomEvent(player, "PassXp", xp, { [Enum.AnalyticsCustomFieldKeys.CustomField01.Name] = tostring(missions) })
+	end)
+end
+
+function Analytics.passClaimed(player: Player, track: string, tier: number)
+	trace(`custom PassClaimed = {tier} ({track})`)
+	if not ENABLED then
+		return
+	end
+	pcall(function()
+		AnalyticsService:LogCustomEvent(player, "PassClaimed", tier, { [Enum.AnalyticsCustomFieldKeys.CustomField01.Name] = track })
+	end)
+end
+
+-- A gift opened by its receiver (custom event GiftReceived, field 1 = product).
+function Analytics.giftReceived(player: Player, product: string)
+	trace(`custom GiftReceived ({product})`)
+	if not ENABLED then
+		return
+	end
+	pcall(function()
+		AnalyticsService:LogCustomEvent(player, "GiftReceived", 1, { [Enum.AnalyticsCustomFieldKeys.CustomField01.Name] = product })
+	end)
+end
+
+-- An in-match boost used (custom event BoostUsed, field 1 = which).
+function Analytics.boostUsed(player: Player, which: string)
+	trace(`custom BoostUsed ({which})`)
+	if not ENABLED then
+		return
+	end
+	local fields = {
+		[Enum.AnalyticsCustomFieldKeys.CustomField01.Name] = which,
+	}
+	pcall(function()
+		AnalyticsService:LogCustomEvent(player, "BoostUsed", 1, fields)
+	end)
+end
+
+-- A Shop shelf opened (custom event ShopShelf, field 1 = the shelf).
+function Analytics.shopShelf(player: Player, shelf: string)
+	if not Analytics.SHOP_SHELVES[shelf] then
+		return
+	end
+	trace(`custom ShopShelf ({shelf})`)
+	if not ENABLED then
+		return
+	end
+	local fields = {
+		[Enum.AnalyticsCustomFieldKeys.CustomField01.Name] = shelf,
+	}
+	pcall(function()
+		AnalyticsService:LogCustomEvent(player, "ShopShelf", 1, fields)
+	end)
+end
+
 function Analytics.boughtWithStars(player: Player, what: string, stars: number)
 	trace(`custom BoughtWithStars = {stars} ({what})`)
 	if not ENABLED then

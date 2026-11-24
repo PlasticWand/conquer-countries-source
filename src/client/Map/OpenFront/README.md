@@ -1,5 +1,147 @@
 # Renderer ports — v0.35.2
 
+## Operation Iron Road match cosmetics, 2026-11-23
+
+Bruno approved the match cosmetics earned by the Campaign Pass. Contract
+agreement with Claude's `52a93c7`: optional human roster strings `title`,
+`nameStyle`, `conquestFx`, `blastFx`; nil/unknown/non-human uses the default.
+Takeover's RosterChanged path refreshes these with the rest of the roster.
+Confirmed match state and gameplay outcomes remain unchanged.
+
+`MatchCosmetics` owns the presentation ID allowlists and shared immutable RGB
+values. `n_gold` changes only the name fill to gold and its outline to dark.
+Troops retain their original fill/outline, and status icons/flags/heads/anchors
+and source LOD retain their normal rules. Unequip and role changes restore the
+original style. Titles are the fixed uppercase names RECRUIT, VETERAN, WARLORD,
+SOLDIER, never arbitrary player text.
+
+`TitleOverlay` shares **eight** pooled TextLabels/UIStrokes across the whole
+map, creating at most one slot per layout pass from the existing GUI creation
+allowance. It adds no image. Titles appear only when the source-visible name
+em is at least **30 screen pixels**, with a **10..14px** title em. A title goes
+between the name and troops; only the troop line's presentation offset changes
+while the title is shown. The source name anchor never moves for a title.
+Titles yield to gameplay name/troop/status bounds, existing label occluders,
+other accepted titles and viewport edges. The existing own-label HUD relocation
+still runs first. If the title cannot fit, the normal name/troops remain. At
+most eight eligible candidates (own first, then roster order), 128 visible ink
+rectangles and 1,024 title-vs-name checks per layout; dense overviews suppress
+titles instead of an unbounded search. Source-culling, small fonts, unequip,
+snapshot and teardown hide/recycle them. Bounds include actual title ink, not
+the wide transparent TextLabel container. Stable layouts avoid title reparent,
+visibility and geometry writes. Title work runs in the existing annotation
+layout, with no extra RenderStepped or ownership-map scan.
+
+`x_conquest_gold` tints the existing staged conquest mark, stencil stamp and
+private gold popup, retaining their counts, timing, gold value and position.
+The existing private ConquestEvent remains conqueror-only. For everyone else,
+the renderer accepts this additional **live public cosmetic event** (Claude's
+replication follow-up; this implementation does not edit shared/server code):
+
+```luau
+{
+    type = "ConquestCosmeticEvent",
+    conquerorId = "human-id", -- stable roster string id, not smallID
+    conqueredId = "defeated-id",
+    x = 100, y = 150, -- confirmed defeated label anchor BEFORE removal
+    tick = 1200,     -- event's original match tick, stable for deduplication
+    tickAge = 0,     -- elapsed ticks, matching the existing 10Hz FX convention
+    conquestFx = "x_conquest_gold",
+}
+```
+
+Emit only for an equipped gold conquest style, to all match viewers including
+spectators; **no gold amount**, no private payload, no snapshot replay. The
+existing generic ClientState.DiplomacyEvents path carries the new event. The
+adapter validates known human conqueror, coordinates, style, tick and age.
+The conqueror suppresses this public copy and uses the existing private effect.
+Observers see one gold animated flag mark, with **no gold popup or stencil**.
+Four simultaneous public marks, 900ms lifetime including event age, bounded
+64-entry recent-event dedup cache; expired/overflow cosmetic marks are omitted.
+No ownership inference, eliminated-player name lookup or offscreen resurrection
+is used for a public event. Snapshot, rebound, results and renderer teardown
+clear transient conquest presentation. A new private moment does not erase
+other players' public marks.
+
+`x_blast_ironroad` freezes the confirmed unit owner's equipped style at receipt
+of the final inactive/reached-target record. Atom, Hydrogen, MIRV Warhead, Mega
+and Scattershot use orange-red multipliers on the existing burst/debris sprites
+and expanding shockwave. Counts, geometry, radius, start time, duration and
+fade remain unchanged. Intercepts, other unit deaths, trajectory/danger/relation
+colours, telegraph boundaries, authoritative fallout raster, glow masks and
+long-lived aftermath retain their defaults. No per-style atlas, pixels or
+EditableImage is allocated or written. Pooled sprites/rings/popups explicitly
+restore white/default style on reuse. Snapshot seeding still invents no deaths.
+
+### Studio screenshot preview
+
+After restarting Play for synced code and entering a ready match, the renderer
+creates **LocalPlayer.OpenFrontCosmetics** only when RunService:IsStudio(). It
+is a local BindableFunction, not a remote or an inventory grant. Omit `player`
+for your own nation; pass a known roster **smallID** to preview a bot/nation.
+The override changes only cosmetic drawing; bot heads/types and confirmed
+ClientState, units, gold and map tiles remain untouched.
+
+```luau
+local p = game:GetService("Players").LocalPlayer
+p.OpenFrontCosmetics:Invoke("set", {
+    -- player = 2, -- optional known smallID, including a bot for screenshots
+    title = "t_warlord", nameStyle = "n_gold",
+    conquestFx = "x_conquest_gold", blastFx = "x_blast_ironroad",
+})
+p.OpenFrontCosmetics:Invoke("conquest") -- synthetic 125K sequence at our label
+p.OpenFrontCosmetics:Invoke("blast", {unit = "Hydrogen Bomb"}) -- our spawn tile
+-- Optional {player=<smallID>,tile=<valid tile>,unit="MIRV Warhead"}, etc.
+p.OpenFrontCosmetics:Invoke("clear") -- restore confirmed label/owner styles
+```
+
+Preview blasts skip fallout/mask preparation entirely, so they add no image or
+gameplay fallout. Transient preview FX expire normally; clear restores equipped
+styles. Snapshot and rebound clear overrides; renderer destroy removes the
+endpoint/callback and pooled titles. These previews are screenshot aids, not
+evidence of public replication, ownership, a purchase or a native phone gate.
+
+### Changed functions and verification
+
+- `EditableRenderer`: `attachState`, `destroy`; adds public event consumption,
+  optional style on own conquests and the Studio-only endpoint/lifecycle.
+- `SceneOverlay`: `new`, `nameScreenRect`, `layoutLabels`, private `drawNames`,
+  `setRoster`, `unitUpdates`, `metrics`, `destroy`; new `publicConquests`,
+  `setCosmeticPreview`. No changes to input, map camera or picking functions.
+- `NameLine`: new pure `titleLayout` only.
+- `FxState`: `deadUnit`, `unitUpdates`, `clearConquests`, `stagedConquests`,
+  `clear`; new `publicConquests`, `clearPublicConquests`.
+- `EffectOverlay`: `new`, `clearConquests`, private `drawConquestStamp`, `step`,
+  and new lazy native-colour initialization/tint resolver. Require-time stays
+  pure for raster-only hosts. Existing atlas/mask upload paths unchanged.
+- New `MatchCosmetics` and `TitleOverlay` own their allowlists/pooling/cleanup.
+  Effects harness loads the native title adapter and models Studio/Players.
+  No Main/OpenFrontClient/shared/server/Net/config/art changes by Codex.
+
+`OpenFrontMatchCosmetics` covers known IDs/role/unequip/Takeover, source LOD,
+crowding/HUD/resize and ink bounds; eight-slot stress and stable native-property
+reuse; exact default-vs-tinted nuke emissions/intercepts/unchanged aftermath;
+pool colour restoration; private timing/gold, public age/dedup/caps/validation,
+no gold leaks, no snapshot replay; live/Studio separation, bot override without
+state mutation, no preview images, rebound and cleanup. Final gates over
+`52a93c712f50f3721054dae8011d1e95ad8a1112` plus the shared working tree: full
+**679 passed / 0 failed** (expected isolated warship-listener warning), focused
+MatchCosmetics **11/0**, Raster **10/0**, FalloutReveal **10/0**; fresh-sourcemap
+full-src strict, Rojo build and whitespace clean. First full was 675/4 because
+raster-only hosts caught native Color3 creation at require time; initialization
+now runs lazily in EffectOverlay.new. The passing full suite used unchanged
+hashes for all nine renderer/test source files. No assertion was weakened.
+
+`tmp/cosmetics_property_metrics.luau` / `.json`: warmed 844×390 property shim,
+default vs gold name + visible title, 120 idle and 120 pan frames. Both allocate
+**zero new instances/images/uploads**, idle has zero changed GUI properties,
+pan has the same 1,151 Position and 24 Size changes in both configurations,
+with no title reparent/visibility churn. The equipped title adds two bounded
+name-intersection checks per layout in that scene. This is no CPU/native
+font/layout/GPU timing or phone-performance claim (the full suite was running
+concurrently, so no CPU benchmark is reported). Native look, crowded real
+fonts, actual public event delivery and weak-phone p95 remain acceptance work.
+
 ## Sabotage reach while armed, 2026-11-17
 
 Bruno chose to retain Sabotage's 60-tile rule and show its reason and reach.

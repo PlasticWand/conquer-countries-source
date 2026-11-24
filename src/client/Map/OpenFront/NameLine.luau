@@ -25,4 +25,12 @@ function Line.outline(screenPixels: number): number
 	return math.max(1.4, screenPixels * .085)
 end
 
+-- A title yields to gameplay ink. Dimensions are in the annotation's world
+-- units; its 10..14px em and threshold are actual screen pixels.
+function Line.titleLayout(text:string?,namePixels:number,screenScale:number):any?
+	if not text or screenScale<=0 or namePixels*screenScale<30 then return nil end
+	local pixels=math.clamp(namePixels*screenScale*.32,10,14)/screenScale
+	return {text=text,pixels=pixels,top=namePixels*1.04,shift=pixels+namePixels*.12,width=#text*pixels*.75}
+end
+
 return Line

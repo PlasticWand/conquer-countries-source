@@ -155,6 +155,9 @@ return function(t)
 		t.eq(Profile.view(p, true, false).cratePrice, 49)
 		local three = Profile.grant(p, "crate3", "def", rolls({ 0.2, 0.4, 0.6, 0.8 }), 0) :: any
 		t.eq(#three.items, 3)
+		local five = Profile.grant(p, "crate5", "def5", rolls({ 0.2, 0.4, 0.6, 0.8, 0.3, 0.7 }), 0) :: any
+		t.eq(#five.items, 5, "the 5-pack opens five crates")
+		t.eq((Catalog.product("crate5") :: any).price, 179)
 		t.eq(Profile.grant(p, "nonsense", "ghi", rolls({ 0.1 }), 0), nil, "unknown products stay unclaimed")
 		local mega = Profile.grant(p, "unlockMega", "jkl", rolls({ 0.1 }), 0) :: any
 		t.eq(mega.items[1], "w_mega")
@@ -183,7 +186,7 @@ return function(t)
 		t.eq(select(2, Profile.unlockWithStars(p, "w_reinforce")), "stars")
 		p.stars = 35000
 		t.ok(Profile.unlockWithStars(p, "w_reinforce"))
-		t.eq(p.stars, 5000, "30,000 stars (doubled 2026-11-16)")
+		t.eq(p.stars, 19000, "16,000 stars (tier 2, 2026-11-23)")
 		t.eq(select(2, Profile.unlockWithStars(p, "w_reinforce")), "owned")
 		t.eq(select(2, Profile.unlockWithStars(p, "b_double")), "unknown", "2x Stars is Robux only")
 	end)

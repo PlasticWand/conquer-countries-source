@@ -31,7 +31,9 @@ local MapCatalog = require(Shared.MapCatalog)
 local MenuModel = require(Shared.MenuModel)
 
 local Dossier = require(script.Parent.Parent.Dossier)
-local GeneralOffer = require(script.Parent.GeneralOffer)
+local HudStyle = require(script.Parent.Parent.HudStyle)
+local MenuCards = require(script.Parent.MenuCards)
+local Art = require(script.Parent.Parent.Art)
 local FieldMaps = require(script.Parent.Parent.FieldMaps)
 local Kit = require(script.Parent.Parent.Kit)
 local MapThumbs = require(script.Parent.Parent.MapThumbs)
@@ -47,6 +49,8 @@ MainMenu.__index = MainMenu
 
 export type Actions = {
 	startSolo: (mapFolder: string, difficulty: string) -> (),
+	-- A private server's match for everyone on it (2026-11-23; the owner only).
+	startPrivate: ((mapFolder: string, kind: string) -> ())?,
 	joinQueue: (id: string) -> (),
 	leaveQueue: () -> (),
 	watchQueue: (id: string) -> (),
@@ -57,6 +61,8 @@ export type Actions = {
 	openCredits: (() -> ())?,
 	toggleMusic: () -> (),
 	openArsenal: () -> (),
+	-- The Shop on a shelf (2026-11-23; nil = Featured).
+	openShop: ((tab: string?) -> ())?,
 	openLocker: () -> (),
 	openFlagShop: () -> (),
 	openParty: () -> (),
@@ -66,6 +72,8 @@ export type Actions = {
 	openGift: (() -> ())?,
 	-- Conquest General's window (the gold-edged card under it).
 	openGeneral: (() -> ())?,
+	-- The Campaign Pass window (the card under General's).
+	openPass: (() -> ())?,
 }
 
 -- Concept pixels to canvas units (desktop). The phone layout is written in
@@ -74,6 +82,15 @@ local DESKTOP_K = 1920 / 1024
 local K = DESKTOP_K
 local STAGE_W, STAGE_H = 1920, 1072
 
+-- A private match's modes, on the difficulty chips (Easy, Medium, Hard).
+local PRIVATE_KIND: { [string]: string } = { Easy = "ffa", Medium = "team", Hard = "blitz" }
+local PRIVATE_LABEL: { [string]: string } = { ffa = "FREE FOR ALL", team = "TEAMS", blitz = "BLITZ" }
+local PRIVATE_LINE: { [string]: string } = {
+	ffa = "Everyone for themselves, with the map's AI nations.",
+	team = "Teams, shared out by the game; friends in a party stay together.",
+	blitz = "Ten minutes; the most land wins.",
+}
+
 local function at(x: number, y: number): UDim2
 	return UDim2.fromOffset(math.round(x * K), math.round(y * K))
 end
@@ -81,12 +98,6 @@ end
 local function sz(w: number, h: number): UDim2
 	return UDim2.fromOffset(math.round(w * K), math.round(h * K))
 end
-
-local RIBBON = Color3.fromHex("#D9702A")
-local GOLD_BUTTON = Color3.fromHex("#E2AE2E")
-local BADGE = Color3.fromHex("#3F9B4F")
-local BAR = Color3.fromHex("#2A2924")
-local METAL = Color3.fromHex("#3A3E3E")
 
 -- A map thumbnail cell as an ImageLabel (blank until the page is uploaded).
 function MainMenu.thumb(folder: string, props: { [string]: any }): ImageLabel
@@ -125,91 +136,33 @@ function MainMenu.fieldMap(folder: string, props: { [string]: any }): ImageLabel
 end
 
 local click = Dossier.click
-local merge = Dossier.merge
 local stencil = Dossier.stencil
 local typed = Dossier.typed
-local art = Dossier.art
-local icon = Dossier.icon
 local surface = Dossier.surface
-local shadow = Dossier.shadow
 local inkButton = Dossier.inkButton
+-- The deployment orders in the dark style (2026-11-23, like the Campaign
+-- Pass): a dark sheet under a green banner, light words, soft buttons.
+local ORDERS_WASH = Color3.fromHex("#2F9A5B")
+local ORDERS_LABEL = Color3.fromHex("#FFD75E")
+local ORDERS_TEXT = Color3.fromHex("#E6E0CC")
+local function darkSheet(props: { [string]: any }, bannerH: number): Frame
+	local sheet = Kit.new("Frame", Dossier.merge({ Name = "Sheet", BackgroundColor3 = Dossier.DARK, BorderSizePixel = 0 }, props)) :: Frame
+	Kit.corner(12).Parent = sheet
+	Kit.stroke(Color3.fromHex("#0B1218"), 4, 0).Parent = sheet
+	local band = Dossier.banner(sheet, UDim2.new(1, 0, 0, bannerH), { wash = ORDERS_WASH, art = "banner_orders" }, 12)
+	band.ZIndex = 0
+	for _, d in band:GetChildren() do
+		if d:IsA("GuiObject") then
+			d.ZIndex = 0
+		end
+	end
+	return sheet
+end
+local function softButton(b: GuiObject)
+	b.BackgroundColor3 = Color3.fromHex("#2C3E33")
+	Kit.stroke(Color3.fromHex("#7C9A86"), 2, 0).Parent = b
+end
 local plate = Dossier.plate
-local SPRING = Dossier.SPRING
-local SETTLE = Dossier.SETTLE
-
--- How far each folder picture reaches past the card's front face (its tab
--- above, the papers peeking out at the right), as fractions of the face.
-local FOLDER_ART: { [string]: { left: number, top: number, right: number, bottom: number } } = {
-	-- Measured on art/dossier/*.png (the face of folder_card is x 13..973,
-	-- y 58..404 of 1024x430, and so on).
-	folder_card = { left = 0.014, top = 0.168, right = 0.053, bottom = 0.075 },
-	folder_tall = { left = 0.013, top = 0.121, right = 0.049, bottom = 0.048 },
-	folder_report = { left = 0.013, top = 0.145, right = 0.046, bottom = 0.057 },
-}
--- Children of a folder card that make up the folder itself (under the text).
-local FOLDER_PARTS = { Art = true, ArtShadow = true, Star = true, Tab = true }
-
--- Draws a card's text and icons over its folder picture.
-local function overArt(card: GuiObject)
-	for _, child in card:GetChildren() do
-		if child:IsA("GuiObject") and not FOLDER_PARTS[child.Name] then
-			child.ZIndex = math.max(child.ZIndex, 5)
-		end
-	end
-end
-
--- A folder card: the folder picture `artName` when it's uploaded (the face
--- is the card's rect; the tab and the papers reach past it), else a manila
--- body with its tab at the top left, darker towards the bottom like stacked
--- folders. `tabW` is in concept pixels. A faded star stamp sits at `star`
--- (concept pixels on the face), if given.
-local function folderCard(parent: Instance, name: string, x: number, y: number, w: number, h: number, tabW: number, z: number, artName: string?, star: { number }?): (ImageButton, Frame)
-	-- Anchored at its centre, so the click squashes it about its middle.
-	local props = { Name = name, AnchorPoint = Vector2.new(0.5, 0.5), Position = at(x + w / 2, y + h / 2), Size = sz(w, h), ZIndex = z }
-	local shade = shadow(parent, props, z)
-	local pads = if artName and (A[artName] or "") ~= "" then FOLDER_ART[artName] else nil
-	if pads then
-		local card = Kit.new("ImageButton", merge({ AutoButtonColor = false, BackgroundTransparency = 1, Image = "", Parent = parent }, props)) :: ImageButton
-		-- The picture has its own outline, so the square shadow goes; a
-		-- dark copy of the picture is its shadow instead.
-		shade.Visible = false
-		local box = {
-			Position = UDim2.fromScale(-pads.left, -pads.top),
-			Size = UDim2.fromScale(1 + pads.left + pads.right, 1 + pads.top + pads.bottom),
-		}
-		Kit.new("ImageLabel", { Name = "ArtShadow", BackgroundTransparency = 1, Image = A[artName :: string], ImageColor3 = Color3.new(0, 0, 0), ImageTransparency = 0.6, ScaleType = Enum.ScaleType.Stretch, Position = box.Position + UDim2.fromOffset(5, 8), Size = box.Size, ZIndex = 1, Parent = card })
-		Kit.new("ImageLabel", { Name = "Art", BackgroundTransparency = 1, Image = A[artName :: string], ScaleType = Enum.ScaleType.Stretch, Position = box.Position, Size = box.Size, ZIndex = 2, Parent = card })
-		if star then
-			art("star_stamp", { Name = "Star", Position = at(star[1], star[2]), Size = sz(star[3], star[3]), ImageTransparency = 0.78, Rotation = -12, ZIndex = 3, Parent = card })
-		end
-		return card, shade
-	end
-	local card = surface("ImageButton", "tex_manila", C.manila, merge(props, { Parent = parent })) :: ImageButton
-	Kit.corner(6).Parent = card
-	Kit.stroke(C.manilaLine, 1.5, 0.2).Parent = card
-	local tab = surface("ImageLabel", "tex_manila", C.manila, { Name = "Tab", Position = UDim2.fromOffset(0, math.round(-15 * K)), Size = sz(tabW, 21), Parent = card })
-	Kit.corner(7).Parent = tab
-	Kit.new("UIGradient", { Rotation = 90, Color = ColorSequence.new(Color3.new(1, 1, 1), Color3.fromRGB(222, 210, 186)), Parent = card })
-	return card, shade
-end
-
-
--- A strip of tape (art, else a translucent band).
-local function tape(parent: Instance, name: string, x: number, y: number, w: number, h: number, rot: number, z: number, fallback: Color3): GuiObject
-	local props = { Name = "Tape", AnchorPoint = Vector2.new(0.5, 0.5), Position = at(x, y), Size = sz(w, h), Rotation = rot, ZIndex = z, ScaleType = Enum.ScaleType.Stretch, Parent = parent }
-	return art(name, props)
-		or Kit.new("Frame", { Name = "Tape", BackgroundColor3 = fallback, BackgroundTransparency = 0.2, BorderSizePixel = 0, AnchorPoint = props.AnchorPoint, Position = props.Position, Size = props.Size, Rotation = rot, ZIndex = z, Parent = parent })
-end
-
-local function pin(parent: Instance, x: number, y: number, z: number)
-	-- The pin art stands on its needle: anchor its point on (x, y).
-	local props = { Name = "Pin", AnchorPoint = Vector2.new(0.5, 0.75), Position = at(x, y), Size = sz(20, 28), ZIndex = z, Parent = parent }
-	if art("pin", props) == nil then
-		local p = Kit.new("Frame", { Name = "Pin", BackgroundColor3 = Color3.fromRGB(176, 44, 36), BorderSizePixel = 0, AnchorPoint = props.AnchorPoint, Position = props.Position, Size = sz(12, 12), ZIndex = z, Parent = parent })
-		Kit.new("UICorner", { CornerRadius = UDim.new(0.5, 0), Parent = p })
-		Kit.stroke(Color3.fromRGB(92, 20, 14), 2, 0).Parent = p
-	end
-end
 
 -- The label a public queue's action has.
 local function actionText(row: any, mine: boolean): string
@@ -221,6 +174,111 @@ local function actionText(row: any, mine: boolean): string
 		return "JOIN TEAMS"
 	end
 	return "JOIN"
+end
+
+-- The desktop layout in style B (Bruno, 2026-11-24: "build B for ... the
+-- menu ... as close as possible to the mock ups"): one dark sheet under a
+-- gold-washed title banner; the four requisition cards, each a banner
+-- photo washed in its window's colour; the live map with the frontline
+-- card; General, Campaign and PLAY on the right; the three public queues
+-- under teal headers; the credits strip along the foot. Positions are the
+-- mock-up's pixels (Main menu in style B, the sheet 1286x758) scaled by MOCK
+-- onto the canvas.
+local MOCK = 1 / 0.736 -- the mock-up's screen pixels to canvas units
+local function m(v: number): number
+	return math.round(v * MOCK)
+end
+local function mAt(x: number, y: number): UDim2
+	return UDim2.fromOffset(m(x), m(y))
+end
+local function mSz(w: number, h: number): UDim2
+	return UDim2.fromOffset(m(w), m(h))
+end
+local SHEET = { x = 122, y = 22, w = 1747, h = 1030 } -- the sheet on the stage
+
+-- The mock-up's type, exactly (Bruno, 2026-11-24: "the font size and
+-- spacing just like the mock-up"). The browser sizes a font by its em,
+-- Roblox by its whole line (ascent + descent), so the same number reads
+-- smaller here: each face has its factor (Oswald measured from the two
+-- screenshots: 1.42; the others from their line metrics).
+local FACE = { oswald = 1.42, sans = 1.26, elite = 1.3 }
+local HAIR = utf8.char(0x200A)
+-- The mock-up's letter-spacing: a hair space (about 0.1 em) between letters,
+-- `n` of them.
+local function spaced(text: string, n: number?): string
+	local chars = {}
+	for _, code in utf8.codes(text) do
+		table.insert(chars, utf8.char(code))
+	end
+	return table.concat(chars, string.rep(HAIR, n or 1))
+end
+-- A label in the mock-up's `px` CSS size of `face`, its box the CSS line
+-- box: `lh` (line-height, nil = the font's own) times `lines`. Position it
+-- by that box, as the mock-up's x/y place it.
+local function mockText(props: { [string]: any }, px: number, face: string, lh: number?, lines: number?): TextLabel
+	local factor = FACE[face]
+	local size = math.round(px * factor * MOCK)
+	local n = lines or 1
+	local box = if lh then math.round(px * lh * MOCK) * n else size * n
+	local font = if face == "sans" then F.bodySemibold elseif face == "elite" then F.typewriter else F.stencil
+	-- Roblox caps TextSize at 100: past that, a UIScale makes up the rest.
+	local grow = if size > 100 then size / 100 else 1
+	local label = Kit.label(Dossier.merge({ FontFace = font, TextSize = math.min(size, 100), TextYAlignment = Enum.TextYAlignment.Center, AutomaticSize = Enum.AutomaticSize.X, Size = UDim2.fromOffset(0, math.round(box / grow)) }, props))
+	if lh then
+		label.LineHeight = lh / factor
+	end
+	if grow > 1 then
+		Kit.new("UIScale", { Scale = grow, Parent = label })
+	end
+	return label
+end
+
+-- A banner photo washed dark at the left and `wash` at the right, under a
+-- card's words (`from`, `mid`, `to`: how strongly the dark shows).
+local function washedPhoto(parent: GuiObject, photo: string?, wash: Color3, radius: number, darkLeft: number?)
+	local z = parent.ZIndex
+	local image = if photo then A[photo] else nil
+	if image and image ~= "" then
+		local pic = Kit.new("ImageLabel", { Name = "Banner", BackgroundTransparency = 1, Image = image, ScaleType = Enum.ScaleType.Crop, Size = UDim2.fromScale(1, 1), ZIndex = z, Parent = parent })
+		Kit.corner(radius).Parent = pic
+	end
+	local veil = Kit.new("Frame", { Name = "Wash", BackgroundColor3 = Color3.new(1, 1, 1), BorderSizePixel = 0, Size = UDim2.fromScale(1, 1), ZIndex = z, Parent = parent })
+	Kit.corner(radius).Parent = veil
+	local dark = Color3.fromHex("#0C120E")
+	Kit.new("UIGradient", {
+		Color = ColorSequence.new({ ColorSequenceKeypoint.new(0, dark), ColorSequenceKeypoint.new(0.4, dark), ColorSequenceKeypoint.new(1, wash) }),
+		Transparency = NumberSequence.new({ NumberSequenceKeypoint.new(0, darkLeft or 0.08), NumberSequenceKeypoint.new(0.4, 0.4), NumberSequenceKeypoint.new(1, 0.38) }),
+		Parent = veil,
+	})
+	return veil
+end
+
+-- The darker gold lip under a gold plate (the mock-up's 6 px "shadow"), a
+-- sibling just behind and below it, so the plate seems to stand up.
+local function goldLip(plate: GuiObject, drop: number, radius: number)
+	local lip = Kit.new("Frame", { Name = plate.Name .. "Lip", BackgroundColor3 = Color3.fromHex("#8A6200"), BorderSizePixel = 0, AnchorPoint = plate.AnchorPoint, Position = plate.Position + UDim2.fromOffset(0, drop), Size = plate.Size, ZIndex = plate.ZIndex - 1, Parent = plate.Parent })
+	Kit.corner(radius).Parent = lip
+	Kit.stroke(HudStyle.EDGE, 3, 0).Parent = lip
+end
+
+-- SOLO DEPLOYMENT over PLAY, centred together on the plate (the mock-up).
+local function playWords(plate: GuiObject, kickSize: number, playSize: number, mock: boolean?)
+	local stack = Kit.new("Frame", { Name = "Words", BackgroundTransparency = 1, Size = UDim2.fromScale(1, 1), ZIndex = plate.ZIndex + 1, Parent = plate })
+	Kit.list(Enum.FillDirection.Vertical, 0, Enum.HorizontalAlignment.Center, Enum.VerticalAlignment.Center).Parent = stack
+	if mock then
+		-- (Desktop: the mock-up's 13 px kicker, spaced 0.16 em, over 64 px PLAY.)
+		mockText({ Text = spaced("SOLO DEPLOYMENT", 2), FontFace = F.labelSemibold, TextColor3 = Color3.fromHex("#7A5300"), LayoutOrder = 1, ZIndex = plate.ZIndex + 1, Parent = stack }, kickSize, "oswald")
+		mockText({ Text = "PLAY", TextColor3 = HudStyle.BROWN, LayoutOrder = 2, ZIndex = plate.ZIndex + 1, Parent = stack }, playSize, "oswald", 1)
+		return
+	end
+	Dossier.stencil({ Text = spaced("SOLO DEPLOYMENT", 2), TextSize = kickSize, TextColor3 = Color3.fromHex("#7A5300"), LayoutOrder = 1, ZIndex = plate.ZIndex + 1, Parent = stack })
+	Dossier.stencil({ Text = "PLAY", TextSize = playSize, LineHeight = 0.9, TextColor3 = HudStyle.BROWN, LayoutOrder = 2, ZIndex = plate.ZIndex + 1, Parent = stack })
+end
+
+-- A fade from clear to the sheet's dark along the foot of a banner.
+local function footFade(parent: GuiObject, height: number)
+	local f = Kit.new("Frame", { Name = "Foot", BackgroundColor3 = HudStyle.BG, BorderSizePixel = 0, AnchorPoint = Vector2.new(0, 1), Position = UDim2.fromScale(0, 1), Size = UDim2.new(1, 0, 0, height), ZIndex = parent.ZIndex, Parent = parent })
+	Kit.new("UIGradient", { Rotation = 90, Transparency = NumberSequence.new(1, 0), Parent = f })
 end
 
 function MainMenu.new(host: Frame, root: any, actions: Actions)
@@ -281,71 +339,48 @@ function MainMenu.new(host: Frame, root: any, actions: Actions)
 	return self
 end
 
--- The desktop layout, on the concept's stage.
 function MainMenu._buildDesktop(self: any)
-	local root, actions = self.root, self.actions
+	local actions = self.actions
 	local aspect = UiAssets.BACKDROP_SIZE.X / UiAssets.BACKDROP_SIZE.Y
-	-- The concept's 1024x572 picture, scaled onto the canvas.
 	local stage = Kit.new("Frame", { Name = "Stage", BackgroundTransparency = 1, AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromScale(0.5, 0.5), Size = UDim2.fromOffset(STAGE_W, STAGE_H), Parent = self.layer })
 	self.stage = stage
+	local S = SHEET
 
-	-- The folder, with a second one behind it and its tab at the top left.
-	local behind = surface("ImageLabel", "tex_manila", C.manilaDark, { Name = "FolderBehind", Position = at(78, 18), Size = sz(922, 540), Rotation = 0.5, ImageColor3 = Color3.fromRGB(214, 200, 172), ZIndex = 1, Parent = stage })
-	Kit.corner(8).Parent = behind
-	local folder = surface("ImageLabel", "tex_manila", C.manila, { Name = "Folder", Position = at(62, 22), Size = sz(926, 532), ZIndex = 2, Parent = stage })
-	Kit.corner(8).Parent = folder
-	Kit.stroke(C.manilaLine, 1.5, 0.3).Parent = folder
-	local folderTab = surface("ImageLabel", "tex_manila", C.manila, { Name = "FolderTab", Position = at(62, 12), Size = sz(275, 22), ZIndex = 2, Parent = stage })
-	Kit.corner(8).Parent = folderTab
+	-- The sheet.
+	local sheet = Kit.new("Frame", { Name = "Sheet", BackgroundColor3 = HudStyle.BG, BorderSizePixel = 0, Position = UDim2.fromOffset(S.x, S.y), Size = UDim2.fromOffset(S.w, S.h), ZIndex = 2, Parent = stage })
+	Kit.corner(24).Parent = sheet
+	Kit.stroke(HudStyle.EDGE, 5, 0).Parent = sheet
 
-	-- Title band.
-	local band = surface("ImageLabel", "tex_paper", C.sheet, { Name = "TitleBand", Position = at(68, 26), Size = sz(708, 78), ZIndex = 3, Parent = stage })
-	if A.title_band ~= "" then
-		-- The crumpled strip, stretched once over the band.
-		band.Image, band.ScaleType = A.title_band, Enum.ScaleType.Stretch
-	else
-		Kit.stroke(C.sheetLine, 1, 0.3).Parent = band
-	end
-	local logo: any = art("logo", { Name = "Title", AnchorPoint = Vector2.new(0, 0.5), Position = UDim2.new(0, math.round(16 * K), 0.5, -2), Size = sz(616, 62), Parent = band })
-		or stencil({ Name = "Title", Text = "CONQUER COUNTRIES", TextSize = 128, AnchorPoint = Vector2.new(0, 0.5), Position = UDim2.new(0, math.round(16 * K), 0.5, -2), Parent = band })
-	local rule = Kit.new("Frame", { Name = "Rule", BackgroundColor3 = C.inkBlack, BackgroundTransparency = 0.15, BorderSizePixel = 0, Position = UDim2.fromOffset(math.round(16 * K), math.round(72 * K)), Size = UDim2.fromOffset(math.round(676 * K), 3), Parent = band })
-	-- Keep the title clear of Roblox's own buttons at the top left.
-	local function placeTitle()
-		local s = root.scale.Scale
-		local left = band.AbsolutePosition.X / s
-		local x = math.max(math.round(16 * K), root.topLeft - left + 12)
-		logo.Position = UDim2.new(0, x, 0.5, -2)
-		rule.Position = UDim2.fromOffset(x, math.round(72 * K))
-	end
-	table.insert(self.built, root.Changed.Event:Connect(placeTitle))
-	table.insert(self.built, band:GetPropertyChangedSignal("AbsolutePosition"):Connect(placeTitle))
-	task.defer(placeTitle)
+	-- The title banner: the supply-drop photo, dark at the left, gold at the
+	-- right, fading into the sheet.
+	local banner = Kit.new("Frame", { Name = "TitleBanner", BackgroundColor3 = HudStyle.BG, BorderSizePixel = 0, Size = UDim2.new(1, 0, 0, m(132)), ZIndex = 2, Parent = sheet })
+	Kit.corner(24).Parent = banner
+	washedPhoto(banner, "banner_starter", HudStyle.WASH.gold, 24, 0.05)
+	footFade(banner, m(50))
+	mockText({ Text = "Fork of OpenFront", TextColor3 = Color3.fromHex("#F3D488"), Position = mAt(36, 14), ZIndex = 3, Parent = banner }, 15, "elite")
+	mockText({ Name = "Title", Text = "CONQUER COUNTRIES", TextColor3 = HudStyle.TEXT, Position = mAt(32, 34), ZIndex = 3, Parent = banner }, 74, "oswald", 1)
 
-	-- The board everything is pinned to.
-	local board = surface("ImageLabel", "tex_board", C.board, { Name = "Board", Position = at(66, 108), Size = sz(921, 434), ZIndex = 3, Parent = stage })
-	if A.board ~= "" then
-		-- The stained board, stretched once (its stains don't tile).
-		board.Image, board.ScaleType = A.board, Enum.ScaleType.Stretch
-	end
-	Kit.corner(4).Parent = board
-	Kit.stroke(C.boardDark, 2, 0).Parent = board
-
-	-- Top right: the TOP-SECRET note.
-	local noteProps = { Name = "Secret", Position = at(757, 12), Size = sz(228, 92), Rotation = 1.2, ZIndex = 12 }
-	shadow(stage, noteProps, 11)
-	local note = surface("ImageLabel", "tex_paper", C.sheet, merge(noteProps, { Parent = stage }))
-	Kit.stroke(C.sheetLine, 1, 0.2).Parent = note
-	if art("stamp_secret", { Name = "Stamp", Position = at(9, 7), Size = sz(140, 36), Rotation = -1, Parent = note }) == nil then
-		local box = Kit.new("Frame", { Name = "Stamp", BackgroundTransparency = 1, Position = at(10, 9), Size = sz(136, 32), Rotation = -1, Parent = note })
-		Kit.stroke(C.stamp, 3, 0).Parent = box
-		stencil({ Text = "TOP-SECRET", TextSize = 46, TextColor3 = C.stamp, AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromScale(0.5, 0.5), Parent = box })
-	end
-	local strip = surface("ImageLabel", "tex_manila", C.manilaDark, { Name = "Icons", Position = at(156, 16), Size = sz(66, 36), ImageColor3 = Color3.fromRGB(214, 200, 172), Parent = note })
-	Kit.corner(5).Parent = strip
-	local function noteIcon(name: string, glyph: string, x: number, tip: string, onClick: () -> ())
-		local b = Kit.new("TextButton", { Name = glyph, Text = "", AutoButtonColor = false, BackgroundTransparency = 1, AnchorPoint = Vector2.new(0.5, 0.5), Position = at(x + 16, 18), Size = sz(32, 32), Parent = strip })
-		icon(name, glyph, { AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromScale(0.5, 0.5), Size = sz(24, 24), Parent = b })
-		Dossier.clicky(b, 1.12)
+	-- Top right: TOP SECRET, your stars, settings and sound.
+	local corner = Kit.new("Frame", { Name = "Corner", BackgroundTransparency = 1, AnchorPoint = Vector2.new(1, 0), Position = UDim2.new(1, -m(24), 0, m(22)), Size = UDim2.fromOffset(0, m(44)), AutomaticSize = Enum.AutomaticSize.X, ZIndex = 3, Parent = banner })
+	Kit.list(Enum.FillDirection.Horizontal, m(10), Enum.HorizontalAlignment.Right, Enum.VerticalAlignment.Center).Parent = corner
+	local secret = Kit.new("Frame", { Name = "Secret", BackgroundColor3 = Color3.fromHex("#140804"), BackgroundTransparency = 0.3, BorderSizePixel = 0, Size = UDim2.fromOffset(0, 0), AutomaticSize = Enum.AutomaticSize.XY, Rotation = -3, LayoutOrder = 1, ZIndex = 3, Parent = corner })
+	Kit.stroke(Color3.fromHex("#E0483C"), 2.5, 0).Parent = secret
+	Kit.corner(8).Parent = secret
+	Kit.padding(m(3), m(10)).Parent = secret
+	mockText({ Text = spaced("TOP SECRET"), TextColor3 = Color3.fromHex("#FF7A6C"), ZIndex = 3, Parent = secret }, 14, "oswald")
+	local stars = Kit.new("Frame", { Name = "Stars", BackgroundColor3 = Color3.fromHex("#140804"), BackgroundTransparency = 0.25, BorderSizePixel = 0, Size = UDim2.fromOffset(0, m(44)), AutomaticSize = Enum.AutomaticSize.X, LayoutOrder = 2, ZIndex = 3, Parent = corner })
+	Kit.corner(13).Parent = stars
+	Kit.stroke(HudStyle.GOLD, 1.5, 0.55).Parent = stars
+	Kit.padding(0, m(14)).Parent = stars
+	Kit.list(Enum.FillDirection.Horizontal, m(8), Enum.HorizontalAlignment.Center, Enum.VerticalAlignment.Center).Parent = stars
+	Kit.glyph("star", { ImageColor3 = HudStyle.GOLD, Size = UDim2.fromOffset(m(18), m(18)), LayoutOrder = 1, ZIndex = 3, Parent = stars })
+	self.starsText = mockText({ Name = "Stars", Text = "…", TextColor3 = HudStyle.TEXT, LayoutOrder = 2, ZIndex = 3, Parent = stars }, 22, "oswald")
+	local function cornerIcon(glyph: string, tint: string, order: number, tip: string, onClick: () -> ()): TextButton
+		local b = HudStyle.iconButton(glyph, Color3.fromHex(tint), { Size = UDim2.fromOffset(m(44), m(44)), LayoutOrder = order, ZIndex = 3, Parent = corner })
+		local glyphIcon = b:FindFirstChild("Icon") :: ImageLabel
+		glyphIcon.Size = UDim2.fromOffset(m(22), m(22))
+		glyphIcon.ZIndex = 3
+		Dossier.clicky(b, 1.1)
 		b.Activated:Connect(function()
 			click()
 			onClick()
@@ -355,233 +390,163 @@ function MainMenu._buildDesktop(self: any)
 		end)
 		return b
 	end
-	noteIcon("icon_settings", "settings", 1, "Settings", actions.openSettings)
-	self.soundSlash = Kit.slash(noteIcon("icon_sound", "music", 33, "Music", actions.toggleMusic))
+	cornerIcon("settings", "#264B78", 3, "Settings", actions.openSettings)
+	self.soundSlash = Kit.slash(cornerIcon("music", "#22343F", 4, "Music", actions.toggleMusic))
 	self:setMusicOn(self.musicOn)
-	icon("icon_star", "star", { AnchorPoint = Vector2.new(0, 0.5), Position = at(11, 66), Size = sz(15, 15), Parent = note })
-	self.starsText = stencil({ Name = "Stars", Text = "…", TextSize = 38, AnchorPoint = Vector2.new(0, 0.5), Position = at(29, 66), Parent = note })
-	-- The green badge: Supply crates' price in Robux.
-	local badge = Kit.new("TextButton", { Name = "CratePrice", Text = "", AutoButtonColor = false, BackgroundColor3 = BADGE, BorderSizePixel = 0, AnchorPoint = Vector2.new(0.5, 0.5), Position = at(94 + 25, 54 + 12), Size = sz(50, 24), Visible = false, Parent = note })
-	Dossier.clicky(badge, 1.15)
-	Kit.corner(4).Parent = badge
-	Kit.stroke(Color3.fromRGB(31, 90, 43), 2, 0).Parent = badge
-	Kit.list(Enum.FillDirection.Horizontal, 6, Enum.HorizontalAlignment.Center, Enum.VerticalAlignment.Center).Parent = badge
-	Kit.new("ImageLabel", { BackgroundTransparency = 1, Image = UiAssets.robux, Size = UDim2.fromOffset(22, 22), LayoutOrder = 1, Parent = badge })
-	self.crateText = stencil({ Text = "", TextSize = 32, TextColor3 = C.sheet, LayoutOrder = 2, Parent = badge })
+	-- (The old crate-price badge: hidden since 2026-11-23, kept for setProfile.)
+	local badge = Kit.new("TextButton", { Name = "CratePrice", Text = "", Visible = false, Parent = stage })
+	self.crateText = stencil({ Text = "", Parent = badge })
 	self.crateBadge = badge
-	badge.Activated:Connect(function()
-		click()
-		actions.openLocker()
-	end)
-	Kit.tip(badge, function(card)
-		Kit.text({ Text = "Supply crate price", FontFace = F.uiBold, Parent = card })
-	end)
-	tape(note, "tape", 85, 88, 66, 20, 2, 0, C.tape)
-	tape(note, "tape", 222, 62, 46, 18, 72, 0, C.tape)
 
-	-- Left: the "Military requisitions" spine.
-	local spine = surface("ImageLabel", "tex_manila", C.manilaDark, { Name = "Requisitions", Position = at(33, 128), Size = sz(38, 272), ImageColor3 = Color3.fromRGB(214, 200, 172), ZIndex = 4, Parent = stage })
-	Kit.corner(7).Parent = spine
-	Kit.stroke(C.manilaLine, 1.5, 0.2).Parent = spine
-	stencil({ Text = "MILITARY REQUISITIONS", TextSize = 44, AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromScale(0.5, 0.5), Rotation = -90, Parent = spine })
+	-- Left: MILITARY REQUISITIONS, up the edge.
+	local spine = Kit.new("Frame", { Name = "Requisitions", BackgroundTransparency = 1, Position = mAt(12, 150), Size = mSz(22, 530), ZIndex = 2, Parent = sheet })
+	mockText({ Text = spaced("MILITARY REQUISITIONS", 2), FontFace = F.labelSemibold, TextColor3 = Color3.fromHex("#7F948A"), AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromScale(0.5, 0.5), Rotation = -90, ZIndex = 2, Parent = spine }, 14, "oswald")
 
-	-- The four requisition cards, each overlapping the one above.
-	local function requisition(name: string, text: string, y: number, h: number, z: number, iconName: string, glyph: string, iconAt: { number }, onClick: () -> ()): ImageButton
-		local card, shade = folderCard(stage, name, 70, y, 192, h, 95, z, if h > 90 then "folder_tall" else "folder_card", { 96, h / 2 - 20, 40 })
-		-- Pulled out to the right, tipped down (Bruno, 2026-10-26).
-		local hit = self:_lift(card, shade, 48, 0, 4, function()
+	-- The four requisition cards.
+	local CARD_X, CARD_W, CARD_H, CARD_GAP = 44, 244, 124, 10
+	local function requisition(name: string, title: string, kicker: string, i: number, photo: string, wash: Color3, sil: string, onClick: () -> ()): TextButton
+		local y = 148 + (i - 1) * (CARD_H + CARD_GAP)
+		local card = Kit.new("TextButton", { Name = name, Text = "", AutoButtonColor = false, BackgroundColor3 = HudStyle.BG, BorderSizePixel = 0, AnchorPoint = Vector2.new(0.5, 0.5), Position = mAt(CARD_X + CARD_W / 2, y + CARD_H / 2), Size = mSz(CARD_W, CARD_H), ZIndex = 3, Parent = sheet }) :: TextButton
+		Kit.corner(16).Parent = card
+		Kit.stroke(HudStyle.EDGE, 4, 0).Parent = card
+		washedPhoto(card, photo, wash, 16)
+		mockText({ Name = "Kicker", Text = spaced(kicker), FontFace = F.labelSemibold, TextColor3 = wash:Lerp(Color3.new(1, 1, 1), 0.6), Position = mAt(18, 18), ZIndex = 5, Parent = card }, 12, "oswald")
+		mockText({ Name = "Name", Text = title, TextColor3 = HudStyle.TEXT, Position = mAt(16, 36), ZIndex = 5, Parent = card }, 34, "oswald", 0.95)
+		-- The cream silhouette (Codex), 78 square, hard at the right: further
+		-- right than the mock-up so the flag's pole clears FLAG SHOP (Bruno).
+		Kit.new("ImageLabel", { Name = "Icon", BackgroundTransparency = 1, Image = A[sil] or "", ImageTransparency = 0.1, ScaleType = Enum.ScaleType.Fit, AnchorPoint = Vector2.new(1, 0.5), Position = UDim2.new(1, -m(4), 0.5, 0), Size = mSz(78, 78), ZIndex = 4, Parent = card })
+		Dossier.clicky(card, 1.03)
+		card.Activated:Connect(function()
 			click()
 			onClick()
 		end)
-		Dossier.clicky(hit, 1, card, false)
-		stencil({ Name = "Name", Text = text, TextSize = 54, LineHeight = 0.86, AnchorPoint = Vector2.new(0, 0.5), Position = UDim2.new(0, math.round(18 * K), 0, math.round(iconAt[5] * K)), Parent = card })
-		icon(iconName, glyph, { Name = "Icon", Position = at(iconAt[1], iconAt[2]), Size = sz(iconAt[3], iconAt[4]), Parent = card })
 		return card
 	end
-	local party = requisition("Party", "PARTY", 128, 80, 5, "icon_party", "party", { 126, 6, 58, 66, 38 }, actions.openParty)
-	self.partyText = typed({ Name = "Squad", Text = "", TextSize = 18, TextColor3 = C.inkBlack, Position = at(18, 58), Visible = false, Parent = party })
-	local armory = requisition("Armory", "ARSENAL", 216, 80, 6, "icon_armory", "silo", { 114, 14, 74, 50, 39 }, actions.openArsenal)
-	self:_dealRibbon(armory, at(3, 56), sz(110, 21), 26)
-	local crates = requisition("Crates", "SUPPLY\nCRATES", 304, 86, 7, "icon_crates", "chest", { 122, 14, 62, 56, 42 }, actions.openLocker)
-	self:_crateRibbon(crates, at(3, 64), sz(124, 20), 25, at(18, 33))
-	local shop = requisition("FlagShop", "FLAG\nSHOP", 398, 104, 8, "icon_flag", "flag", { 122, 10, 60, 60, 42 }, actions.openFlagShop)
-	local ribbon = Kit.new("Frame", { Name = "Ribbon", BackgroundColor3 = RIBBON, BorderSizePixel = 0, Position = at(3, 75), Size = sz(192, 25), Parent = shop })
-	Kit.stroke(Color3.fromRGB(120, 52, 14), 2, 0).Parent = ribbon
-	self.flagEvent = stencil({ Text = "TODAY'S FLAGS", TextSize = 30, TextColor3 = C.sheet, AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.new(0.5, -24, 0.5, 0), Parent = ribbon })
-	self.flagTimer = typed({ Text = "", TextSize = 15, TextColor3 = C.sheet, AnchorPoint = Vector2.new(1, 0.5), Position = UDim2.new(1, -8, 0.5, 0), Parent = ribbon })
-	-- Paperclips on the left edge of Party and the Flag Shop (Bruno's reference).
-	art("paperclip", { Name = "Clip", Position = at(-6, 18), Size = sz(10, 34), Parent = party })
-	art("paperclip", { Name = "Clip", Position = at(-6, 4), Size = sz(10, 34), Parent = shop })
-	for _, card in { party, shop } do
-		overArt(card)
-	end
-	for _, name in { "Armory", "Crates" } do
-		overArt(stage:FindFirstChild(name) :: GuiObject)
-	end
-
-	-- Centre: the war map, pinned to the board.
-	local mapProps = { Name = "WarMap", Position = at(272, 118), Size = sz(444, 282), ZIndex = 5 }
-	shadow(stage, mapProps, 4)
-	local map = Kit.new("Frame", merge({ BackgroundColor3 = METAL, BorderSizePixel = 0 }, merge(mapProps, { Parent = stage })))
-	Kit.corner(3).Parent = map
-	Kit.stroke(Color3.fromRGB(24, 26, 26), 2, 0).Parent = map
-	local inset = math.round(6 * K)
-	local view = Kit.new("Frame", { Name = "View", BackgroundColor3 = Color3.fromRGB(38, 92, 140), BorderSizePixel = 0, ClipsDescendants = true, Position = UDim2.fromOffset(inset, inset), Size = UDim2.new(1, -2 * inset, 1, -2 * inset), Parent = map })
-	-- Cover the view by height (the sides crop).
-	local viewH = math.round(282 * K) - 2 * inset
-	local world = Kit.new("Frame", { BackgroundTransparency = 1, AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromScale(0.5, 0.5), Size = UDim2.fromOffset(math.ceil(viewH * aspect), viewH), Parent = view })
-	for i, image in UiAssets.backdrop do
-		Kit.new("ImageLabel", { BackgroundTransparency = 1, Image = image, Position = UDim2.fromScale((i - 1) * 0.5, 0), Size = UDim2.fromScale(0.5, 1), ScaleType = Enum.ScaleType.Stretch, Parent = world })
-	end
-	Kit.new("Frame", { Name = "Slate", BackgroundColor3 = Color3.fromRGB(34, 44, 44), BackgroundTransparency = 0.5, BorderSizePixel = 0, Size = UDim2.fromScale(1, 1), Parent = view })
-	for gx = 1, 9 do
-		Kit.new("Frame", { BackgroundColor3 = Color3.new(1, 1, 1), BackgroundTransparency = 0.88, BorderSizePixel = 0, Position = UDim2.new(gx / 10, 0, 0, 0), Size = UDim2.new(0, 1, 1, 0), Parent = view })
-	end
-	for gy = 1, 5 do
-		Kit.new("Frame", { BackgroundColor3 = Color3.new(1, 1, 1), BackgroundTransparency = 0.88, BorderSizePixel = 0, Position = UDim2.new(0, 0, gy / 6, 0), Size = UDim2.new(1, 0, 0, 1), Parent = view })
-	end
-	-- Degree ticks along the edges.
-	for t = 1, 39 do
-		local long = t % 4 == 0
-		Kit.new("Frame", { BackgroundColor3 = C.sheet, BackgroundTransparency = 0.35, BorderSizePixel = 0, AnchorPoint = Vector2.new(0.5, 1), Position = UDim2.new(t / 40, 0, 1, 0), Size = UDim2.fromOffset(1, if long then 12 else 6), Parent = view })
-	end
-	for t = 1, 23 do
-		local long = t % 4 == 0
-		Kit.new("Frame", { BackgroundColor3 = C.sheet, BackgroundTransparency = 0.35, BorderSizePixel = 0, AnchorPoint = Vector2.new(0, 0.5), Position = UDim2.new(0, 0, t / 24, 0), Size = UDim2.fromOffset(if long then 12 else 6, 1), Parent = view })
-	end
-	icon("icon_compass", "target", { Name = "Compass", AnchorPoint = Vector2.new(0.5, 0.5), Position = at(46, 228), Size = sz(48, 48), ImageColor3 = C.sheet, Parent = view })
-	pin(stage, 286, 128, 6)
-
-	-- The featured public queue (World): the frontline note.
-	local frontProps = { Name = "Frontline", Position = at(545, 115), Size = sz(184, 186), Rotation = 2, ZIndex = 10 }
-	shadow(stage, frontProps, 9)
-	local front = surface("ImageLabel", "tex_paper", C.sheet, merge(frontProps, { Parent = stage }))
-	Kit.stroke(C.sheetLine, 1, 0.2).Parent = front
-	pin(front, 103, 13, 0)
-	if art("paperclip", { Name = "Clip", Position = at(136, -8), Size = sz(18, 54), Parent = front }) == nil then
-		local clip = Kit.new("Frame", { Name = "Clip", BackgroundTransparency = 1, Position = at(138, -8), Size = sz(14, 44), Parent = front })
-		Kit.new("UICorner", { CornerRadius = UDim.new(0.5, 0), Parent = clip })
-		Kit.stroke(Color3.fromRGB(150, 150, 150), 4, 0).Parent = clip
-	end
-	stencil({ Text = "DEPLOY TO\nFRONTLINE", TextSize = 62, LineHeight = 0.88, TextXAlignment = Enum.TextXAlignment.Center, AnchorPoint = Vector2.new(0.5, 0), Position = UDim2.new(0.5, 0, 0, math.round(46 * K)), Parent = front })
-	local frontBtn = Kit.new("TextButton", { Name = "Join", Text = "", AutoButtonColor = false, BackgroundColor3 = GOLD_BUTTON, BorderSizePixel = 0, AnchorPoint = Vector2.new(0.5, 0.5), Position = at(92, 140), Size = sz(152, 48), Parent = front })
-	Kit.corner(4).Parent = frontBtn
-	Kit.stroke(C.inkBlack, 4, 0).Parent = frontBtn
-	-- A darker lower half, like a pressed metal button.
-	Kit.new("UIGradient", { Rotation = 90, Color = ColorSequence.new({ ColorSequenceKeypoint.new(0, Color3.new(1, 1, 1)), ColorSequenceKeypoint.new(0.55, Color3.new(1, 1, 1)), ColorSequenceKeypoint.new(1, Color3.fromRGB(205, 190, 160)) }), Parent = frontBtn })
-	local frontLabel = stencil({ Text = "JOIN", TextSize = 56, AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromScale(0.5, 0.5), Parent = frontBtn })
-	Dossier.clicky(frontBtn, 1.06)
-	frontBtn.MouseEnter:Connect(function()
-		if Kit.covered(frontBtn) then
-			return
+	local W = HudStyle.WASH
+	local party = requisition("Party", "PARTY", "PLAY WITH FRIENDS", 1, "banner_party", W.pink, "sil_party", actions.openParty)
+	self.partyText = mockText({ Name = "Squad", Text = "", TextColor3 = Color3.fromHex("#F4D3E0"), Position = mAt(18, 76), Visible = false, ZIndex = 5, Parent = party }, 13, "elite")
+	local armory = requisition("Armory", "SHOP", "WEAPONS & BOOSTS", 2, "banner_arsenal", W.gold, "sil_shop", function()
+		if actions.openShop then
+			actions.openShop(nil)
+		else
+			actions.openArsenal()
 		end
-		frontBtn.BackgroundColor3 = C.hazard
 	end)
-	frontBtn.MouseLeave:Connect(function()
-		frontBtn.BackgroundColor3 = GOLD_BUTTON
-	end)
-	local frontCount = stencil({ Text = "", TextSize = 24, AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.new(0.5, 0, 0, math.round(173 * K)), Parent = front })
+	self:_dealRibbon(armory, UDim2.new(0, 0, 1, -m(24)), UDim2.new(1, 0, 0, m(24)), m(12 * FACE.oswald))
+	local crates = requisition("Crates", "LOCKER", "CRATES & FLAGS", 3, "banner_locker", W.purple, "sil_locker", actions.openLocker)
+	local lockerName = crates:FindFirstChild("Name") :: TextLabel
+	self:_crateRibbon(crates, UDim2.new(0, 0, 1, -m(24)), UDim2.new(1, 0, 0, m(24)), m(12 * FACE.oswald), lockerName.Position)
+	local shop = requisition("FlagShop", "FLAG SHOP", "NEW THIS WEEK", 4, "banner_flags", W.orange, "sil_flag", actions.openFlagShop)
+	local ribbon = Kit.new("Frame", { Name = "Ribbon", BackgroundColor3 = W.orange, BorderSizePixel = 0, AnchorPoint = Vector2.new(0, 1), Position = UDim2.fromScale(0, 1), Size = UDim2.new(1, 0, 0, m(24)), ZIndex = 5, Parent = shop })
+	Kit.corner(16).Parent = ribbon
+	-- (Squares off the ribbon's top corners: only the card's bottom is round.)
+	Kit.new("Frame", { BackgroundColor3 = W.orange, BorderSizePixel = 0, Size = UDim2.new(1, 0, 0.5, 0), ZIndex = 5, Parent = ribbon })
+	self.flagEvent = mockText({ Text = "TODAY'S FLAGS", TextColor3 = HudStyle.TEXT, AnchorPoint = Vector2.new(0, 0.5), Position = UDim2.new(0, m(12), 0.5, 0), ZIndex = 6, Parent = ribbon }, 12, "oswald")
+	self.flagTimer = mockText({ Text = "", TextColor3 = Color3.fromHex("#FFE3CC"), AnchorPoint = Vector2.new(1, 0.5), Position = UDim2.new(1, -m(12), 0.5, 0), ZIndex = 6, Parent = ribbon }, 11, "sans")
+
+	-- Centre: the live map in a dark frame.
+	local map = Kit.new("Frame", { Name = "WarMap", BackgroundColor3 = HudStyle.EDGE, BorderSizePixel = 0, ClipsDescendants = true, Position = mAt(306, 148), Size = mSz(592, 380), ZIndex = 3, Parent = sheet })
+	Kit.corner(16).Parent = map
+	Kit.stroke(HudStyle.EDGE, 4, 0).Parent = map
+	local viewH = m(380)
+	local world = Kit.new("Frame", { BackgroundTransparency = 1, AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromScale(0.5, 0.5), Size = UDim2.fromOffset(math.ceil(viewH * aspect), viewH), ZIndex = 3, Parent = map })
+	for i, image in UiAssets.backdrop do
+		Kit.new("ImageLabel", { BackgroundTransparency = 1, Image = image, Position = UDim2.fromScale((i - 1) * 0.5, 0), Size = UDim2.fromScale(0.5, 1), ScaleType = Enum.ScaleType.Stretch, ZIndex = 3, Parent = world })
+	end
+	Kit.new("Frame", { Name = "Slate", BackgroundColor3 = Color3.fromRGB(20, 30, 28), BackgroundTransparency = 0.6, BorderSizePixel = 0, Size = UDim2.fromScale(1, 1), ZIndex = 3, Parent = map })
+
+	-- The featured public queue (World): DEPLOY TO FRONTLINE.
+	-- (Bruno, 2026-11-24: "Same card, shorter", so more of the map shows.)
+	local front = HudStyle.panel("Frame", { Name = "Frontline", Position = mAt(660, 168), Size = mSz(250, 196), ZIndex = 4, Parent = sheet }, 16)
+	front.ClipsDescendants = false
+	local frontHead = Kit.new("Frame", { Name = "Head", BackgroundColor3 = HudStyle.BG, BorderSizePixel = 0, Size = UDim2.new(1, 0, 0, m(98)), ZIndex = 4, Parent = front })
+	Kit.corner(16).Parent = frontHead
+	washedPhoto(frontHead, "banner_orders", W.green, 16)
+	footFade(frontHead, m(30))
+	mockText({ Text = "Orders", TextColor3 = Color3.fromHex("#A3D2AB"), Position = mAt(16, 12), ZIndex = 5, Parent = frontHead }, 13, "elite")
+	mockText({ Text = "DEPLOY TO\nFRONTLINE", TextColor3 = HudStyle.TEXT, Position = mAt(14, 30), ZIndex = 5, Parent = frontHead }, 30, "oswald", 0.95, 2)
+	local frontBtn = HudStyle.goldPlate({ Name = "Join", AnchorPoint = Vector2.new(0.5, 0), Position = UDim2.new(0.5, 0, 0, m(102)), Size = UDim2.new(1, -m(32), 0, m(52)), ZIndex = 6, Parent = front }, 14)
+	goldLip(frontBtn, m(4), 14)
+	local frontLabel = mockText({ Text = "JOIN", TextColor3 = HudStyle.BROWN, AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromScale(0.5, 0.5), ZIndex = 6, Parent = frontBtn }, 28, "oswald")
+	Dossier.clicky(frontBtn, 1.05)
+	local frontCount = mockText({ Text = "", FontFace = F.labelSemibold, TextColor3 = HudStyle.SOFT, AnchorPoint = Vector2.new(0.5, 1), Position = UDim2.new(0.5, 0, 1, -m(12)), ZIndex = 5, Parent = front }, 13, "oswald")
 	self.front = { frame = front, btn = frontBtn, label = frontLabel, count = frontCount, data = nil :: any }
 	frontBtn.Activated:Connect(function()
-		click()
 		self:_press(self.front.data)
 	end)
 
-	-- Right: solo deployment, the stamp over the PLAY plate.
-	local stampProps = { Name = "SoloStamp", AnchorPoint = Vector2.new(0.5, 0.5), Position = at(722 + 122, 178 + 71), Size = sz(244, 142), Rotation = -5, ZIndex = 7 }
-	local soloStamp
-	if A.stamp_solo ~= "" then
-		soloStamp = Kit.new("ImageButton", merge({ AutoButtonColor = false, BackgroundTransparency = 1, Image = A.stamp_solo, ScaleType = Enum.ScaleType.Fit }, merge(stampProps, { Parent = stage })))
-	else
-		soloStamp = Kit.new("TextButton", merge({ Text = "", AutoButtonColor = false, BackgroundTransparency = 1 }, merge(stampProps, { Parent = stage })))
-		Kit.corner(12).Parent = soloStamp
-		Kit.stroke(C.stamp, 7, 0.05).Parent = soloStamp
-		stencil({ Text = "SOLO", TextSize = 150, TextColor3 = C.stamp, AnchorPoint = Vector2.new(0.5, 0), Position = UDim2.new(0.5, 0, 0, 0), Parent = soloStamp })
-		stencil({ Text = "DEPLOYMENT", TextSize = 64, TextColor3 = C.stamp, AnchorPoint = Vector2.new(0.5, 1), Position = UDim2.new(0.5, 0, 1, -8), Parent = soloStamp })
-	end
-	-- Hovered, the stamp presses in like a rubber stamp; clicked, it thumps.
-	Dossier.clicky(soloStamp, 0.94)
-	local ink = TweenInfo.new(0.12)
-	soloStamp.MouseEnter:Connect(function()
-		if Kit.covered(soloStamp) then
-			return
-		end
-		if soloStamp:IsA("ImageButton") then
-			TweenService:Create(soloStamp, ink, { ImageColor3 = Color3.fromRGB(205, 200, 200) }):Play()
-		end
-	end)
-	soloStamp.MouseLeave:Connect(function()
-		if soloStamp:IsA("ImageButton") then
-			TweenService:Create(soloStamp, ink, { ImageColor3 = Color3.new(1, 1, 1) }):Play()
-		end
-	end)
-	local function openSolo()
+	-- Right: PLAY (General and Campaign sit above it, MenuCards).
+	-- (Bruno, 2026-11-24: "Make it look like the mockup": the words centred
+	-- together, a darker gold lip under the plate.)
+	local play = HudStyle.goldPlate({ Name = "Play", AnchorPoint = Vector2.new(0.5, 0.5), Position = mAt(930 + 165, 410 + 56), Size = mSz(330, 112), ZIndex = 5, Parent = sheet }, 20)
+	goldLip(play, m(6), 20)
+	playWords(play, 13, 64, true)
+	play.Activated:Connect(function()
 		self:showSolo(true)
-	end
-	soloStamp.Activated:Connect(function()
-		click()
-		openSolo()
 	end)
-	local play = plate(stage, "PLAY", { Name = "Play", AnchorPoint = Vector2.new(0.5, 0.5), Position = at(740 + 111, 329 + 32), Size = sz(222, 64), ZIndex = 8, Parent = stage }, 110)
-	play.Activated:Connect(openSolo)
-	Dossier.clicky(play, 1.06)
-	-- Taped to the plate (positions relative to it), so they grow with it.
-	tape(play, "red_tape", 12, 37, 80, 20, 56, 0, C.stamp)
-	tape(play, "red_tape", 214, 15, 80, 20, 48, 0, C.stamp)
+	Dossier.clicky(play, 1.05)
 
-	-- Bottom: the other public queues, as field reports (three since Blitz,
-	-- 2026-11-16: the free-for-all, Blitz and the team game).
+	-- Bottom: the other public queues, under teal headers.
 	self.reports = {}
-	local cw, gap = 220, 13
+	local RW, RGAP = (954 - 28) / 3, 14
 	for i = 1, 3 do
-		local x = 285 + (i - 1) * (cw + gap)
-		local card, shade = folderCard(stage, `Report{i}`, x, 425, cw, 140, 90, 5, "folder_report", { cw - 62, 62, 46 })
-		-- Lifted up out of the folder.
+		local x = 306 + (i - 1) * (RW + RGAP)
+		local card = Kit.new("TextButton", { Name = `Report{i}`, Text = "", AutoButtonColor = false, BackgroundColor3 = HudStyle.BG, BorderSizePixel = 0, AnchorPoint = Vector2.new(0.5, 0.5), Position = mAt(x + RW / 2, 548 + 82), Size = mSz(RW, 164), ZIndex = 3, Parent = sheet }) :: TextButton
+		Kit.corner(16).Parent = card
+		Kit.stroke(HudStyle.EDGE, 4, 0).Parent = card
+		local head = HudStyle.header(card, m(44), W.teal, 16)
+		local header = mockText({ Text = "", TextColor3 = Color3.fromHex("#CFF3F3"), TextTruncate = Enum.TextTruncate.AtEnd, AnchorPoint = Vector2.new(0, 0.5), Position = UDim2.new(0, m(14), 0.5, 0), ZIndex = 4, Parent = head }, 14, "elite")
+		header.AutomaticSize = Enum.AutomaticSize.None
+		header.Size = UDim2.new(1, -m(120), 0, header.Size.Y.Offset)
+		local tag = Kit.new("Frame", { Name = "Tag", BackgroundColor3 = Color3.fromHex("#080C0A"), BackgroundTransparency = 0.2, BorderSizePixel = 0, AnchorPoint = Vector2.new(1, 0.5), Position = UDim2.new(1, -m(10), 0.5, 0), Size = mSz(70, 26), ZIndex = 4, Parent = head })
+		Kit.corner(8).Parent = tag
+		local dot = Kit.new("Frame", { BackgroundColor3 = C.ok, BorderSizePixel = 0, AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.new(0, m(13), 0.5, 0), Size = mSz(8, 8), ZIndex = 4, Parent = tag })
+		Kit.new("UICorner", { CornerRadius = UDim.new(0.5, 0), Parent = dot })
+		local tagText = mockText({ Text = "LIVE", FontFace = F.labelSemibold, TextColor3 = HudStyle.TEXT, AnchorPoint = Vector2.new(0, 0.5), Position = UDim2.new(0, m(23), 0.5, 0), ZIndex = 4, Parent = tag }, 14, "oswald")
+		local name = mockText({ Text = "", TextColor3 = HudStyle.TEXT, TextTruncate = Enum.TextTruncate.AtEnd, Position = mAt(14, 56), ZIndex = 4, Parent = card }, 28, "oswald")
+		name.AutomaticSize = Enum.AutomaticSize.None
+		name.Size = UDim2.new(1, -m(140), 0, name.Size.Y.Offset)
+		-- A long name ("SOUTH AMERICA") shrinks to fit rather than cut off.
+		Kit.new("UITextSizeConstraint", { MaxTextSize = name.TextSize, MinTextSize = 18, Parent = name })
+		name.TextScaled = true
+		local count = mockText({ Text = "", TextColor3 = HudStyle.MUTED, AnchorPoint = Vector2.new(0, 1), Position = UDim2.new(0, m(14), 1, -m(14)), ZIndex = 4, Parent = card }, 14, "sans")
+		-- The map, or the team's soldiers, at the bottom right.
+		local photo = Kit.new("Frame", { Name = "Photo", BackgroundColor3 = HudStyle.EDGE, BorderSizePixel = 0, ClipsDescendants = true, AnchorPoint = Vector2.new(1, 1), Position = UDim2.new(1, -m(14), 1, -m(14)), Size = mSz(108, 76), ZIndex = 4, Parent = card })
+		Kit.corner(10).Parent = photo
+		local photoTape = Kit.new("Frame", { Name = "NoTape", BackgroundTransparency = 1, Parent = card })
+		local team = Kit.new("ImageLabel", { Name = "Team", BackgroundTransparency = 1, Image = A.sil_team or "", ImageTransparency = 0.1, ScaleType = Enum.ScaleType.Fit, AnchorPoint = Vector2.new(1, 1), Position = UDim2.new(1, -m(14), 1, -m(14)), Size = mSz(108, 76), Visible = false, ZIndex = 4, Parent = card })
 		local r: any
-		local hit = self:_lift(card, shade, 0, -48, 0, function()
+		Dossier.clicky(card, 1.03)
+		card.Activated:Connect(function()
 			click()
 			self:_press(r.data)
 		end)
-		Dossier.clicky(hit, 1, card, false)
-		local header = typed({ Text = "", TextColor3 = C.inkBlack, TextSize = 20, TextTruncate = Enum.TextTruncate.AtEnd, AutomaticSize = Enum.AutomaticSize.None, AnchorPoint = Vector2.new(0, 0.5), Position = at(14, 22), Size = sz(cw - 92, 22), Parent = card })
-		Kit.new("Frame", { BackgroundColor3 = C.inkBlack, BackgroundTransparency = 0.25, BorderSizePixel = 0, Position = at(14, 36), Size = UDim2.fromOffset(math.round((cw - 28) * K), 2), Parent = card })
-		local name = stencil({ Text = "", TextSize = 42, TextTruncate = Enum.TextTruncate.AtEnd, AutomaticSize = Enum.AutomaticSize.None, Size = sz(cw - 102, 44), TextYAlignment = Enum.TextYAlignment.Top, Position = at(14, 44), Parent = card })
-		local count = typed({ Text = "", TextColor3 = C.inkBlack, TextSize = 20, AutomaticSize = Enum.AutomaticSize.None, Size = sz(cw - 102, 24), Position = at(14, 90), Parent = card })
-		local tag = Kit.new("Frame", { Name = "Tag", BackgroundColor3 = C.inkBlack, BorderSizePixel = 0, AnchorPoint = Vector2.new(1, 0), Position = at(cw - 8, 7), Size = sz(64, 24), Parent = card })
-		Kit.corner(3).Parent = tag
-		local dot = Kit.new("Frame", { BackgroundColor3 = C.red, BorderSizePixel = 0, AnchorPoint = Vector2.new(0.5, 0.5), Position = at(10, 12), Size = sz(9, 9), Parent = tag })
-		Kit.new("UICorner", { CornerRadius = UDim.new(0.5, 0), Parent = dot })
-		local tagText = stencil({ Text = "LIVE", TextSize = 30, TextColor3 = C.sheet, AnchorPoint = Vector2.new(0, 0.5), Position = at(19, 12), Parent = tag })
-		-- The map as a print with a white border, taped on at the top.
-		local photo = Kit.new("Frame", { Name = "Photo", BackgroundColor3 = C.sheet, BorderSizePixel = 0, AnchorPoint = Vector2.new(1, 0), Position = at(cw - 10, 42), Size = sz(82, 58), Rotation = 3, Parent = card })
-		Kit.stroke(C.sheetLine, 1, 0).Parent = photo
-		local photoTape = tape(card, "tape", cw - 70, 42, 46, 14, -4, 7, C.tape)
-		local team = icon("icon_team", "troops", { Name = "Team", AnchorPoint = Vector2.new(1, 0), Position = at(cw - 12, 44), Size = sz(78, 56), Visible = false, Parent = card })
-		overArt(card)
 		r = { frame = card, header = header, name = name, count = count, tag = tag, dot = dot, tagText = tagText, photo = photo, photoTape = photoTape, team = team, pic = nil :: Instance?, picFor = nil :: string?, data = nil :: any }
-		Kit.tip(hit, function(tip)
+		Kit.tip(card, function(tip)
 			Kit.text({ Text = if r.data then actionText(r.data, self.queued == r.data.id) else "", FontFace = F.uiBold, Parent = tip })
 		end)
 		self.reports[i] = r
 	end
 
-	-- The credits bar (LICENSING_PLAN 7(b) and 7(c); CC BY-SA attribution),
-	-- which opens the credits and source window (Bruno, 2026-11-08). Above
-	-- the folders' click areas (30+), which reach down over it.
-	local bar = Kit.new("TextButton", { Name = "Credits", Text = "", AutoButtonColor = false, BackgroundColor3 = BAR, BorderSizePixel = 0, Position = at(62, 540), Size = sz(926, 22), ZIndex = 45, Parent = stage })
+	-- The credits strip (LICENSING_PLAN 7(b) and 7(c); CC BY-SA attribution),
+	-- which opens the credits and source window (Bruno, 2026-11-08).
+	local bar = Kit.new("TextButton", { Name = "Credits", Text = "", AutoButtonColor = false, BackgroundColor3 = Color3.fromHex("#0A120E"), BorderSizePixel = 0, AnchorPoint = Vector2.new(0, 1), Position = UDim2.fromScale(0, 1), Size = UDim2.new(1, 0, 0, m(30)), ZIndex = 45, Parent = sheet })
+	Kit.corner(24).Parent = bar
+	Kit.new("Frame", { BackgroundColor3 = Color3.fromHex("#0A120E"), BorderSizePixel = 0, Size = UDim2.new(1, 0, 0.5, 0), ZIndex = 45, Parent = bar })
 	self:_creditsButton(bar)
 	Kit.label({
 		Text = CreditsText.BAR,
-		FontFace = F.ui,
-		TextSize = 19,
-		TextColor3 = C.sheet,
+		FontFace = F.bodySemibold,
+		TextSize = m(12 * FACE.sans),
+		TextColor3 = HudStyle.MUTED,
 		AnchorPoint = Vector2.new(0.5, 0.5),
 		Position = UDim2.fromScale(0.5, 0.5),
+		ZIndex = 46,
 		Parent = bar,
 	})
 
 	self:_buildOrders(stage)
-	self.tagSizes = { sz(64, 24), sz(78, 24) }
+	self.tagSizes = { mSz(70, 26), mSz(96, 26) }
 end
 
 -- The credits bar opens the credits window, with the menus' click.
@@ -616,7 +581,7 @@ end
 -- In front of Conquest General's card (Bruno, 2026-11-13): ZIndex 14 over its 13.
 function MainMenu._buildStarterTag(self: any)
 	local compact = self.compact
-	local tag = Kit.new("TextButton", { Name = "StarterTag", Text = "", AutoButtonColor = false, BackgroundColor3 = C.stamp, BorderSizePixel = 0, AnchorPoint = Vector2.new(0.5, 0), Position = if compact then UDim2.new(1, -140, 0, 80) else at(871, 108), Size = if compact then UDim2.fromOffset(250, 56) else sz(150, 30), Rotation = -2, Visible = false, ZIndex = 14, Parent = if compact then self.layer else self.stage })
+	local tag = Kit.new("TextButton", { Name = "StarterTag", Text = "", AutoButtonColor = false, BackgroundColor3 = C.stamp, BorderSizePixel = 0, AnchorPoint = Vector2.new(0.5, 0), Position = if compact then UDim2.new(1, -140, 0, 80) else UDim2.fromOffset(1690, 128), Size = if compact then UDim2.fromOffset(250, 56) else sz(150, 30), Rotation = -2, Visible = false, ZIndex = 14, Parent = if compact then self.layer else self.stage })
 	Kit.corner(6).Parent = tag
 	Kit.stroke(Color3.fromHex("#6E1A14"), 2, 0).Parent = tag
 	Kit.list(Enum.FillDirection.Horizontal, 8, Enum.HorizontalAlignment.Center, Enum.VerticalAlignment.Center).Parent = tag
@@ -640,33 +605,65 @@ function MainMenu._buildStarterTag(self: any)
 	self.starterTag = tag
 	self.starterStroke = tag:FindFirstChildOfClass("UIStroke")
 
-	-- Conquest General's card (Bruno, 2026-11-09: on the menu, as RoWorld
-	-- does), under the starter tag, or in its place when there's none.
+	-- The General and Campaign cards (Bruno, 2026-11-23: option A, "Framed
+	-- photos", where SOLO DEPLOYMENT was). Desktop: two wide cards stacked
+	-- above PLAY; a phone: two tiles side by side.
+	local host = self.stage
+	local function sizeAndPlace(i: number): (Vector2, UDim2)
+		if compact then
+			local W = self.root.width
+			-- (Bruno, 2026-11-23: smaller, further apart.)
+			return Vector2.new(108, 88), UDim2.fromOffset(W - 140 + (if i == 1 then -62 else 62), 190)
+		end
+		-- Style B: the mock-up's 330x116 cards at x 930, y 148 and 278 on
+		-- the sheet (SHEET, 1 / 0.736 canvas units a pixel).
+		local k = 1 / 0.736
+		return Vector2.new(math.round(330 * k), math.round(116 * k)), UDim2.fromOffset(SHEET.x + math.round((930 + 165) * k), SHEET.y + math.round((if i == 1 then 148 + 58 else 278 + 58) * k))
+	end
 	if Catalog.SUBSCRIPTION.id ~= "" then
-		-- (Desktop: on the stage, centred under the TOP-SECRET note.)
-		local size = if compact then Vector2.new(250, 64) else Vector2.new(math.round(150 * K), math.round(40 * K))
-		-- Anchored at its centre from the start: Dossier.clicky re-anchors a
-		-- hovered button there and shifts it, so a top anchor here made the
-		-- card jump up by half its height whenever the profile view set its
-		-- position again (after a crate; Bruno, 2026-11-09).
-		local card, setOn = GeneralOffer.card(if compact then self.layer else self.stage, size, { AnchorPoint = Vector2.new(0.5, 0.5), Rotation = 1.5, ZIndex = 13 })
-		card.Activated:Connect(function()
-			click()
-			if self.actions.openGeneral then
-				self.actions.openGeneral()
-			end
-		end)
-		self.generalCard, self.setGeneralOn = card, setOn
-		self.generalAt = {
-			-- (Desktop: midway between the note's bottom edge, y 104, and the
-			-- SOLO DEPLOYMENT stamp's red border, equal space above and below;
-			-- Bruno, 2026-11-09, after 140 was too low and 108 too high.)
-			-- (Centres: the card's top edge at 122 / 142, desktop 40 tall; phone
-			-- top at 80 / 146, 64 tall.)
-			high = if compact then UDim2.new(1, -140, 0, 80 + 32) else at(871, 122 + 20),
-			low = if compact then UDim2.new(1, -140, 0, 146 + 32) else at(871, 142 + 20),
-		}
-		card.Position = self.generalAt.high
+		local size, pos = sizeAndPlace(1)
+		self.generalCard = MenuCards.card(host, {
+			name = "GeneralCard",
+			title = "GENERAL",
+			colors = { Color3.fromHex("#5B4A12"), Color3.fromHex("#B8860B"), Color3.fromHex("#FFD75E") },
+			kickInk = Color3.fromHex("#3B2B00"),
+			kickFill = Color3.fromHex("#FFE08A"),
+			wash = HudStyle.WASH.gold,
+			photo = "banner_general",
+			picture = function(holder)
+				if (A.arsenal_general or "") ~= "" then
+					Kit.new("ImageLabel", { BackgroundTransparency = 1, Image = A.arsenal_general, ScaleType = Enum.ScaleType.Crop, Size = UDim2.fromScale(1, 1), Parent = holder })
+				end
+			end,
+			onPress = function()
+				if self.actions.openGeneral then
+					self.actions.openGeneral()
+				end
+			end,
+		}, size, not compact, { Position = pos, Rotation = 0, ZIndex = 13 })
+		self.generalCard.setKicker("MONTHLY")
+		self.generalCard.setLine("A crate a day, +50% stars")
+	end
+	do
+		local size, pos = sizeAndPlace(2)
+		self.passCard = MenuCards.card(host, {
+			name = "PassCard",
+			title = "CAMPAIGN",
+			colors = { Color3.fromHex("#1B1F5E"), Color3.fromHex("#4A2FB0"), Color3.fromHex("#8E6CFF") },
+			kickInk = Color3.fromHex("#1B1F5E"),
+			kickFill = Color3.fromHex("#BFB0FF"),
+			wash = HudStyle.WASH.ember,
+			photo = "arsenal_mega",
+			picture = function(holder)
+				Art.flag("o_campaign1_c", { AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromScale(0.5, 0.5), Size = UDim2.fromScale(0.95, 0.9), Parent = holder })
+			end,
+			onPress = function()
+				if self.actions.openPass then
+					self.actions.openPass()
+				end
+			end,
+		}, size, not compact, { Position = pos, Rotation = 0, ZIndex = 13 })
+		self.passCard.root.Visible = false
 	end
 end
 
@@ -680,15 +677,25 @@ function MainMenu._dealRibbon(self: any, card: Instance, pos: UDim2, size: UDim2
 end
 
 -- A red ribbon across a requisition folder (hidden until shown).
+-- Above the card's photo and wash (they sit at the card's own ZIndex; at the
+-- default 1 the ribbon hid under them, showing only past the card's edge:
+-- Bruno, 2026-11-24), and shaped like the Flag Shop's ribbon: the card's
+-- rounded bottom, square on top.
 function MainMenu._redRibbon(name: string, text: string, card: Instance, pos: UDim2, size: UDim2, textSize: number): Frame
-	local ribbon = Kit.new("Frame", { Name = name, BackgroundColor3 = C.stamp, BorderSizePixel = 0, Position = pos, Size = size, Visible = false, Parent = card })
-	Kit.stroke(Color3.fromHex("#6E1A14"), 2, 0).Parent = ribbon
-	stencil({ Text = text, TextSize = textSize, TextColor3 = C.sheet, AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromScale(0.5, 0.5), Parent = ribbon })
+	local z = if card:IsA("GuiObject") then card.ZIndex + 2 else 5
+	local red = Color3.fromHex("#D8342B")
+	local ribbon = Kit.new("Frame", { Name = name, BackgroundColor3 = red, BorderSizePixel = 0, Position = pos, Size = size, Visible = false, ZIndex = z, Parent = card }) :: Frame
+	local round = card:FindFirstChildOfClass("UICorner")
+	if round then
+		Kit.new("UICorner", { CornerRadius = round.CornerRadius, Parent = ribbon })
+		Kit.new("Frame", { Name = "Square", BackgroundColor3 = red, BorderSizePixel = 0, Size = UDim2.new(1, 0, 0.5, 0), ZIndex = z, Parent = ribbon })
+	end
+	stencil({ Text = text, TextSize = textSize, TextColor3 = Color3.new(1, 1, 1), AnchorPoint = Vector2.new(0, 0.5), Position = UDim2.new(0, math.round(size.Y.Offset / 2), 0.5, 0), ZIndex = z + 1, Parent = ribbon })
 	return ribbon
 end
 
--- The free crate (Bruno, 2026-11-16): a red FREE CRATE ribbon on SUPPLY
--- CRATES while it waits; the two-line name moves up to `namePos` for it.
+-- The free crate (Bruno, 2026-11-16): a red FREE CRATE ribbon on the
+-- LOCKER folder (SUPPLY CRATES until 2026-11-23) while it waits; the two-line name moves up to `namePos` for it.
 function MainMenu._crateRibbon(self: any, card: Instance, pos: UDim2, size: UDim2, textSize: number, namePos: UDim2)
 	self.crateRibbon = MainMenu._redRibbon("FreeCrateRibbon", "FREE CRATE", card, pos, size, textSize)
 	local name = card:FindFirstChild("Name") :: TextLabel?
@@ -760,39 +767,34 @@ function MainMenu._buildCompact(self: any)
 	local aspect = UiAssets.BACKDROP_SIZE.X / UiAssets.BACKDROP_SIZE.Y
 	local stage = Kit.new("Frame", { Name = "Stage", BackgroundTransparency = 1, Size = UDim2.fromScale(1, 1), Parent = self.layer })
 	self.stage = stage
+	local WASH = HudStyle.WASH
 
-	-- The board everything is pinned to, under the title strip.
-	local board = surface("ImageLabel", "tex_board", C.board, { Name = "Board", Position = at(6, 78), Size = sz(W - 12, 428), ZIndex = 1, Parent = stage })
-	if A.board ~= "" then
-		board.Image, board.ScaleType = A.board, Enum.ScaleType.Stretch
-	end
-	Kit.corner(4).Parent = board
-	Kit.stroke(C.boardDark, 2, 0).Parent = board
+	-- Style B (2026-11-24): one dark sheet, as on desktop.
+	local sheet = Kit.new("Frame", { Name = "Sheet", BackgroundColor3 = HudStyle.BG, BorderSizePixel = 0, Position = UDim2.fromOffset(4, 4), Size = UDim2.fromOffset(W - 8, 532), ZIndex = 1, Parent = stage })
+	Kit.corner(18).Parent = sheet
+	Kit.stroke(HudStyle.EDGE, 4, 0).Parent = sheet
 
-	-- Top right: the note with stars, the crate price, settings and sound.
-	local note = surface("ImageLabel", "tex_paper", C.sheet, { Name = "Secret", AnchorPoint = Vector2.new(1, 0), Position = at(W - 8, 6), Size = sz(0, 66), AutomaticSize = Enum.AutomaticSize.X, Rotation = 0.8, ZIndex = 12, Parent = stage })
-	Kit.stroke(C.sheetLine, 1, 0.2).Parent = note
-	Kit.padding(0, 12).Parent = note
-	Kit.list(Enum.FillDirection.Horizontal, 10, Enum.HorizontalAlignment.Left, Enum.VerticalAlignment.Center).Parent = note
-	icon("icon_star", "star", { Size = sz(24, 24), LayoutOrder = 1, Parent = note })
-	self.starsText = stencil({ Name = "Stars", Text = "…", TextSize = 40, LayoutOrder = 2, Parent = note })
-	local badge = Kit.new("TextButton", { Name = "CratePrice", Text = "", AutoButtonColor = false, BackgroundColor3 = BADGE, BorderSizePixel = 0, Size = sz(0, 48), AutomaticSize = Enum.AutomaticSize.X, Visible = false, LayoutOrder = 3, Parent = note })
-	Kit.corner(5).Parent = badge
-	Kit.stroke(Color3.fromRGB(31, 90, 43), 2, 0).Parent = badge
-	Kit.padding(0, 10).Parent = badge
-	Kit.list(Enum.FillDirection.Horizontal, 6, Enum.HorizontalAlignment.Center, Enum.VerticalAlignment.Center).Parent = badge
-	Kit.new("ImageLabel", { BackgroundTransparency = 1, Image = UiAssets.robux, Size = UDim2.fromOffset(26, 26), LayoutOrder = 1, Parent = badge })
-	self.crateText = stencil({ Text = "", TextSize = 38, TextColor3 = C.sheet, LayoutOrder = 2, Parent = badge })
-	self.crateBadge = badge
-	Dossier.clicky(badge, 1.1)
-	badge.Activated:Connect(function()
-		click()
-		actions.openLocker()
-	end)
-	local function noteIcon(name: string, glyph: string, order: number, onClick: () -> ())
-		local b = surface("ImageButton", "tex_manila", C.manilaDark, { Name = glyph, Size = sz(58, 58), ImageColor3 = Color3.fromRGB(214, 200, 172), LayoutOrder = order, Parent = note })
-		Kit.corner(6).Parent = b
-		icon(name, glyph, { AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromScale(0.5, 0.5), Size = sz(36, 36), Parent = b })
+	-- Top: the title banner (right of Roblox's buttons), with stars,
+	-- settings and sound at its right end.
+	local banner = Kit.new("Frame", { Name = "TitleBanner", BackgroundColor3 = HudStyle.BG, BorderSizePixel = 0, Size = UDim2.new(1, 0, 0, 80), ZIndex = 2, Parent = sheet })
+	Kit.corner(18).Parent = banner
+	washedPhoto(banner, "banner_starter", WASH.gold, 18, 0.05)
+	footFade(banner, 24)
+	stencil({ Name = "Title", Text = "CONQUER COUNTRIES", TextSize = 46, TextColor3 = HudStyle.TEXT, AnchorPoint = Vector2.new(0, 0.5), Position = UDim2.new(0, math.max(16, root.topLeft + 4), 0.5, -2), ZIndex = 3, Parent = banner })
+	local corner = Kit.new("Frame", { Name = "Corner", BackgroundTransparency = 1, AnchorPoint = Vector2.new(1, 0.5), Position = UDim2.new(1, -12, 0.5, -2), Size = UDim2.fromOffset(0, 54), AutomaticSize = Enum.AutomaticSize.X, ZIndex = 3, Parent = banner })
+	Kit.list(Enum.FillDirection.Horizontal, 10, Enum.HorizontalAlignment.Right, Enum.VerticalAlignment.Center).Parent = corner
+	local stars = Kit.new("Frame", { Name = "Stars", BackgroundColor3 = Color3.fromHex("#140804"), BackgroundTransparency = 0.25, BorderSizePixel = 0, Size = UDim2.fromOffset(0, 54), AutomaticSize = Enum.AutomaticSize.X, LayoutOrder = 1, ZIndex = 3, Parent = corner })
+	Kit.corner(13).Parent = stars
+	Kit.stroke(HudStyle.GOLD, 1.5, 0.55).Parent = stars
+	Kit.padding(0, 14).Parent = stars
+	Kit.list(Enum.FillDirection.Horizontal, 8, Enum.HorizontalAlignment.Center, Enum.VerticalAlignment.Center).Parent = stars
+	Kit.glyph("star", { ImageColor3 = HudStyle.GOLD, Size = UDim2.fromOffset(24, 24), LayoutOrder = 1, ZIndex = 3, Parent = stars })
+	self.starsText = stencil({ Name = "Stars", Text = "…", TextSize = 34, TextColor3 = HudStyle.TEXT, LayoutOrder = 2, ZIndex = 3, Parent = stars })
+	local function cornerIcon(glyph: string, tint: string, order: number, onClick: () -> ()): TextButton
+		local b = HudStyle.iconButton(glyph, Color3.fromHex(tint), { Size = UDim2.fromOffset(54, 54), LayoutOrder = order, ZIndex = 3, Parent = corner })
+		local glyphIcon = b:FindFirstChild("Icon") :: ImageLabel
+		glyphIcon.Size = UDim2.fromOffset(30, 30)
+		glyphIcon.ZIndex = 3
 		Dossier.clicky(b, 1.1)
 		b.Activated:Connect(function()
 			click()
@@ -800,160 +802,132 @@ function MainMenu._buildCompact(self: any)
 		end)
 		return b
 	end
-	noteIcon("icon_settings", "settings", 4, actions.openSettings)
-	self.soundSlash = Kit.slash(noteIcon("icon_sound", "music", 5, actions.toggleMusic))
+	cornerIcon("settings", "#264B78", 2, actions.openSettings)
+	self.soundSlash = Kit.slash(cornerIcon("music", "#22343F", 3, actions.toggleMusic))
 	self:setMusicOn(self.musicOn)
+	local badge = Kit.new("TextButton", { Name = "CratePrice", Text = "", Visible = false, Parent = stage })
+	self.crateText = stencil({ Text = "", Parent = badge })
+	self.crateBadge = badge
 
-	-- Top: the title strip, from right of Roblox's buttons to the note.
-	local left = root.topLeft
-	local band = surface("ImageLabel", "tex_paper", C.sheet, { Name = "TitleBand", Position = at(left, 8), Size = sz(math.max(200, W - 8 - 340 - left), 62), ZIndex = 3, Parent = stage })
-	if A.title_band ~= "" then
-		band.Image, band.ScaleType = A.title_band, Enum.ScaleType.Stretch
-	end
-	if art("logo", { Name = "Title", AnchorPoint = Vector2.new(0, 0.5), Position = UDim2.new(0, 14, 0.5, 0), Size = UDim2.new(1, -28, 0, 46), Parent = band }) == nil then
-		stencil({ Name = "Title", Text = "CONQUER COUNTRIES", TextSize = 50, AnchorPoint = Vector2.new(0, 0.5), Position = UDim2.new(0, 14, 0.5, 0), Parent = band })
-	end
-
-	-- Left: the four requisition folders, each overlapping the one above.
-	local function requisition(name: string, text: string, y: number, z: number, iconName: string, glyph: string, onClick: () -> ()): ImageButton
-		local h = 100
-		local card, shade = folderCard(stage, name, 12, y, 266, h, 130, z, "folder_card", { 150, 24, 52 })
-		-- Pulled out to the right, tipped down, as on desktop.
-		local hit = self:_lift(card, shade, 26, 0, 3, function()
+	-- Left: the four requisition cards.
+	local function requisition(name: string, title: string, kicker: string, y: number, photo: string, wash: Color3, sil: string, onClick: () -> ()): TextButton
+		local card = Kit.new("TextButton", { Name = name, Text = "", AutoButtonColor = false, BackgroundColor3 = HudStyle.BG, BorderSizePixel = 0, AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromOffset(12 + 133, y + 48), Size = UDim2.fromOffset(266, 96), ZIndex = 3, Parent = stage }) :: TextButton
+		Kit.corner(14).Parent = card
+		Kit.stroke(HudStyle.EDGE, 3, 0).Parent = card
+		washedPhoto(card, photo, wash, 14)
+		Kit.label({ Name = "Kicker", Text = spaced(kicker), FontFace = F.labelSemibold, TextSize = 17, TextColor3 = wash:Lerp(Color3.new(1, 1, 1), 0.6), Position = UDim2.fromOffset(14, 8), ZIndex = 5, Parent = card })
+		stencil({ Name = "Name", Text = title, TextSize = 46, LineHeight = 0.9, TextColor3 = HudStyle.TEXT, Position = UDim2.fromOffset(13, 26), ZIndex = 5, Parent = card })
+		Kit.new("ImageLabel", { Name = "Icon", BackgroundTransparency = 1, Image = A[sil] or "", ImageTransparency = 0.1, ScaleType = Enum.ScaleType.Fit, AnchorPoint = Vector2.new(1, 0.5), Position = UDim2.new(1, -10, 0.5, 0), Size = UDim2.fromOffset(84, 70), ZIndex = 4, Parent = card })
+		Dossier.clicky(card, 1.03)
+		card.Activated:Connect(function()
 			click()
 			onClick()
 		end)
-		Dossier.clicky(hit, 1, card, false)
-		stencil({ Name = "Name", Text = text, TextSize = 38, LineHeight = 0.86, AnchorPoint = Vector2.new(0, 0.5), Position = UDim2.fromOffset(14, 50), Parent = card })
-		icon(iconName, glyph, { Name = "Icon", AnchorPoint = Vector2.new(1, 0.5), Position = UDim2.fromOffset(256, 50), Size = sz(78, 70), Parent = card })
 		return card
 	end
-	local party = requisition("Party", "PARTY", 84, 5, "icon_party", "party", actions.openParty)
-	self.partyText = typed({ Name = "Squad", Text = "", TextSize = 17, TextColor3 = C.inkBlack, Position = at(14, 72), Visible = false, Parent = party })
-	local armory = requisition("Armory", "ARSENAL", 190, 6, "icon_armory", "silo", actions.openArsenal)
-	self:_dealRibbon(armory, at(4, 70), sz(150, 26), 30)
-	local crates = requisition("Crates", "SUPPLY\nCRATES", 296, 7, "icon_crates", "chest", actions.openLocker)
-	self:_crateRibbon(crates, at(4, 68), sz(160, 26), 30, UDim2.fromOffset(14, 36))
-	local shop = requisition("FlagShop", "FLAG SHOP", 402, 8, "icon_flag", "flag", actions.openFlagShop)
-	-- The flag shop's name moves up for its event ribbon.
-	local shopName = shop:FindFirstChild("Name") :: TextLabel
-	shopName.Position = UDim2.fromOffset(14, 34)
-	local ribbon = Kit.new("Frame", { Name = "Ribbon", BackgroundColor3 = RIBBON, BorderSizePixel = 0, Position = at(4, 66), Size = sz(258, 28), Parent = shop })
-	Kit.stroke(Color3.fromRGB(120, 52, 14), 2, 0).Parent = ribbon
-	self.flagEvent = stencil({ Text = "TODAY'S FLAGS", TextSize = 32, TextColor3 = C.sheet, AnchorPoint = Vector2.new(0, 0.5), Position = UDim2.new(0, 10, 0.5, 0), Parent = ribbon })
-	self.flagTimer = typed({ Text = "", TextSize = 16, TextColor3 = C.sheet, AnchorPoint = Vector2.new(1, 0.5), Position = UDim2.new(1, -8, 0.5, 0), Parent = ribbon })
-	art("paperclip", { Name = "Clip", Position = at(-6, 14), Size = sz(12, 38), Parent = party })
-	for _, card in { party, armory, crates, shop } do
-		overArt(card)
-	end
-
-	-- Right: solo deployment, the stamp over the PLAY plate.
-	local rx = W - 140
-	local stampProps = { Name = "SoloStamp", AnchorPoint = Vector2.new(0.5, 0.5), Position = at(rx, 152), Size = sz(236, 138), Rotation = -5, ZIndex = 7 }
-	local soloStamp
-	if A.stamp_solo ~= "" then
-		soloStamp = Kit.new("ImageButton", merge({ AutoButtonColor = false, BackgroundTransparency = 1, Image = A.stamp_solo, ScaleType = Enum.ScaleType.Fit }, merge(stampProps, { Parent = stage })))
-	else
-		soloStamp = Kit.new("TextButton", merge({ Text = "", AutoButtonColor = false, BackgroundTransparency = 1 }, merge(stampProps, { Parent = stage })))
-		Kit.stroke(C.stamp, 5, 0.05).Parent = soloStamp
-		stencil({ Text = "SOLO", TextSize = 90, TextColor3 = C.stamp, AnchorPoint = Vector2.new(0.5, 0), Position = UDim2.fromScale(0.5, 0), Parent = soloStamp })
-	end
-	Dossier.clicky(soloStamp, 0.94)
-	local function openSolo()
-		self:showSolo(true)
-	end
-	soloStamp.Activated:Connect(function()
-		click()
-		openSolo()
+	local party = requisition("Party", "PARTY", "PLAY WITH FRIENDS", 86, "banner_party", WASH.pink, "sil_party", actions.openParty)
+	self.partyText = typed({ Name = "Squad", Text = "", TextSize = 16, TextColor3 = Color3.fromHex("#F4D3E0"), Position = UDim2.fromOffset(14, 68), Visible = false, ZIndex = 4, Parent = party })
+	local armory = requisition("Armory", "SHOP", "WEAPONS & BOOSTS", 192, "banner_arsenal", WASH.gold, "sil_shop", function()
+		if actions.openShop then
+			actions.openShop(nil)
+		else
+			actions.openArsenal()
+		end
 	end)
-	local play = plate(stage, "PLAY", { Name = "Play", AnchorPoint = Vector2.new(0.5, 0.5), Position = at(rx, 288), Size = sz(244, 92), ZIndex = 8, Parent = stage }, 80)
-	play.Activated:Connect(openSolo)
-	Dossier.clicky(play, 1.06)
-	tape(play, "red_tape", 14, 50, 80, 20, 56, 0, C.stamp)
-	tape(play, "red_tape", 232, 18, 80, 20, 48, 0, C.stamp)
+	self:_dealRibbon(armory, UDim2.new(0, 0, 1, -24), UDim2.new(1, 0, 0, 24), 18)
+	local crates = requisition("Crates", "LOCKER", "CRATES & FLAGS", 298, "banner_locker", WASH.purple, "sil_locker", actions.openLocker)
+	local lockerName = crates:FindFirstChild("Name") :: TextLabel
+	self:_crateRibbon(crates, UDim2.new(0, 0, 1, -24), UDim2.new(1, 0, 0, 24), 18, lockerName.Position)
+	local shop = requisition("FlagShop", "FLAG SHOP", "NEW THIS WEEK", 404, "banner_flags", WASH.orange, "sil_flag", actions.openFlagShop)
+	local ribbon = Kit.new("Frame", { Name = "Ribbon", BackgroundColor3 = WASH.orange, BorderSizePixel = 0, AnchorPoint = Vector2.new(0, 1), Position = UDim2.fromScale(0, 1), Size = UDim2.new(1, 0, 0, 26), ZIndex = 5, Parent = shop })
+	Kit.corner(14).Parent = ribbon
+	Kit.new("Frame", { BackgroundColor3 = WASH.orange, BorderSizePixel = 0, Size = UDim2.new(1, 0, 0.5, 0), ZIndex = 5, Parent = ribbon })
+	self.flagEvent = stencil({ Text = "TODAY'S FLAGS", TextSize = 18, TextColor3 = HudStyle.TEXT, AnchorPoint = Vector2.new(0, 0.5), Position = UDim2.new(0, 12, 0.5, 0), ZIndex = 6, Parent = ribbon })
+	self.flagTimer = Kit.label({ Text = "", FontFace = F.bodyBold, TextSize = 15, TextColor3 = Color3.fromHex("#FFE3CC"), AnchorPoint = Vector2.new(1, 0.5), Position = UDim2.new(1, -10, 0.5, 0), ZIndex = 6, Parent = ribbon })
 
-	-- Centre: the war map, and the World queue's frontline note on it.
+	-- Right: PLAY (General and Campaign sit above it, MenuCards).
+	local rx = W - 140
+	local play = HudStyle.goldPlate({ Name = "Play", AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromOffset(rx, 294), Size = UDim2.fromOffset(244, 96), ZIndex = 8, Parent = stage }, 18)
+	goldLip(play, 5, 18)
+	playWords(play, 16, 62)
+	play.Activated:Connect(function()
+		self:showSolo(true)
+	end)
+	Dossier.clicky(play, 1.05)
+
+	-- Centre: the map, and the World queue's frontline card on it.
 	local cx0, cx1 = 290, W - 278
-	local mapProps = { Name = "WarMap", Position = at(cx0, 88), Size = sz(cx1 - cx0, 254), ZIndex = 5 }
-	shadow(stage, mapProps, 4)
-	local map = Kit.new("Frame", merge({ BackgroundColor3 = METAL, BorderSizePixel = 0 }, merge(mapProps, { Parent = stage })))
-	Kit.corner(3).Parent = map
-	Kit.stroke(Color3.fromRGB(24, 26, 26), 2, 0).Parent = map
-	local view = Kit.new("Frame", { Name = "View", BackgroundColor3 = Color3.fromRGB(38, 92, 140), BorderSizePixel = 0, ClipsDescendants = true, Position = UDim2.fromOffset(6, 6), Size = UDim2.new(1, -12, 1, -12), Parent = map })
-	local world = Kit.new("Frame", { BackgroundTransparency = 1, AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromScale(0.5, 0.5), Size = UDim2.fromOffset(math.ceil(242 * aspect), 242), Parent = view })
+	local map = Kit.new("Frame", { Name = "WarMap", BackgroundColor3 = HudStyle.EDGE, BorderSizePixel = 0, ClipsDescendants = true, Position = UDim2.fromOffset(cx0, 88), Size = UDim2.fromOffset(cx1 - cx0, 254), ZIndex = 3, Parent = stage })
+	Kit.corner(14).Parent = map
+	Kit.stroke(HudStyle.EDGE, 3, 0).Parent = map
+	local world = Kit.new("Frame", { BackgroundTransparency = 1, AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromScale(0.5, 0.5), Size = UDim2.fromOffset(math.ceil(254 * aspect), 254), ZIndex = 3, Parent = map })
 	for i, image in UiAssets.backdrop do
-		Kit.new("ImageLabel", { BackgroundTransparency = 1, Image = image, Position = UDim2.fromScale((i - 1) * 0.5, 0), Size = UDim2.fromScale(0.5, 1), ScaleType = Enum.ScaleType.Stretch, Parent = world })
+		Kit.new("ImageLabel", { BackgroundTransparency = 1, Image = image, Position = UDim2.fromScale((i - 1) * 0.5, 0), Size = UDim2.fromScale(0.5, 1), ScaleType = Enum.ScaleType.Stretch, ZIndex = 3, Parent = world })
 	end
-	Kit.new("Frame", { Name = "Slate", BackgroundColor3 = Color3.fromRGB(34, 44, 44), BackgroundTransparency = 0.5, BorderSizePixel = 0, Size = UDim2.fromScale(1, 1), Parent = view })
-	for gx = 1, 5 do
-		Kit.new("Frame", { BackgroundColor3 = Color3.new(1, 1, 1), BackgroundTransparency = 0.88, BorderSizePixel = 0, Position = UDim2.new(gx / 6, 0, 0, 0), Size = UDim2.new(0, 1, 1, 0), Parent = view })
-	end
-	for gy = 1, 3 do
-		Kit.new("Frame", { BackgroundColor3 = Color3.new(1, 1, 1), BackgroundTransparency = 0.88, BorderSizePixel = 0, Position = UDim2.new(0, 0, gy / 4, 0), Size = UDim2.new(1, 0, 0, 1), Parent = view })
-	end
-	pin(stage, cx0 + 14, 98, 6)
+	Kit.new("Frame", { Name = "Slate", BackgroundColor3 = Color3.fromRGB(20, 30, 28), BackgroundTransparency = 0.6, BorderSizePixel = 0, Size = UDim2.fromScale(1, 1), ZIndex = 3, Parent = map })
 
-	local frontProps = { Name = "Frontline", AnchorPoint = Vector2.new(1, 0), Position = at(cx1 - 8, 96), Size = sz(206, 236), Rotation = 2, ZIndex = 10 }
-	shadow(stage, frontProps, 9)
-	local front = surface("ImageLabel", "tex_paper", C.sheet, merge(frontProps, { Parent = stage }))
-	Kit.stroke(C.sheetLine, 1, 0.2).Parent = front
-	pin(front, 103, 12, 0)
-	stencil({ Text = "DEPLOY TO\nFRONTLINE", TextSize = 38, LineHeight = 0.88, TextXAlignment = Enum.TextXAlignment.Center, AnchorPoint = Vector2.new(0.5, 0), Position = UDim2.new(0.5, 0, 0, 28), Parent = front })
-	local frontBtn = Kit.new("TextButton", { Name = "Join", Text = "", AutoButtonColor = false, BackgroundColor3 = GOLD_BUTTON, BorderSizePixel = 0, AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.new(0.5, 0, 0, 148), Size = sz(172, 66), Parent = front })
-	Kit.corner(4).Parent = frontBtn
-	Kit.stroke(C.inkBlack, 3, 0).Parent = frontBtn
-	Kit.new("UIGradient", { Rotation = 90, Color = ColorSequence.new({ ColorSequenceKeypoint.new(0, Color3.new(1, 1, 1)), ColorSequenceKeypoint.new(0.55, Color3.new(1, 1, 1)), ColorSequenceKeypoint.new(1, Color3.fromRGB(205, 190, 160)) }), Parent = frontBtn })
-	local frontLabel = stencil({ Text = "JOIN", TextSize = 48, AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromScale(0.5, 0.5), Parent = frontBtn })
-	Dossier.clicky(frontBtn, 1.06)
-	local frontCount = stencil({ Text = "", TextSize = 22, TextWrapped = true, AutomaticSize = Enum.AutomaticSize.None, TextXAlignment = Enum.TextXAlignment.Center, AnchorPoint = Vector2.new(0.5, 0), Position = UDim2.new(0.5, 0, 0, 188), Size = sz(194, 40), Parent = front })
+	local front = HudStyle.panel("Frame", { Name = "Frontline", AnchorPoint = Vector2.new(1, 0), Position = UDim2.fromOffset(cx1 - 8, 96), Size = UDim2.fromOffset(206, 196), ZIndex = 10, Parent = stage }, 14)
+	local frontHead = Kit.new("Frame", { Name = "Head", BackgroundColor3 = HudStyle.BG, BorderSizePixel = 0, Size = UDim2.new(1, 0, 0, 84), ZIndex = 10, Parent = front })
+	Kit.corner(14).Parent = frontHead
+	washedPhoto(frontHead, "banner_orders", WASH.green, 14)
+	footFade(frontHead, 26)
+	stencil({ Text = "DEPLOY TO\nFRONTLINE", TextSize = 32, LineHeight = 0.9, TextColor3 = HudStyle.TEXT, Position = UDim2.fromOffset(12, 10), ZIndex = 11, Parent = frontHead })
+	local frontBtn = HudStyle.goldPlate({ Name = "Join", AnchorPoint = Vector2.new(0.5, 0), Position = UDim2.new(0.5, 0, 0, 88), Size = UDim2.new(1, -24, 0, 58), ZIndex = 12, Parent = front }, 14)
+	goldLip(frontBtn, 4, 14)
+	local frontLabel = stencil({ Text = "JOIN", TextSize = 40, TextColor3 = HudStyle.BROWN, AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromScale(0.5, 0.5), ZIndex = 12, Parent = frontBtn })
+	Dossier.clicky(frontBtn, 1.05)
+	local frontCount = stencil({ Text = "", TextSize = 16, TextColor3 = HudStyle.SOFT, TextWrapped = true, AutomaticSize = Enum.AutomaticSize.None, TextXAlignment = Enum.TextXAlignment.Center, AnchorPoint = Vector2.new(0.5, 1), Position = UDim2.new(0.5, 0, 1, -6), Size = UDim2.new(1, -16, 0, 36), ZIndex = 11, Parent = front })
 	self.front = { frame = front, btn = frontBtn, label = frontLabel, count = frontCount, data = nil :: any }
 	frontBtn.Activated:Connect(function()
-		click()
 		self:_press(self.front.data)
 	end)
 
-	-- Bottom: the other public queues, as field reports (three since Blitz).
+	-- Bottom: the other public queues, under teal headers.
 	self.reports = {}
 	local rw = (W - 10 - cx0 - 24) / 3
 	for i = 1, 3 do
 		local x = cx0 + (i - 1) * (rw + 12)
-		local card, shade = folderCard(stage, `Report{i}`, x, 362, rw, 140, 110, 5, "folder_report", { rw - 66, 80, 50 })
+		local card = Kit.new("TextButton", { Name = `Report{i}`, Text = "", AutoButtonColor = false, BackgroundColor3 = HudStyle.BG, BorderSizePixel = 0, AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromOffset(x + rw / 2, 360 + 70), Size = UDim2.fromOffset(rw, 140), ZIndex = 5, Parent = stage }) :: TextButton
+		Kit.corner(14).Parent = card
+		Kit.stroke(HudStyle.EDGE, 3, 0).Parent = card
+		local head = HudStyle.header(card, 40, WASH.teal, 14)
+		local header = typed({ Text = "", TextColor3 = Color3.fromHex("#CFF3F3"), TextSize = 17, TextTruncate = Enum.TextTruncate.AtEnd, AutomaticSize = Enum.AutomaticSize.None, AnchorPoint = Vector2.new(0, 0.5), Position = UDim2.new(0, 12, 0.5, 0), Size = UDim2.new(1, -112, 0, 22), ZIndex = 6, Parent = head })
+		local tag = Kit.new("Frame", { Name = "Tag", BackgroundColor3 = Color3.fromHex("#080C0A"), BackgroundTransparency = 0.2, BorderSizePixel = 0, AnchorPoint = Vector2.new(1, 0.5), Position = UDim2.new(1, -8, 0.5, 0), Size = UDim2.fromOffset(84, 30), ZIndex = 6, Parent = head })
+		Kit.corner(8).Parent = tag
+		local dot = Kit.new("Frame", { BackgroundColor3 = C.ok, BorderSizePixel = 0, AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.new(0, 14, 0.5, 0), Size = UDim2.fromOffset(10, 10), ZIndex = 6, Parent = tag })
+		Kit.new("UICorner", { CornerRadius = UDim.new(0.5, 0), Parent = dot })
+		local tagText = stencil({ Text = "LIVE", TextSize = 20, TextColor3 = HudStyle.TEXT, AnchorPoint = Vector2.new(0, 0.5), Position = UDim2.new(0, 25, 0.5, 0), ZIndex = 6, Parent = tag })
+		local name = stencil({ Text = "", TextSize = 32, TextColor3 = HudStyle.TEXT, TextTruncate = Enum.TextTruncate.AtEnd, AutomaticSize = Enum.AutomaticSize.None, Size = UDim2.fromOffset(rw - 112, 36), Position = UDim2.fromOffset(12, 48), ZIndex = 6, Parent = card })
+		local count = Kit.label({ Text = "", FontFace = F.bodySemibold, TextColor3 = HudStyle.MUTED, TextSize = 17, AnchorPoint = Vector2.new(0, 1), Position = UDim2.new(0, 12, 1, -10), ZIndex = 6, Parent = card })
+		local photo = Kit.new("Frame", { Name = "Photo", BackgroundColor3 = HudStyle.EDGE, BorderSizePixel = 0, ClipsDescendants = true, AnchorPoint = Vector2.new(1, 1), Position = UDim2.new(1, -10, 1, -10), Size = UDim2.fromOffset(92, 64), ZIndex = 6, Parent = card })
+		Kit.corner(9).Parent = photo
+		local photoTape = Kit.new("Frame", { Name = "NoTape", BackgroundTransparency = 1, Parent = card })
+		local team = Kit.new("ImageLabel", { Name = "Team", BackgroundTransparency = 1, Image = A.sil_team or "", ImageTransparency = 0.1, ScaleType = Enum.ScaleType.Fit, AnchorPoint = Vector2.new(1, 1), Position = UDim2.new(1, -10, 1, -10), Size = UDim2.fromOffset(92, 64), Visible = false, ZIndex = 6, Parent = card })
 		local r: any
-		local hit = self:_lift(card, shade, 0, -26, 0, function()
+		Dossier.clicky(card, 1.03)
+		card.Activated:Connect(function()
 			click()
 			self:_press(r.data)
 		end)
-		Dossier.clicky(hit, 1, card, false)
-		local header = typed({ Text = "", TextColor3 = C.inkBlack, TextSize = 18, TextTruncate = Enum.TextTruncate.AtEnd, AutomaticSize = Enum.AutomaticSize.None, AnchorPoint = Vector2.new(0, 0.5), Position = at(12, 20), Size = sz(rw - 104, 24), Parent = card })
-		Kit.new("Frame", { BackgroundColor3 = C.inkBlack, BackgroundTransparency = 0.25, BorderSizePixel = 0, Position = at(12, 34), Size = UDim2.fromOffset(math.round(rw - 24), 2), Parent = card })
-		local name = stencil({ Text = "", TextSize = 36, TextTruncate = Enum.TextTruncate.AtEnd, AutomaticSize = Enum.AutomaticSize.None, Size = sz(rw - 112, 40), TextYAlignment = Enum.TextYAlignment.Top, Position = at(12, 44), Parent = card })
-		local count = typed({ Text = "", TextColor3 = C.inkBlack, TextSize = 18, AutomaticSize = Enum.AutomaticSize.None, Size = sz(rw - 112, 24), Position = at(12, 88), Parent = card })
-		local tag = Kit.new("Frame", { Name = "Tag", BackgroundColor3 = C.inkBlack, BorderSizePixel = 0, AnchorPoint = Vector2.new(1, 0), Position = at(rw - 8, 6), Size = sz(84, 30), Parent = card })
-		Kit.corner(3).Parent = tag
-		local dot = Kit.new("Frame", { BackgroundColor3 = C.red, BorderSizePixel = 0, AnchorPoint = Vector2.new(0.5, 0.5), Position = at(13, 15), Size = sz(10, 10), Parent = tag })
-		Kit.new("UICorner", { CornerRadius = UDim.new(0.5, 0), Parent = dot })
-		local tagText = stencil({ Text = "LIVE", TextSize = 28, TextColor3 = C.sheet, AnchorPoint = Vector2.new(0, 0.5), Position = at(24, 15), Parent = tag })
-		local photo = Kit.new("Frame", { Name = "Photo", BackgroundColor3 = C.sheet, BorderSizePixel = 0, AnchorPoint = Vector2.new(1, 0), Position = at(rw - 10, 44), Size = sz(92, 64), Rotation = 3, Parent = card })
-		Kit.stroke(C.sheetLine, 1, 0).Parent = photo
-		local photoTape = tape(card, "tape", rw - 64, 46, 48, 14, -4, 7, C.tape)
-		local team = icon("icon_team", "troops", { Name = "Team", AnchorPoint = Vector2.new(1, 0), Position = at(rw - 12, 46), Size = sz(88, 62), Visible = false, Parent = card })
-		overArt(card)
 		r = { frame = card, header = header, name = name, count = count, tag = tag, dot = dot, tagText = tagText, photo = photo, photoTape = photoTape, team = team, pic = nil :: Instance?, picFor = nil :: string?, data = nil :: any }
 		self.reports[i] = r
 	end
-	self.tagSizes = { sz(84, 30), sz(108, 30) }
+	self.tagSizes = { UDim2.fromOffset(84, 30), UDim2.fromOffset(108, 30) }
 
 	-- The credits line (LICENSING_PLAN 7(b) and 7(c); CC BY-SA attribution),
 	-- which opens the credits and source window (Bruno, 2026-11-08).
-	local bar = Kit.new("TextButton", { Name = "Credits", Text = "", AutoButtonColor = false, BackgroundColor3 = BAR, BorderSizePixel = 0, Position = at(6, 512), Size = sz(W - 12, 24), ZIndex = 45, Parent = stage })
+	local bar = Kit.new("TextButton", { Name = "Credits", Text = "", AutoButtonColor = false, BackgroundColor3 = Color3.fromHex("#0A120E"), BorderSizePixel = 0, AnchorPoint = Vector2.new(0, 1), Position = UDim2.fromScale(0, 1), Size = UDim2.new(1, 0, 0, 26), ZIndex = 45, Parent = sheet })
+	Kit.corner(18).Parent = bar
+	Kit.new("Frame", { BackgroundColor3 = Color3.fromHex("#0A120E"), BorderSizePixel = 0, Size = UDim2.new(1, 0, 0.5, 0), ZIndex = 45, Parent = bar })
 	self:_creditsButton(bar)
 	Kit.label({
 		Text = CreditsText.BAR,
-		FontFace = F.ui,
-		TextSize = 16,
-		TextColor3 = C.sheet,
+		FontFace = F.uiSemi,
+		TextSize = 15,
+		TextColor3 = HudStyle.MUTED,
 		AnchorPoint = Vector2.new(0.5, 0.5),
 		Position = UDim2.fromScale(0.5, 0.5),
+		ZIndex = 46,
 		Parent = bar,
 	})
 
@@ -971,24 +945,17 @@ function MainMenu._buildOrdersCompact(self: any, stage: Frame)
 	local orders = Kit.new("Frame", { Name = "Orders", BackgroundTransparency = 1, Size = UDim2.fromScale(1, 1), ZIndex = 60, Visible = false, Parent = self.layer })
 	self.orders = orders
 	Kit.new("TextButton", { Name = "Blocker", Text = "", AutoButtonColor = false, BackgroundColor3 = C.desk, BackgroundTransparency = 0.3, BorderSizePixel = 0, Size = UDim2.fromScale(1, 1), Parent = orders })
-	local paper = surface("ImageLabel", "tex_paper", C.sheet, { Name = "Sheet", Position = at(6, 6), Size = sz(W - 12, H - 12), Parent = orders })
-	Kit.stroke(C.sheetLine, 2, 0).Parent = paper
+	local paper = darkSheet({ Position = at(6, 6), Size = sz(W - 12, H - 12), Parent = orders }, 84)
 	local pw = W - 12
 	-- The header, clear of Roblox's buttons.
 	local tx = math.max(24, root.topLeft - 6)
-	stencil({ Text = "DEPLOYMENT ORDERS", TextSize = 56, AnchorPoint = Vector2.new(0, 0.5), Position = at(tx, 38), Parent = paper })
-	art("stamp_secret", { AnchorPoint = Vector2.new(1, 0.5), Position = at(pw - 92, 38), Size = sz(190, 50), Rotation = 6, Parent = paper })
-	local close = Kit.new("TextButton", { Name = "Close", Text = "", AutoButtonColor = false, BackgroundColor3 = C.inkBlack, BorderSizePixel = 0, AnchorPoint = Vector2.new(0.5, 0.5), Position = at(pw - 45, 38), Size = sz(62, 62), Parent = paper })
-	Kit.corner(6).Parent = close
-	Kit.glyph("close", { ImageColor3 = C.sheet, AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromScale(0.5, 0.5), Size = sz(30, 30), Parent = close })
-	Dossier.clicky(close, 1.08)
-	close.Activated:Connect(function()
+	Dossier.outline(stencil({ Text = "DEPLOYMENT ORDERS", TextSize = 56, TextColor3 = Color3.new(1, 1, 1), AnchorPoint = Vector2.new(0, 0.5), Position = at(tx, 38), Parent = paper }))
+	Dossier.closeRed(paper, at(pw - 45, 38), sz(62, 62), function()
 		click()
 		self:showSolo(false)
 	end)
-	Kit.new("Frame", { BackgroundColor3 = C.inkBlack, BackgroundTransparency = 0.3, BorderSizePixel = 0, Position = at(20, 74), Size = sz(pw - 40, 2), Parent = paper })
 
-	typed({ Text = "1. THEATRE OF OPERATIONS", TextSize = 19, TextColor3 = C.inkBlack, Position = at(24, 84), Parent = paper })
+	typed({ Text = "1. THEATRE OF OPERATIONS", TextSize = 19, TextColor3 = ORDERS_LABEL, Position = at(24, 84), Parent = paper })
 	local mapRow = surface("ImageButton", "tex_manila", C.manila, { Name = "MapRow", AnchorPoint = Vector2.new(0.5, 0), Position = UDim2.new(0.5, 0, 0, 110), Size = sz(pw - 40, 88), Parent = paper })
 	Dossier.clicky(mapRow, 1.02)
 	Kit.corner(5).Parent = mapRow
@@ -1006,7 +973,7 @@ function MainMenu._buildOrdersCompact(self: any, stage: Frame)
 		end)
 	end)
 
-	typed({ Text = "2. THREAT LEVEL", TextSize = 19, TextColor3 = C.inkBlack, Position = at(24, 212), Parent = paper })
+	typed({ Text = "2. THREAT LEVEL", TextSize = 19, TextColor3 = ORDERS_LABEL, Position = at(24, 212), Parent = paper })
 	self.diffChips = {} :: { [string]: TextButton }
 	local n = #MenuModel.DIFFICULTIES
 	local chipW = (pw - 40 - (n - 1) * 12) / n
@@ -1017,7 +984,11 @@ function MainMenu._buildOrdersCompact(self: any, stage: Frame)
 		Kit.stroke(C.inkBlack, 2, 0).Parent = chip
 		chip.Activated:Connect(function()
 			click()
-			self.difficulty = d
+			if self.privateMode then
+				self.privateKind = PRIVATE_KIND[d] or self.privateKind
+			else
+				self.difficulty = d
+			end
 			self:_refreshSolo()
 		end)
 		self.diffChips[d] = chip
@@ -1025,7 +996,7 @@ function MainMenu._buildOrdersCompact(self: any, stage: Frame)
 	self.diffText = typed({
 		Text = "",
 		TextSize = 20,
-		TextColor3 = C.inkBlack,
+		TextColor3 = ORDERS_TEXT,
 		TextWrapped = true,
 		AutomaticSize = Enum.AutomaticSize.None,
 		TextYAlignment = Enum.TextYAlignment.Top,
@@ -1045,10 +1016,15 @@ function MainMenu._buildOrdersCompact(self: any, stage: Frame)
 	for _, b in { cancel, howTo } do
 		local label = b:FindFirstChild("Label") :: TextLabel
 		label.TextSize = 32
+		softButton(b)
 	end
 	local start = plate(paper, "START", { Name = "Start", AnchorPoint = Vector2.new(0.5, 0.5), Position = at(pw - 185, by - 4), Size = sz(330, 92), Parent = paper }, 70)
 	start.Activated:Connect(function()
-		actions.startSolo(self.soloMap, self.difficulty)
+		if self.privateMode and actions.startPrivate then
+			actions.startPrivate(self.soloMap, self.privateKind or "ffa")
+		else
+			actions.startSolo(self.soloMap, self.difficulty)
+		end
 	end)
 	Dossier.clicky(start, 1.04)
 	self:_refreshSolo()
@@ -1063,27 +1039,15 @@ function MainMenu._buildOrders(self: any, stage: Frame)
 	-- The whole screen dims, and clicks and hovers outside the sheet don't
 	-- reach what's under it (the stage is centred, so 3x covers any screen).
 	Kit.new("TextButton", { Name = "Blocker", Text = "", AutoButtonColor = false, BackgroundColor3 = C.desk, BackgroundTransparency = 0.3, BorderSizePixel = 0, AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromScale(0.5, 0.5), Size = UDim2.fromScale(3, 3), Parent = orders })
-	local paper = surface("ImageLabel", "tex_paper", C.sheet, { Name = "Sheet", Position = at(268, 104), Size = sz(540, 326), Rotation = -1, Parent = orders })
-	Kit.stroke(C.sheetLine, 2, 0).Parent = paper
-	tape(paper, "tape", 30, 2, 70, 20, -30, 0, C.tape)
-	tape(paper, "tape", 510, 2, 70, 20, 30, 0, C.tape)
-	stencil({ Text = "DEPLOYMENT ORDERS", TextSize = 70, Position = UDim2.fromOffset(48, 26), Parent = paper })
-	typed({ Text = "Operation: solo · one commander against bots and nations", TextSize = 19, Position = UDim2.fromOffset(50, 112), Parent = paper })
-	if art("stamp_secret", { AnchorPoint = Vector2.new(1, 0), Position = UDim2.new(1, -110, 0, 34), Size = UDim2.fromOffset(250, 64), Rotation = 6, Parent = paper }) == nil then
-		local classified = Kit.new("Frame", { BackgroundTransparency = 1, AnchorPoint = Vector2.new(1, 0), Position = UDim2.new(1, -110, 0, 36), Size = UDim2.fromOffset(230, 56), Rotation = 6, Parent = paper })
-		Kit.stroke(C.stamp, 3, 0.1).Parent = classified
-		stencil({ Text = "TOP-SECRET", TextSize = 40, TextColor3 = C.stamp, AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromScale(0.5, 0.5), Parent = classified })
-	end
-	local close = Kit.new("TextButton", { Name = "Close", Text = "", AutoButtonColor = false, BackgroundTransparency = 1, AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.new(1, -48, 0, 48), Size = UDim2.fromOffset(56, 56), Parent = paper })
-	Dossier.clicky(close, 1.12)
-	Kit.glyph("close", { ImageColor3 = C.inkBlack, AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromScale(0.5, 0.5), Size = UDim2.fromOffset(28, 28), Parent = close })
-	close.Activated:Connect(function()
+	local paper = darkSheet({ Position = at(268, 104), Size = sz(540, 326), Parent = orders }, 156)
+	Dossier.outline(stencil({ Text = "DEPLOYMENT ORDERS", TextSize = 70, TextColor3 = Color3.new(1, 1, 1), Position = UDim2.fromOffset(48, 26), Parent = paper }))
+	self.opText = typed({ Text = "Operation: solo · one commander against bots and nations", TextSize = 19, TextColor3 = ORDERS_TEXT, Position = UDim2.fromOffset(50, 112), Parent = paper })
+	Dossier.closeRed(paper, UDim2.new(1, -50, 0, 50), UDim2.fromOffset(64, 64), function()
 		click()
 		self:showSolo(false)
 	end)
-	Kit.new("Frame", { BackgroundColor3 = C.inkBlack, BackgroundTransparency = 0.3, BorderSizePixel = 0, Position = UDim2.fromOffset(48, 148), Size = UDim2.new(1, -96, 0, 2), Parent = paper })
 
-	typed({ Text = "1. THEATRE OF OPERATIONS", TextSize = 20, TextColor3 = C.inkBlack, Position = UDim2.fromOffset(50, 166), Parent = paper })
+	typed({ Text = "1. THEATRE OF OPERATIONS", TextSize = 20, TextColor3 = ORDERS_LABEL, Position = UDim2.fromOffset(50, 166), Parent = paper })
 	local mapRow = surface("ImageButton", "tex_manila", C.manila, { Name = "MapRow", AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.new(0.5, 0, 0, 198 + 46), Size = UDim2.new(1, -96, 0, 92), Parent = paper })
 	Dossier.clicky(mapRow, 1.02)
 	Kit.corner(5).Parent = mapRow
@@ -1112,7 +1076,7 @@ function MainMenu._buildOrders(self: any, stage: Frame)
 		end)
 	end)
 
-	typed({ Text = "2. THREAT LEVEL", TextSize = 20, TextColor3 = C.inkBlack, Position = UDim2.fromOffset(50, 308), Parent = paper })
+	typed({ Text = "2. THREAT LEVEL", TextSize = 20, TextColor3 = ORDERS_LABEL, Position = UDim2.fromOffset(50, 308), Parent = paper })
 	local diffRow = Kit.new("Frame", { BackgroundTransparency = 1, Position = UDim2.fromOffset(48, 340), Size = UDim2.new(1, -96, 0, 58), Parent = paper })
 	self.diffChips = {} :: { [string]: TextButton }
 	for i, d in MenuModel.DIFFICULTIES do
@@ -1123,7 +1087,11 @@ function MainMenu._buildOrders(self: any, stage: Frame)
 		Kit.stroke(C.inkBlack, 2, 0).Parent = chip
 		chip.Activated:Connect(function()
 			click()
-			self.difficulty = d
+			if self.privateMode then
+				self.privateKind = PRIVATE_KIND[d] or self.privateKind
+			else
+				self.difficulty = d
+			end
 			self:_refreshSolo()
 		end)
 		self.diffChips[d] = chip
@@ -1131,7 +1099,7 @@ function MainMenu._buildOrders(self: any, stage: Frame)
 	self.diffText = typed({
 		Text = "",
 		TextSize = 19,
-		TextColor3 = C.inkBlack,
+		TextColor3 = ORDERS_TEXT,
 		TextWrapped = true,
 		AutomaticSize = Enum.AutomaticSize.None,
 		Size = UDim2.new(1, -96, 0, 50),
@@ -1147,89 +1115,32 @@ function MainMenu._buildOrders(self: any, stage: Frame)
 	local howTo = inkButton(paper, "HOW TO PLAY", { AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.new(0, 244 + 110, 1, -36 - 30), Size = UDim2.fromOffset(220, 60), Parent = paper })
 	Dossier.clicky(howTo, 1.06)
 	howTo.Activated:Connect(actions.openHowToPlay)
+	softButton(cancel)
+	softButton(howTo)
 	local start = plate(paper, "START", { Name = "Start", AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.new(1, -48 - 190, 1, -28 - 50), Size = UDim2.fromOffset(380, 100), Parent = paper }, 76)
 	start.Activated:Connect(function()
-		actions.startSolo(self.soloMap, self.difficulty)
+		if self.privateMode and actions.startPrivate then
+			actions.startPrivate(self.soloMap, self.privateKind or "ffa")
+		else
+			actions.startSolo(self.soloMap, self.difficulty)
+		end
 	end)
 	Dossier.clicky(start, 1.06)
 	self:_refreshSolo()
 end
 
--- A folder pops out on hover: moved by (dx, dy) canvas units and turned by
--- `rot` degrees with a spring, brighter, drawn over its neighbours, its
--- shadow longer and darker; it settles back on leave. An invisible hit area
--- stays where the folder rests, so a folder that moves out from under the
--- pointer doesn't flicker. A click calls `onOpen`. With no hover (a phone),
--- a tap pops the folder out with its rustle and opens it a moment later
--- (Bruno, 2026-10-27); a click on a folder already out thuds. Returns the
--- hit area.
-local POP_BEFORE_OPEN = 0.25
-function MainMenu._lift(self: any, card: ImageButton, shade: Frame, dx: number, dy: number, rot: number, onOpen: () -> ()): TextButton
-	local pos, turn, z = card.Position, card.Rotation, card.ZIndex
-	local shadePos, shadeSize = shade.Position, shade.Size
-	local hit = Kit.new("TextButton", { Name = card.Name .. "Hit", Text = "", AutoButtonColor = false, BackgroundTransparency = 1, AnchorPoint = card.AnchorPoint, Position = pos, Size = card.Size, Rotation = turn, ZIndex = 30 + z, Parent = card.Parent })
-	-- With folder art, the shadow is a dark copy of the picture inside the card.
-	local artShadow = card:FindFirstChild("ArtShadow") :: ImageLabel?
-	local artShadowPos = if artShadow then artShadow.Position else nil
-	local hovering = false
-	local poppedAt = 0
-	local function pop()
-		hovering = true
-		poppedAt = os.clock()
-		card.ZIndex, shade.ZIndex = 21, 20
-		card.ImageColor3 = Color3.fromRGB(255, 250, 238)
-		card.BackgroundColor3 = C.manila:Lerp(Color3.new(1, 1, 1), 0.15)
-		TweenService:Create(card, SPRING, { Position = pos + UDim2.fromOffset(dx, dy), Rotation = turn + rot }):Play()
-		TweenService:Create(shade, SPRING, { Position = shadePos + UDim2.fromOffset(dx + 8, dy + 12), Size = shadeSize + UDim2.fromOffset(6, 6), Rotation = turn + rot, BackgroundTransparency = 0.5 }):Play()
-		if artShadow and artShadowPos then
-			TweenService:Create(artShadow, SPRING, { Position = artShadowPos + UDim2.fromOffset(8, 12), ImageTransparency = 0.45 }):Play()
-		end
-		Dossier.rustle()
-	end
-	hit.MouseEnter:Connect(function()
-		if not Kit.covered(hit) then
-			pop()
-		end
-	end)
-	local function settle()
-		hovering = false
-		card.ImageColor3 = Color3.new(1, 1, 1)
-		card.BackgroundColor3 = C.manila
-		local back = TweenService:Create(card, SETTLE, { Position = pos, Rotation = turn })
-		back.Completed:Connect(function(state)
-			if state == Enum.PlaybackState.Completed and not hovering then
-				card.ZIndex, shade.ZIndex = z, z
-			end
-		end)
-		back:Play()
-		TweenService:Create(shade, SETTLE, { Position = shadePos, Size = shadeSize, Rotation = turn, BackgroundTransparency = 0.68 }):Play()
-		if artShadow and artShadowPos then
-			TweenService:Create(artShadow, SETTLE, { Position = artShadowPos, ImageTransparency = 0.6 }):Play()
-		end
-	end
-	hit.MouseLeave:Connect(settle)
-	hit.Activated:Connect(function()
-		if hovering then
-			if os.clock() - poppedAt >= POP_BEFORE_OPEN then
-				Dossier.thud()
-			end
-		else
-			pop()
-		end
-		-- Opens once the pop has had its moment; the window then covers the
-		-- menu, and no MouseLeave follows.
-		task.delay(math.max(0, POP_BEFORE_OPEN - (os.clock() - poppedAt)), function()
-			if hit.Parent then
-				onOpen()
-				task.delay(0.15, settle)
-			end
-		end)
-	end)
-	return hit
-end
-
 function MainMenu.showSolo(self: any, on: boolean)
 	self.orders.Visible = on
+end
+
+-- On a private server its owner's PLAY sets up a match for everyone here
+-- (the sheet's chips pick the mode; Bruno, 2026-11-23).
+function MainMenu.setPrivateMode(self: any, on: boolean)
+	self.privateMode = on
+	self.privateKind = self.privateKind or "ffa"
+	if self.diffChips then
+		self:_refreshSolo()
+	end
 end
 
 function MainMenu._refreshSolo(self: any)
@@ -1239,12 +1150,20 @@ function MainMenu._refreshSolo(self: any)
 		self.mapPic:Destroy()
 	end
 	self.mapPic = MainMenu.fieldMap(self.soloMap, { Size = UDim2.new(1, -8, 1, -8), Position = UDim2.fromOffset(4, 4), Parent = self.mapPhoto })
+	-- A private server (2026-11-23): the chips pick the mode instead.
+	local private = self.privateMode == true
 	for d, chip in self.diffChips do
-		local on = d == self.difficulty
-		chip.BackgroundColor3 = if on then C.inkBlack else C.sheet
-		chip.TextColor3 = if on then C.hazard else C.inkBlack
+		local kind = PRIVATE_KIND[d]
+		local on = if private then kind == (self.privateKind or "ffa") else d == self.difficulty
+		chip.Visible = not private or kind ~= nil
+		chip.Text = if private and kind then PRIVATE_LABEL[kind] else string.upper(MenuModel.difficultyName(d))
+		chip.BackgroundColor3 = if on then C.hazard else C.sheet
+		chip.TextColor3 = C.inkBlack
 	end
-	self.diffText.Text = MenuModel.difficultyText(self.difficulty)
+	self.diffText.Text = if private then PRIVATE_LINE[self.privateKind or "ffa"] else MenuModel.difficultyText(self.difficulty)
+	if self.opText then
+		self.opText.Text = if private then "Operation: private · everyone on this server, with AI nations" else "Operation: solo · one commander against bots and nations"
+	end
 end
 
 function MainMenu._press(self: any, row: any)
@@ -1312,7 +1231,7 @@ function MainMenu._paintFront(self: any)
 		elseif state == "line" then "FINDING A SEAT…"
 		elseif state == "joining" then "JOINING THE MATCH…"
 		else `PLAYER COUNT: {row.players}/{row.capacity}` .. (if seconds then ` · {Kit.clock(seconds)}` else "")
-	f.count.TextColor3 = if row.live or mine then C.stamp else C.inkBlack
+	f.count.TextColor3 = if row.live or mine then HudStyle.BAD else HudStyle.SOFT
 end
 
 function MainMenu._paintReport(self: any, r: any)
@@ -1389,7 +1308,9 @@ function MainMenu.setProfile(self: any, view: { [string]: any })
 	if view.cratePrice then
 		self.crateText.Text = tostring(view.cratePrice)
 	end
-	self.crateBadge.Visible = view.cratePrice ~= nil
+	-- (Hidden since 2026-11-23: unlabelled, it read as a Robux balance;
+	-- the first crate's price is on the Shop's Crates shelf.)
+	self.crateBadge.Visible = false
 	-- The starter pack: "ready" (not started: NEW) or "active" (counting);
 	-- during the launch event, its free claim instead (gold: LAUNCH GIFT).
 	local gift = view.gift == "claimable"
@@ -1408,8 +1329,36 @@ function MainMenu.setProfile(self: any, view: { [string]: any })
 	self.starterTimer.Text = if gift then "FREE" elseif view.starter == "ready" then "NEW · 48 HOURS" else ""
 	self:_paintDeal()
 	if self.generalCard then
-		self.generalCard.Position = if self.starterTag.Visible then self.generalAt.low else self.generalAt.high
-		self.setGeneralOn(view.general == true)
+		self.generalCard.setLine(if view.general == true then "Your perks are on" else "A crate a day, +50% stars")
+	end
+	-- The Campaign card: the season, your tier, the XP bar, and how many
+	-- rewards wait to be claimed.
+	local pass = view.pass
+	if self.passCard then
+		self.passCard.root.Visible = pass ~= nil
+		if pass then
+			local tier = math.min(30, pass.xp // 1000)
+			self.passCard.setKicker(`SEASON {pass.season} · {math.max(1, math.ceil((pass.endsAt - os.time()) / 86400))} DAYS`)
+			self.passCard.setLine(`Tier {tier} of 30`)
+			self.passCard.setBar(if tier >= 30 then 1 else (pass.xp % 1000) / 1000)
+			local function count(list: { number }, open: boolean): number
+				if not open then
+					return 0
+				end
+				local seen: { [number]: boolean } = {}
+				for _, t in list do
+					seen[t] = true
+				end
+				local n = 0
+				for t = 1, tier do
+					if not seen[t] then
+						n += 1
+					end
+				end
+				return n
+			end
+			self.passCard.setCount(count(pass.free, true) + count(pass.paid, pass.premium == true))
+		end
 	end
 end
 

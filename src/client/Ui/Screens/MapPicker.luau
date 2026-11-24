@@ -49,6 +49,7 @@ end
 function MapPicker.open(host: Instance, current: string, done: (folder: string) -> (), openHelp: (() -> ())?): Kit.Modal
 	local chosen = current
 	local phone = Dossier.phone()
+	Dossier.style = { wash = Color3.fromHex("#1F9A9A"), art = "banner_maps" }
 	local w = if phone then Dossier.phoneWindow(host, "CHOOSE A MAP") else Dossier.window(host, 1455, 1081, WINDOW_H, 36)
 	local at, sz = w.at, w.sz
 	local head = w.header

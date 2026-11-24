@@ -29,6 +29,15 @@ Skins.LIST = {
 	{ id = "s_scales", name = "Dragonscale", rarity = "legendary", scale = 0, rows = { "..####..", ".#....#.", "#......#", "#......#", "##....##", "..####.." } },
 } :: { Skin }
 
+-- The Campaign Pass's exclusive skins (Store/Pass.ITEMS; premium tiers 10
+-- and 30 of season 1); never in crates.
+Skins.CAMPAIGN = {
+	-- Zigzag trench lines across the land.
+	{ id = "c1_trenches", name = "Trench Lines", rarity = "epic", scale = 0, rows = { "#...#...", ".#.#.#.#", "..#...#.", "........", "........", "........" } },
+	-- A compass rose, the season's top prize.
+	{ id = "c1_compass", name = "Compass Rose", rarity = "legendary", scale = 0, rows = { "............", ".....#......", ".....#......", "....###.....", "..#.###.#...", "#####.#####.", "..#.###.#...", "....###.....", ".....#......", ".....#......", "............", "............" } },
+} :: { Skin }
+
 -- Conquest General's skins (Catalog.SUBSCRIPTION.skins): one a month for
 -- subscribers, theirs to keep; never in crates.
 Skins.GENERAL = {
@@ -53,6 +62,9 @@ for _, s in Skins.LIST do
 	byId[s.id] = s
 end
 for _, s in Skins.GENERAL do
+	byId[s.id] = s
+end
+for _, s in Skins.CAMPAIGN do
 	byId[s.id] = s
 end
 

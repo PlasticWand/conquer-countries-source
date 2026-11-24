@@ -9,8 +9,22 @@ local Policy = require(script.Parent.RenderPolicy)
 local Masks = require(script.Parent.FalloutMasks)
 local ShipArt = require(script.Parent.ShipArt)
 local Core = require(script.Parent.RasterCore)
+local Cosmetics = require(script.Parent.MatchCosmetics)
 local Effects = {}
 Effects.__index = Effects
+-- Keep require-time pure for raster-only hosts that never construct this adapter.
+local colors:any={}
+local function initColors()
+	if colors.white then return end
+	colors.white=Color3.new(1,1,1)
+	colors.gold=Color3.new(Cosmetics.gold.r,Cosmetics.gold.g,Cosmetics.gold.b)
+	colors.ironRoad=Color3.new(Cosmetics.ironRoad.r,Cosmetics.ironRoad.g,Cosmetics.ironRoad.b)
+	colors.dark=Color3.new(Cosmetics.outline.r,Cosmetics.outline.g,Cosmetics.outline.b)
+	colors.stampFill,colors.stampOutline=Color3.fromRGB(38,37,31),Color3.fromRGB(245,237,209)
+end
+local function tintColor(tint:any):Color3
+	return if tint==Cosmetics.gold then colors.gold elseif tint==Cosmetics.ironRoad then colors.ironRoad else colors.white
+end
 
 local function layer(parent: Instance, name: string, z: number): Frame
 	local f = Instance.new('Frame')
@@ -19,6 +33,7 @@ local function layer(parent: Instance, name: string, z: number): Frame
 	return f
 end
 function Effects.new(renderer: any, world: Frame?, worldUnit: number?): any
+	initColors()
 	local function parent(pass: string): Frame
 		return if renderer.guiLayers and renderer.guiLayers.enabled then renderer.guiLayers:parent(pass) else world or renderer.root
 	end
@@ -156,6 +171,7 @@ end
 -- Original: FxSpritePass.draw, WorldTextPass.rebuildInstances and spawn shader.
 function Effects.clearConquests(self:any)
 	self.state:clearConquests()
+	self.state:clearPublicConquests()
 	if self.conquestStamp then self.conquestStamp.Visible=false end
 	for _,pool in {self.sprites,self.popups} do
 		for _,view in pool do if view.Name=='ConquestMark' or view.Name=='ConquestGold' then view.Visible=false end end
@@ -188,6 +204,9 @@ local function drawConquestStamp(self:any,now:number)
 	local age=elapsed-180
 	local alpha=math.clamp((elapsed-800)/250,0,1)
 	f.Visible=true; f.Text=if m.count>1 then `CONQUERED x{m.count}` else 'CONQUERED'
+	local fill,outline=if m.tint then tintColor(m.tint) else colors.stampFill,if m.tint then colors.dark else colors.stampOutline
+	if f.TextColor3~=fill then f.TextColor3=fill end
+	if f.TextStrokeColor3~=outline then f.TextStrokeColor3=outline end
 	f.TextSize=24*(1+.16*(1-math.clamp(age/100,0,1)))
 	f.Position=UDim2.fromOffset(x,y); f.TextTransparency=alpha; f.TextStrokeTransparency=.4+.6*alpha
 end
@@ -239,6 +258,8 @@ function Effects.step(self: any, now: number)
 						f.ImageColor3=Color3.new(1,1,1); f.Rotation=0; self.sinkingViews[f]=nil
 					end
 					local offset,size=Vector2.new(index*cfg[1],cfg[3]),Vector2.new(cfg[1],cfg[2])
+					local color=tintColor(e.tint)
+					if f.ImageColor3~=color then f.ImageColor3=color end
 					if f.ImageRectOffset~=offset then f.ImageRectOffset=offset end
 					if f.ImageRectSize~=size then f.ImageRectSize=size end
 				end
@@ -262,6 +283,8 @@ function Effects.step(self: any, now: number)
 			if f then
 				count+=1; f.Visible=true; rect(f,x,y,radius*2,radius*2)
 				local stroke=f:FindFirstChild('Stroke') :: UIStroke
+				local color=tintColor(e.tint)
+				if stroke.Color~=color then stroke.Color=color end
 				stroke.Thickness,stroke.Transparency=math.max(if self.world then self.worldUnit/self.renderer.camera.scale else 1,radius*.04),t
 			end
 		end
@@ -284,6 +307,8 @@ function Effects.step(self: any, now: number)
 			end
 			if f then
 				count+=1; f.Visible=true; f.Name=if e.conquest then 'ConquestGold' else 'BonusGold'
+				local color=tintColor(e.tint)
+				if f.TextColor3~=color then f.TextColor3=color end
 				f.Text=e.text; f.TextSize=math.clamp(px,1,100)
 				f.TextTransparency,f.TextStrokeTransparency=age/e.lifetime,age/e.lifetime
 				local glyphScale=math.max(1,px/100)

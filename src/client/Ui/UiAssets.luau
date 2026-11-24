@@ -58,6 +58,7 @@ UiAssets.dossier = {
 	icon_settings = "rbxassetid://88355510282341",
 	icon_sound = "rbxassetid://82008798882315",
 	icon_star = "rbxassetid://127991183045654",
+	icon_boost = "rbxassetid://99388610471893", -- the Shop's BOOSTS tab (Codex, 2026-11-23)
 	icon_team = "rbxassetid://71972325340470",
 	icon_compass = "rbxassetid://89174371755573",
 	pin = "rbxassetid://138170647136160",
@@ -147,6 +148,28 @@ UiAssets.dossier = {
 	-- Sixth round (Bruno, 2026-10-27): the Arsenal's recon photos, the
 	-- Locker's supply crate (its glint mask is the crate's shape in white) and
 	-- the dust it lands in.
+	-- Dark-window banners (Bruno, 2026-11-24: "background images for all the
+	-- new windows ... just like the Campaign and the shop"; Codex imagegen).
+	-- The menu cards' cream silhouettes (Codex, 2026-11-24).
+	sil_party = "rbxassetid://96398987434755",
+	sil_shop = "rbxassetid://103650489281615",
+	sil_locker = "rbxassetid://94943277130959",
+	sil_flag = "rbxassetid://91863114615920",
+	sil_team = "rbxassetid://124697474756562",
+	banner_locker = "rbxassetid://122936844576652",
+	banner_settings = "rbxassetid://112414528950132",
+	banner_howto = "rbxassetid://97328838446463",
+	banner_credits = "rbxassetid://101283625363513",
+	banner_maps = "rbxassetid://115154860955955",
+	banner_party = "rbxassetid://119671072004743",
+	banner_starter = "rbxassetid://97064860002126",
+	banner_general = "rbxassetid://130867425588434",
+	banner_gift = "rbxassetid://127693204085050",
+	banner_orders = "rbxassetid://112462237542150",
+	banner_pause = "rbxassetid://78440328269918",
+	banner_flags = "rbxassetid://125143146365540",
+	banner_reveal = "rbxassetid://91443433168681",
+	banner_arsenal = "rbxassetid://119014560286486",
 	arsenal_reinforcements = "rbxassetid://125370568756078",
 	arsenal_mega = "rbxassetid://70990584170914",
 	arsenal_2xstars = "rbxassetid://96744587153097",
@@ -161,6 +184,11 @@ UiAssets.dossier = {
 	arsenal_rapidreload = "rbxassetid://82066524472038",
 	arsenal_general = "rbxassetid://131877126022303", -- faces-free (2026-11-09)
 	crate_wood = "rbxassetid://86723813573203",
+	-- The Shop's crate panels (Codex, 2026-11-23; art/dossier/PROMPTS.md).
+	crate_pile3 = "rbxassetid://85038798056009",
+	crate_pile5 = "rbxassetid://129247844538426",
+	crate_ad = "rbxassetid://124362236426153",
+	crate_stars = "rbxassetid://132100646317891",
 	crate_glint = "rbxassetid://96597184210817",
 	-- The crate opening's soft halo (art/crate/haze.png, white, tinted in code).
 	crate_haze = "rbxassetid://114856245564971",

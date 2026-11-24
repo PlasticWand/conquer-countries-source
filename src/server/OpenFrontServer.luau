@@ -419,7 +419,7 @@ local function startMatch(match: Match)
 		local key = keyOf(player)
 		local friends = friendsOf(key)
 		local loadout = Store.loadout(player)
-		match.runner:addHuman(key, player.DisplayName, friends, { flag = loadout.flag, skin = loadout.skin, weapons = loadout.weapons })
+		match.runner:addHuman(key, player.DisplayName, friends, { flag = loadout.flag, skin = loadout.skin, weapons = loadout.weapons, title = loadout.title, nameStyle = loadout.nameStyle, conquestFx = loadout.conquestFx, blastFx = loadout.blastFx })
 		matchOf[player] = match
 	end
 	match.runner:start()
@@ -543,6 +543,32 @@ end
 
 -- Starts lobby `lobbyId`'s public match with `members` (a match server's
 -- arrivals, or in Studio a local lobby's players).
+-- A Roblox private server's owner (its players' own server; nil elsewhere).
+-- In Studio the ServerStorage attribute ConquestPrivateOwner stands in.
+local privateCount = 0
+
+-- An imported map's OpenFront type from its folder name ("BlackSea" ->
+-- "Black Sea"); nil for anything else.
+local function mapTypeOf(folder: any): string?
+	for t, f in folderOfType do
+		if f == folder then
+			return t
+		end
+	end
+	return nil
+end
+
+local function privateOwner(): number?
+	if game.PrivateServerId ~= "" and game.PrivateServerOwnerId ~= 0 then
+		return game.PrivateServerOwnerId
+	end
+	if RunService:IsStudio() then
+		local v = game:GetService("ServerStorage"):GetAttribute("ConquestPrivateOwner")
+		return if type(v) == "number" then v else nil
+	end
+	return nil
+end
+
 local function startPublic(lobbyId: string, kind: string, members: { Player }, config: { [string]: any }): Match?
 	config = table.clone(config)
 	config.extraWeapons = true -- Conquest's Arsenal (each player still needs the unlock)
@@ -1229,6 +1255,32 @@ local function onStart(player: Player, request: any)
 	if type(request) ~= "table" or not take(limitsOf(player).start) then
 		return
 	end
+	if request.mode == "private" then
+		-- A private server's match (Bruno, 2026-11-23: private servers, the
+		-- owner picks map and mode): everyone here who isn't in a match.
+		local owner = privateOwner()
+		local mapType = mapTypeOf(request.map)
+		if owner == nil or player.UserId ~= owner or mapType == nil then
+			remotes.Status:FireClient(player, { phase = "menu", notice = "Only this server's owner can start a private match." })
+			return
+		end
+		local kind = if request.kind == "team" or request.kind == "blitz" then request.kind else "ffa"
+		local cfg = playlist:gameConfig(if kind == "team" then "team" else "ffa", mapType)
+		if kind == "blitz" then
+			cfg.maxTimerValue = PublicLobbies.BLITZ_MINUTES
+		elseif kind == "team" then
+			cfg.nations = "default"
+		end
+		local members = {}
+		for _, p in Players:GetPlayers() do
+			if matchOf[p] == nil then
+				table.insert(members, p)
+			end
+		end
+		privateCount += 1
+		startPublic(`private-{privateCount}`, if kind == "team" then PublicLobbies.KIND_TEAM elseif kind == "blitz" then PublicLobbies.KIND_BLITZ else PublicLobbies.KIND_FFA, members, cfg)
+		return
+	end
 	if request.mode == "solo" then
 		if request.tutorial == true then
 			-- The tutorial's match is always the same (Shared/Tutorial).
@@ -1508,6 +1560,13 @@ function OpenFrontServer.start()
 	if serverRole ~= nil then
 		ReplicatedStorage:SetAttribute(WaitingRoom.ROLE_ATTRIBUTE, serverRole)
 	end
+	-- A private server: whose it is (clients switch PLAY to its match setup).
+	ReplicatedStorage:SetAttribute("PrivateOwner", privateOwner())
+	if RunService:IsStudio() then
+		game:GetService("ServerStorage"):GetAttributeChangedSignal("ConquestPrivateOwner"):Connect(function()
+			ReplicatedStorage:SetAttribute("PrivateOwner", privateOwner())
+		end)
+	end
 	local folder = Instance.new("Folder")
 	folder.Name = "OpenFrontRemotes"
 	for _, name in REMOTES do
@@ -1562,6 +1621,31 @@ function OpenFrontServer.start()
 				end
 				remotes.Snapshot:FireClient(player, match.replicator:snapshot(key))
 				return { ok = true }
+			elseif request.kind == "boost" and type(request.boost) == "string" then
+				-- In-match boosts (2026-11-23; Runner.boostCheck): check it
+				-- applies, spend a saved credit (else the client prompts the
+				-- product and asks again once it's granted), apply it.
+				-- Second Spawn asked without a tile only checks: the client
+				-- then lets the player pick a spot and asks with it.
+				local key = keyOf(player)
+				local which = request.boost
+				local tile = if type(request.tile) == "number" then request.tile else nil
+				local ok, reason = match.runner:boostCheck(key, which, tile)
+				if not ok then
+					return { ok = false, reason = reason }
+				end
+				if which == "secondSpawn" and tile == nil then
+					return if Store.hasBoost(player, which) then { ok = true, pick = true } else { ok = false, reason = "needPurchase" }
+				end
+				if not Store.spendBoost(player, which) then
+					return { ok = false, reason = "needPurchase" }
+				end
+				if not match.runner:useBoost(key, which, tile) then
+					Store.refundBoost(player, which)
+					return { ok = false, reason = "failed" }
+				end
+				Analytics.boostUsed(player, which)
+				return { ok = true }
 			elseif request.kind == "build_preview" and type(request.unit) == "string" then
 				local tile = if type(request.tile) == "number" then request.tile else nil
 				return match.runner:buildPreview(keyOf(player), tile, request.unit)
@@ -1577,6 +1661,17 @@ function OpenFrontServer.start()
 	-- seconds; clients wait on this folder).
 	folder.Parent = ReplicatedStorage
 	Store.start(folder)
+	-- Gifts go to party members (Store.giftTargets).
+	Store.setPartyLookup(function(player: Player): { Player }
+		local out = {}
+		for _, k in parties:members(keyOf(player)) do
+			local other = Players:GetPlayerByUserId(tonumber(k) or 0)
+			if other then
+				table.insert(out, other)
+			end
+		end
+		return out
+	end)
 	-- An Arsenal weapon unlocked (stars or Robux) while in a match is usable
 	-- in it at once (Bruno, 2026-11-08: before, only the next match had it).
 	Store.onChanged(function(player: Player)

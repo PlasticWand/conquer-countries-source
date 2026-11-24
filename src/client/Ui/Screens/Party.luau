@@ -126,6 +126,7 @@ function Party.open(host: Instance, view: View?, send: (request: { [string]: any
 	end
 
 	if Dossier.phone() then
+		Dossier.style = { wash = Color3.fromHex("#D8457E"), art = "banner_party" }
 		local w = Dossier.phoneWindow(host, "INVITE TO PARTY")
 		local at, sz = w.at, w.sz
 		local roblox = Dossier.rivetPlate(w.body, "", 0, true, { Name = "InviteFriends", Position = at(w.width / 2, 46), Size = sz(w.width - 40, 82), Parent = w.body })
@@ -144,6 +145,7 @@ function Party.open(host: Instance, view: View?, send: (request: { [string]: any
 	-- The reference fits a title and one line; each extra line adds a row.
 	local extra = math.clamp(#lines - 2, 0, MAX_EXTRA_ROWS)
 	local refH = 880 + extra * ROW
+	Dossier.style = { wash = Color3.fromHex("#D8457E"), art = "banner_party", bannerH = 300 }
 	local w = Dossier.window(host, 1786, refH, math.round(refH * K), 36)
 	local at, sz = w.at, w.sz
 	local head = w.header
@@ -151,8 +153,9 @@ function Party.open(host: Instance, view: View?, send: (request: { [string]: any
 	-- Header.
 	Dossier.headerPaper(w, 72, 52, 1622, 225, 0)
 	Dossier.clip(head, w, 80, 135, 110, 0)
-	Kit.glyph("party", { ImageColor3 = C.inkBlack, AnchorPoint = Vector2.new(0.5, 0.5), Position = at(268, 162), Size = sz(118, 118), Parent = head })
-	Kit.new("Frame", { BackgroundColor3 = C.inkBlack, BackgroundTransparency = 0.2, BorderSizePixel = 0, Position = at(366, 105), Size = UDim2.fromOffset(2, math.round(128 * w.k)), Parent = head })
+	local headInk = if Dossier.inDark(w.window) then Color3.new(1, 1, 1) else C.inkBlack
+	Kit.glyph("party", { ImageColor3 = headInk, AnchorPoint = Vector2.new(0.5, 0.5), Position = at(268, 162), Size = sz(118, 118), Parent = head })
+	Kit.new("Frame", { BackgroundColor3 = headInk, BackgroundTransparency = 0.2, BorderSizePixel = 0, Position = at(366, 105), Size = UDim2.fromOffset(2, math.round(128 * w.k)), Parent = head })
 	Dossier.bigCaps(w, 120, { Text = "INVITE TO PARTY", AnchorPoint = Vector2.new(0, 0.5), Position = at(410, 165), Parent = head })
 	Dossier.closeManila(head, at(1662, 152), sz(130, 116), w.close)
 

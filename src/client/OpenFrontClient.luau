@@ -216,6 +216,72 @@ function OpenFrontClient.start()
 	local hud: any = nil
 	local actionsUi: any = nil
 	local buildPreview: any = nil
+	-- In-match boosts (2026-11-23). `respawnPick`: Second Spawn is paid for
+	-- (or a credit is waiting) and the next map tap is the new start.
+	local respawnPick = false
+	local BOOST_REASON: { [string]: string } = {
+		wait = "Not yet: that boost is recharging.",
+		nothing = "Nothing of yours is reloading.",
+		late = "Too late in the match to start again.",
+		used = "You've already started again this match.",
+		tile = "Pick free land to start on.",
+		dead = "You need land for that.",
+	}
+	local function boost(which: string, tile: number?)
+		task.spawn(function()
+			local r = Query:InvokeServer({ kind = "boost", boost = which, tile = tile })
+			if type(r) ~= "table" then
+				return
+			end
+			if r.ok and r.pick then
+				respawnPick = true
+				if hud then
+					hud:notify("Tap free land to start again.", "info")
+				end
+				return
+			end
+			if r.ok then
+				if which == "secondSpawn" then
+					respawnPick = false
+					if hud then
+						hud.respawnUsed = true
+					end
+				end
+				return
+			end
+			if r.reason ~= "needPurchase" then
+				if hud and BOOST_REASON[r.reason] then
+					hud:notify(BOOST_REASON[r.reason], "info")
+				end
+				return
+			end
+			local id = Products[which]
+			local Granted = remotes:FindFirstChild("Granted") :: RemoteEvent?
+			if id == nil or Granted == nil then
+				return
+			end
+			-- Bought: ask again (Second Spawn then waits for the spot).
+			local conn: RBXScriptConnection
+			conn = Granted.OnClientEvent:Connect(function(grant: any)
+				if type(grant) == "table" and grant.product == which then
+					conn:Disconnect()
+					local again = Query:InvokeServer({ kind = "boost", boost = which, tile = tile })
+					if type(again) == "table" and again.ok and again.pick then
+						respawnPick = true
+						if hud then
+							hud:notify("Tap free land to start again.", "info")
+						end
+					end
+				end
+			end)
+			task.delay(180, function()
+				if conn.Connected then
+					conn:Disconnect()
+				end
+			end)
+			game:GetService("MarketplaceService"):PromptProductPurchase(player, id)
+		end)
+	end
 	-- The last solo setup (Restart in the pause menu) and the map's terrain
 	-- bytes (the hover card's terrain name).
 	local lastSolo: { map: string, difficulty: string }? = nil
@@ -410,6 +476,17 @@ function OpenFrontClient.start()
 				tile = tutorial:redirectTap(tile)
 			end
 			debugInfo.lastTap = {tile = tile, x = tile % state.width, y = math.floor(tile / state.width)}
+			-- Second Spawn: this tap is the new start (2026-11-23).
+			if respawnPick then
+				local me = state:me()
+				if me ~= nil and me.alive then
+					respawnPick = false
+				else
+					audio:play("act.spawn")
+					boost("secondSpawn", tile)
+					return
+				end
+			end
 			if actionsUi and actionsUi:onMapTap(tile) then
 				return
 			end
@@ -537,7 +614,7 @@ function OpenFrontClient.start()
 			menu:_applySettings(s)
 		end,
 		openShop = function()
-			menu:_shop("arsenal")
+			menu:openShop("weapons")
 		end,
 		-- The result card's free crate line.
 		openLocker = function()
@@ -595,6 +672,13 @@ function OpenFrontClient.start()
 				game:GetService("MarketplaceService"):PromptProductPurchase(player, Products.takeover)
 			end)
 		end,
+		-- In-match boosts (2026-11-23; Runner.boostCheck): ask the server; it
+		-- spends a saved credit, or says to prompt the product, after which
+		-- we ask again. Second Spawn first only checks, then the next map
+		-- tap picks the spot (respawnPick).
+		useBoost = function(which: string, tile: number?)
+			boost(which, tile)
+		end,
 		-- The result card's FREE CRATE: the server shows Roblox's rewarded
 		-- video; when it completes Roblox grants the crate like a purchase
 		-- (the menu's Granted handler opens it).
@@ -640,6 +724,12 @@ function OpenFrontClient.start()
 			audio:play(key)
 		end,
 	}
+	-- The Campaign Pass's XP from the match (under the stars on the card).
+	menu.passGained = function(gained: number, pass: any)
+		if hud then
+			hud:showPassXp(gained, pass)
+		end
+	end
 	menu.starsGained = function(gained: number)
 		audio:play("menu.stars")
 		hud:showStars(gained, menu.view)
@@ -687,6 +777,12 @@ function OpenFrontClient.start()
 	local hudPanelRects: { { x: number, y: number, w: number, h: number } } = {}
 	local actionsActions = {
 		goToPlayer = goToPlayer,
+		-- A boost offered at the moment it helps (OfHud.offerBoost).
+		offerBoost = function(which: string, line: string)
+			if hud then
+				hud:offerBoost(which, line)
+			end
+		end,
 		-- A locked weapon in the ARSENAL fly-out: the unlock card (Shops.unlock).
 		openUnlock = function(weaponId: string)
 			menu:openUnlock(weaponId)
@@ -804,6 +900,9 @@ function OpenFrontClient.start()
 			old:destroy()
 		end
 		hud = OfHud.new(state, root.match, root, hudActions)
+		hud.profileOf = function()
+			return menu.view
+		end
 		hud:setMusicOn(menu.settings.music)
 		actionsUi = OfActions.new(state, hud.match, actionsActions, hud.slotsHost)
 		builtCompact, builtWidth = root.compact, root.width

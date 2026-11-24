@@ -38,6 +38,18 @@ CREATE = {
 ICONS = {
     "crate1": ("chest", (255, 181, 52)),
     "crate3": ("chest", (255, 181, 52)),
+    "crate5": ("chest", (255, 181, 52)),
+    # In-match boosts (2026-11-23).
+    "warChest": ("gold", (227, 181, 76)),
+    "rearm": ("reload", (46, 138, 62)),
+    "secondSpawn": ("flag", (185, 54, 51)),
+    "starBoost": ("star", (255, 201, 60)),
+    # The Campaign Pass premium (2026-11-23).
+    "campaignPass": ("crown", (46, 94, 158)),
+    # Gifts (2026-11-23).
+    "giftCrate3": ("gift", (185, 54, 51)),
+    "giftCrate5": ("gift", (185, 54, 51)),
+    "giftPass": ("gift", (46, 94, 158)),
     "crateFirst": ("gift", (46, 163, 91)),
     "flagRare": ("flag", (79, 141, 255)),
     "flagEpic": ("flag", (176, 92, 255)),
@@ -151,7 +163,39 @@ def write_products(ids):
     path.write_text("\n".join(lines), encoding="utf-8", newline="\n")
 
 
+def sync_prices(apply: bool):
+    """Make live developer-product prices match Catalog.PRODUCTS. Run with
+    --apply only once the build showing those prices is published: Roblox's
+    prompt charges the live price at once, whatever the old build displays."""
+    items = catalog_products()
+    ids = {}
+    for m in re.finditer(r"(\w+) = (\d+),", (ROOT / "src" / "shared" / "Store" / "Products.luau").read_text(encoding="utf-8")):
+        ids[m.group(1)] = int(m.group(2))
+    status, body = call("GET", LIST["product"])
+    if status != 200:
+        sys.exit(f"listing products failed: HTTP {status} {body[:300]}")
+    live = {row["productId"]: row for row in json.loads(body)["developerProducts"]}
+    changes = []
+    for key, (kind, name, price, description) in items.items():
+        if kind != "product" or key not in ids or ids[key] not in live:
+            continue
+        now = live[ids[key]]["priceInformation"]["defaultPriceInRobux"]
+        if now != price:
+            changes.append((key, ids[key], now, price))
+    for key, pid, old, new in changes:
+        line = f"{key}: {old} -> {new}"
+        if apply:
+            body, ctype = multipart({"price": str(new)}, None)
+            status, text = call("PATCH", f"{CREATE['product']}/{pid}", body, ctype)
+            line += f"  HTTP {status}" + ("" if status in (200, 204) else f" {text[:200]}")
+        print(line)
+    print(f"{len(changes)} price(s) differ" + ("" if apply else " (dry run; --apply to change them)"))
+
+
 def main():
+    if sys.argv[1:2] == ["sync"]:
+        sync_prices("--apply" in sys.argv[2:])
+        return
     items = catalog_products()
     wanted = list(items) if sys.argv[1:] == ["all"] else sys.argv[1:]
     unknown = [k for k in wanted if k not in items]

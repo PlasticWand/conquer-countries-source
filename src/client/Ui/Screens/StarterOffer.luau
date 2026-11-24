@@ -29,6 +29,7 @@ export type Handle = { root: Frame, close: () -> (), setLeft: (number?) -> () }
 function StarterOffer.open(host: Instance, left: number?, buy: () -> ()): Handle
 	local w: Dossier.Window
 	if Dossier.phone() then
+		Dossier.style = { wash = Color3.fromHex("#E6A817"), art = "banner_starter" }
 		local p = Dossier.phoneWindow(host, "STARTER PACK")
 		local k = math.min(p.width / REF_W, p.height / REF_H)
 		local page = Kit.new("Frame", { Name = "Page", BackgroundTransparency = 1, AnchorPoint = Vector2.new(0.5, 0), Position = UDim2.new(0.5, 0, 0, 0), Size = UDim2.fromOffset(math.round(REF_W * k), math.round(REF_H * k)), Parent = p.body })
@@ -36,11 +37,12 @@ function StarterOffer.open(host: Instance, left: number?, buy: () -> ()): Handle
 	else
 		local root = Kit.root
 		local height = math.min(REF_H + 120, if root then root.height - 40 else REF_H + 120)
+		Dossier.style = { wash = Color3.fromHex("#E6A817"), art = "banner_starter", bannerH = 170 }
 		w = Dossier.window(host, REF_W, REF_H + 120, height, 140)
 		Dossier.headerPaper(w, 30, 34, 640, 110, -0.6)
-		typed({ Text = "L I M I T E D - T I M E   O F F E R", TextColor3 = C.stamp, TextSize = math.round(20 * w.k), Position = w.at(64, 52), Parent = w.header })
+		typed({ Text = "L I M I T E D - T I M E   O F F E R", TextColor3 = C.stamp, TextSize = math.round(20 * w.k), Position = w.at(64, 30), Parent = w.header })
 		-- Raised off the paper's bottom edge (Bruno, 2026-11-11, twice).
-		Dossier.bigCaps(w, 52, { Text = "STARTER PACK", AnchorPoint = Vector2.new(0, 0.5), Position = w.at(60, 96), Parent = w.header })
+		Dossier.bigCaps(w, 52, { Text = "STARTER PACK", AnchorPoint = Vector2.new(0, 0.5), Position = w.at(60, 108), Parent = w.header })
 		Dossier.closeManila(w.header, w.at(REF_W - 70, 84), w.sz(90, 86), w.close)
 		w = Dossier.rescaled(w, w.k, (function()
 			local page = Kit.new("Frame", { Name = "Page", BackgroundTransparency = 1, Position = w.at(0, 140), Size = w.sz(REF_W, REF_H), Parent = w.body })

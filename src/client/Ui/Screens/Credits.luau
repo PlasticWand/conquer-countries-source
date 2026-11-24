@@ -27,10 +27,12 @@ function Credits.open(host: Instance): Kit.Modal
 	local page: ScrollingFrame
 	local pad, titleSize, textSize
 	if phone then
+		Dossier.style = { wash = Color3.fromHex("#6A7E90"), art = "banner_credits" }
 		w = Dossier.phoneWindow(host, "CREDITS")
 		page = Kit.scroll({ Name = "Page", Position = UDim2.fromOffset(12, 6), Size = UDim2.new(1, -24, 1, -12), Parent = w.body })
 		pad, titleSize, textSize = 14, 30, 19
 	else
+		Dossier.style = { wash = Color3.fromHex("#6A7E90"), art = "banner_credits" }
 		w = Dossier.window(host, REF_W, REF_H, WINDOW_H, 36)
 		Dossier.headerPaper(w, 45, 15, 900, 110, -0.5)
 		Dossier.bigCaps(w, 66, { Text = "CREDITS", AnchorPoint = Vector2.new(0, 0.5), Position = w.at(110, 70), Parent = w.header })

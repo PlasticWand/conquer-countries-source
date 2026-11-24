@@ -38,6 +38,11 @@ export type PlayerView = {
 	team: any,
 	flag: string?, -- a nation's country code, or a human's flag id (Conquest store)
 	skin: string?, -- a human's territory skin id (Store/Skins)
+	-- A human's Campaign Pass cosmetics (Catalog.EXTRAS ids), if worn.
+	title: string?,
+	nameStyle: string?,
+	conquestFx: string?,
+	blastFx: string?,
 	userId: number?, -- a human's Roblox user id (head shot); nil for bots and nations
 	tiles: number,
 	troops: number,
@@ -180,6 +185,7 @@ local function addRoster(self: ClientState, entries: { any }): { number }
 			known.team = e.team
 			known.flag = e.flag
 			known.skin = e.skin
+			known.title, known.nameStyle, known.conquestFx, known.blastFx = e.title, e.nameStyle, e.conquestFx, e.blastFx
 			known.userId = e.userId
 			table.insert(added, e.smallID)
 			continue
@@ -195,6 +201,10 @@ local function addRoster(self: ClientState, entries: { any }): { number }
 			team = e.team,
 			flag = e.flag,
 			skin = e.skin,
+			title = e.title,
+			nameStyle = e.nameStyle,
+			conquestFx = e.conquestFx,
+			blastFx = e.blastFx,
 			userId = e.userId,
 			tiles = 0,
 			troops = 0,

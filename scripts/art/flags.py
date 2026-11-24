@@ -115,12 +115,19 @@ OWN = {
 from daily_flags import DAILY_NEW  # noqa: E402
 # Then the Thanksgiving set (Bruno, 2026-11-11), a limited yearly event.
 from event_flags import THANKSGIVING  # noqa: E402
+from campaign_flags import CAMPAIGN  # noqa: E402
 
 FIRST_BATCH = len(OWN)
 for _batch in (DAILY_NEW, THANKSGIVING):
     for _key, (_name, _rarity, _group, _body) in _batch.items():
         assert _key not in OWN, _key
         OWN[_key] = (_name, _rarity, _group, svg(_body))
+
+# Keep the campaign after all existing cells; its cloth input starts sheet 30.
+PRE_CAMPAIGN = len(OWN)
+for _key, (_name, _rarity, _group, _body) in CAMPAIGN.items():
+    assert _key not in OWN, _key
+    OWN[_key] = (_name, _rarity, _group, svg(_body))
 
 RARITY_SHARE = [("common", 70), ("rare", 22), ("epic", 6), ("legendary", 2)]
 

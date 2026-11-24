@@ -15,7 +15,24 @@ local Skins = require(script.Parent.Skins)
 local Catalog = {}
 
 export type Rarity = "common" | "rare" | "epic" | "legendary"
-export type Cosmetic = { id: string, kind: "skin" | "flag", name: string, rarity: Rarity, set: string? }
+export type Cosmetic = { id: string, kind: "skin" | "flag" | "title" | "name" | "conquest" | "blast", name: string, rarity: Rarity, set: string? }
+
+-- What a player can wear at once: one of each kind (Profile.equip), sent
+-- into matches (Store.loadout, the roster).
+Catalog.SLOTS = { "skin", "flag", "title", "name", "conquest", "blast" }
+
+-- Cosmetics beyond skins and flags (Campaign Pass season 1, 2026-11-23):
+-- titles under your name, match effects others see, a gold name. Earned
+-- from the pass; drawn in matches once the map shows them.
+Catalog.EXTRAS = {
+	{ id = "t_recruit", kind = "title", name = "Recruit", rarity = "rare", set = "campaign" },
+	{ id = "t_veteran", kind = "title", name = "Veteran", rarity = "epic", set = "campaign" },
+	{ id = "t_warlord", kind = "title", name = "Warlord", rarity = "legendary", set = "campaign" },
+	{ id = "t_soldier", kind = "title", name = "Soldier", rarity = "rare", set = "campaign" },
+	{ id = "x_conquest_gold", kind = "conquest", name = "Gold Conquest Flash", rarity = "epic", set = "campaign" },
+	{ id = "x_blast_ironroad", kind = "blast", name = "Iron Road Blast", rarity = "legendary", set = "campaign" },
+	{ id = "n_gold", kind = "name", name = "Gold Name", rarity = "legendary", set = "campaign" },
+} :: { Cosmetic }
 
 Catalog.RARITIES = { "common", "rare", "epic", "legendary" }
 Catalog.RARITY_NAME = { common = "Common", rare = "Rare", epic = "Epic", legendary = "Legendary" }
@@ -32,8 +49,18 @@ for _, s in Skins.GENERAL do
 	table.insert(cosmetics, c)
 	byId[c.id] = c
 end
+for _, s in Skins.CAMPAIGN do
+	local c: Cosmetic = { id = s.id, kind = "skin", name = s.name, rarity = s.rarity, set = "campaign" }
+	table.insert(cosmetics, c)
+	byId[c.id] = c
+end
 for _, f in FlagList do
 	local c: Cosmetic = { id = f.id, kind = "flag", name = f.name, rarity = f.rarity :: Rarity, set = f.set }
+	table.insert(cosmetics, c)
+	byId[c.id] = c
+end
+
+for _, c in Catalog.EXTRAS do
 	table.insert(cosmetics, c)
 	byId[c.id] = c
 end
@@ -51,7 +78,7 @@ end
 function Catalog.crateable(c: Cosmetic): boolean
 	local set: string? = c.set
 	if c.kind == "skin" then
-		return set ~= "general" -- Conquest General's skins: subscribers only
+		return set ~= "general" and set ~= "campaign" -- subscribers' and the pass's: never in crates
 	end
 	return set == "country"
 end
@@ -79,7 +106,7 @@ Catalog.ARSENAL = {
 		name = "Reinforcements",
 		desc = "Troops for gold, on call",
 		bullets = { "+20% of your troop limit at once", "Every 30 seconds" },
-		stars = 30000,
+		stars = 16000,
 		product = "unlockReinforce",
 		weapon = "reinforcements",
 		icon = "troops",
@@ -89,7 +116,7 @@ Catalog.ARSENAL = {
 		name = "Mega Nuke",
 		desc = "Twice the blast radius of an Atom Bomb",
 		bullets = { "4x the blast area", "2.5M gold a launch" },
-		stars = 60000,
+		stars = 30000,
 		product = "unlockMega",
 		weapon = "megaNuke",
 		icon = "atom",
@@ -100,7 +127,7 @@ Catalog.ARSENAL = {
 		name = "Scattershot",
 		desc = "An Atom Bomb with warheads that land around it",
 		bullets = { "4 to 6 extra warheads", "3.75M gold a launch" },
-		stars = 80000,
+		stars = 30000,
 		product = "unlockScatter",
 		weapon = "scattershot",
 		icon = "atom",
@@ -112,7 +139,7 @@ Catalog.ARSENAL = {
 		name = "Artillery",
 		desc = "Shells every enemy in range",
 		bullets = { "Fires on its own", "45-tile range" },
-		stars = 100000,
+		stars = 16000,
 		product = "unlockArtillery",
 		weapon = "artillery",
 		icon = "explosion",
@@ -123,7 +150,7 @@ Catalog.ARSENAL = {
 		name = "Air Strike",
 		desc = "Airfields that bomb anything in reach",
 		bullets = { "15-tile bombing run", "156-tile reach, rearms in 30 s" },
-		stars = 400000,
+		stars = 50000,
 		product = "unlockAirStrike",
 		weapon = "airStrike",
 		icon = "explosion",
@@ -134,7 +161,7 @@ Catalog.ARSENAL = {
 		name = "Railgun",
 		desc = "Hits anywhere on the map",
 		bullets = { "Knocks a building down a level", "Reloads in 25 s" },
-		stars = 1000000,
+		stars = 100000,
 		product = "unlockRailgun",
 		weapon = "railgun",
 		icon = "explosion",
@@ -145,7 +172,7 @@ Catalog.ARSENAL = {
 		name = "Field Works",
 		desc = "Dig in where the front is",
 		bullets = { "A defence post's effect for 60 s", "Built in 1 s, two at a time" },
-		stars = 70000,
+		stars = 8000,
 		product = "unlockFieldWorks",
 		weapon = "fieldWorks",
 		icon = "defense",
@@ -156,7 +183,7 @@ Catalog.ARSENAL = {
 		name = "Coastal Battery",
 		desc = "Shore guns that sink enemy boats",
 		bullets = { "One shell sinks a transport", "40-tile range" },
-		stars = 150000,
+		stars = 8000,
 		product = "unlockCoastal",
 		weapon = "coastalBattery",
 		icon = "port",
@@ -167,7 +194,7 @@ Catalog.ARSENAL = {
 		name = "Sabotage",
 		desc = "Switch off an enemy building",
 		bullets = { "Dark for 30 s after a 5 s fuse", "SAMs, silos, guns, ports" },
-		stars = 200000,
+		stars = 16000,
 		product = "unlockSabotage",
 		weapon = "sabotage",
 		icon = "explosion",
@@ -178,7 +205,7 @@ Catalog.ARSENAL = {
 		name = "Paratroopers",
 		desc = "Fly troops behind the front",
 		bullets = { "Lands up to 120 tiles away", "SAMs can shoot it down" },
-		stars = 300000,
+		stars = 30000,
 		product = "unlockParatroopers",
 		weapon = "paratroopers",
 		icon = "troops",
@@ -227,36 +254,48 @@ export type Product = { key: string, kind: "product" | "pass", name: string, pri
 Catalog.PRODUCTS = {
 	{ key = "crate1", kind = "product", name = "Cosmetic Crate", price = 49, desc = "A territory skin or a country flag you don't own yet. Odds are shown in game." },
 	{ key = "crate3", kind = "product", name = "3 Cosmetic Crates", price = 119, desc = "Three crates: skins or country flags you don't own yet. Odds are shown in game." },
+	{ key = "crate5", kind = "product", name = "5 Cosmetic Crates", price = 179, desc = "Five crates: skins or country flags you don't own yet. Odds are shown in game." },
 	{ key = "crateFirst", kind = "product", name = "First Crate", price = 15, desc = "Your first cosmetic crate at a discount. Once per player." },
 	{ key = "flagRare", kind = "product", name = "Rare Flag", price = 49, desc = "The rare flag you picked in the Flag Shop, yours to keep." },
 	{ key = "flagEpic", kind = "product", name = "Epic Flag", price = 99, desc = "The epic flag you picked in the Flag Shop, yours to keep." },
 	{ key = "flagLegendary", kind = "product", name = "Legendary Flag", price = 149, desc = "The legendary flag you picked in the Flag Shop, yours to keep." },
 	{ key = "unlockReinforce", kind = "product", name = "Arsenal: Reinforcements", price = 79, desc = "Unlock Reinforcements for good: troops for gold, every 30 seconds." },
 	{ key = "unlockMega", kind = "product", name = "Arsenal: Mega Nuke", price = 129, desc = "Unlock the Mega Nuke for good: twice an Atom Bomb's blast radius." },
-	{ key = "unlockScatter", kind = "product", name = "Arsenal: Scattershot", price = 67, desc = "Unlock the Scattershot for good: an Atom Bomb with 4 to 6 warheads around it." },
+	{ key = "unlockScatter", kind = "product", name = "Arsenal: Scattershot", price = 129, desc = "Unlock the Scattershot for good: an Atom Bomb with 4 to 6 warheads around it." },
 	{ key = "starterPack", kind = "product", name = "Starter Pack", price = 39, desc = "Mega Nuke, Scattershot and 2x Stars for good. Once per player, for a limited time." },
 	{ key = "takeover", kind = "product", name = "Takeover", price = 25, desc = "Take command of the AI nation that eliminated you: its land, army, gold and buildings." },
-	{ key = "unlockAirStrike", kind = "product", name = "Arsenal: Air Strike", price = 349, desc = "Unlock Air Strikes for good: airfields that bomb a 15-tile circle up to 156 tiles away." },
-	{ key = "unlockRailgun", kind = "product", name = "Arsenal: Railgun", price = 999, desc = "Unlock the Railgun for good: hits anywhere on the map and knocks buildings down a level." },
+	-- In-match boosts (Bruno, 2026-11-23: names, prices and limits approved).
+	{ key = "warChest", kind = "product", name = "War Chest", price = 25, desc = "Gold now in your match: three minutes of your income, at least 500K. Once every two minutes." },
+	{ key = "rearm", kind = "product", name = "Instant Rearm", price = 15, desc = "Every silo, SAM, battery, airfield and railgun of yours reloads at once. Once a minute." },
+	{ key = "secondSpawn", kind = "product", name = "Second Spawn", price = 25, desc = "Wiped out in a match's first five minutes? Start again at a spot you pick, with starting troops. Once a match." },
+	{ key = "starBoost", kind = "product", name = "Star Boost", price = 19, desc = "Double stars for an hour of play, on top of 2x Stars." },
+	-- The Campaign Pass's premium track for the current season (Bruno, 2026-11-23).
+	{ key = "campaignPass", kind = "product", name = "Campaign Pass", price = 199, desc = "This season's premium rewards: exclusive skins and flags, crates and stars." },
+	-- Gifts for a friend in your party (Bruno, 2026-11-23: 3 crates, 5 crates, the pass).
+	{ key = "giftCrate3", kind = "product", name = "Gift: 3 Cosmetic Crates", price = 119, desc = "Three crates for the friend you picked. They open them next time they play." },
+	{ key = "giftCrate5", kind = "product", name = "Gift: 5 Cosmetic Crates", price = 179, desc = "Five crates for the friend you picked. They open them next time they play." },
+	{ key = "giftPass", kind = "product", name = "Gift: Campaign Pass", price = 199, desc = "This season's Campaign Pass premium for the friend you picked." },
+	{ key = "unlockAirStrike", kind = "product", name = "Arsenal: Air Strike", price = 199, desc = "Unlock Air Strikes for good: airfields that bomb a 15-tile circle up to 156 tiles away." },
+	{ key = "unlockRailgun", kind = "product", name = "Arsenal: Railgun", price = 349, desc = "Unlock the Railgun for good: hits anywhere on the map and knocks buildings down a level." },
 	{ key = "unlockRapidReload", kind = "product", name = "Arsenal: Rapid Reload", price = 129, desc = "Every reload of yours takes half as long: silos, SAMs, Artillery, Airfields and Railguns." },
-	{ key = "unlockCoastal", kind = "product", name = "Arsenal: Coastal Battery", price = 149, desc = "Unlock the Coastal Battery for good: shore guns that sink enemy boats within 40 tiles." },
-	{ key = "unlockSabotage", kind = "product", name = "Arsenal: Sabotage", price = 199, desc = "Unlock Sabotage for good: switch off an enemy building (a SAM, silo, gun or port) for 30 seconds." },
-	{ key = "unlockFieldWorks", kind = "product", name = "Arsenal: Field Works", price = 79, desc = "Unlock Field Works for good: earthworks near a front that defend like a defense post for 60 seconds." },
-	{ key = "unlockParatroopers", kind = "product", name = "Arsenal: Paratroopers", price = 249, desc = "Unlock Paratroopers for good: fly troops from a city up to 120 tiles away to attack behind the front." },
-	{ key = "unlockArtillery", kind = "product", name = "Arsenal: Artillery", price = 99, desc = "Unlock Artillery for good: batteries that shell every enemy within 45 tiles." },
+	{ key = "unlockCoastal", kind = "product", name = "Arsenal: Coastal Battery", price = 49, desc = "Unlock the Coastal Battery for good: shore guns that sink enemy boats within 40 tiles." },
+	{ key = "unlockSabotage", kind = "product", name = "Arsenal: Sabotage", price = 79, desc = "Unlock Sabotage for good: switch off an enemy building (a SAM, silo, gun or port) for 30 seconds." },
+	{ key = "unlockFieldWorks", kind = "product", name = "Arsenal: Field Works", price = 49, desc = "Unlock Field Works for good: earthworks near a front that defend like a defense post for 60 seconds." },
+	{ key = "unlockParatroopers", kind = "product", name = "Arsenal: Paratroopers", price = 129, desc = "Unlock Paratroopers for good: fly troops from a city up to 120 tiles away to attack behind the front." },
+	{ key = "unlockArtillery", kind = "product", name = "Arsenal: Artillery", price = 79, desc = "Unlock Artillery for good: batteries that shell every enemy within 45 tiles." },
 	{ key = "doubleStars", kind = "pass", name = "2x Stars", price = 199, desc = "Every match pays double stars, forever." },
 	-- Daily deals, 40% off (Bruno, 2026-11-16; Catalog.dealOf picks one a day).
 	{ key = "dealReinforce", kind = "product", name = "Deal: Reinforcements", price = 47, desc = "Today's deal: unlock Reinforcements for good, 40% off." },
 	{ key = "dealMega", kind = "product", name = "Deal: Mega Nuke", price = 77, desc = "Today's deal: unlock Mega Nuke for good, 40% off." },
-	{ key = "dealScatter", kind = "product", name = "Deal: Scattershot", price = 40, desc = "Today's deal: unlock Scattershot for good, 40% off." },
-	{ key = "dealArtillery", kind = "product", name = "Deal: Artillery", price = 59, desc = "Today's deal: unlock Artillery for good, 40% off." },
-	{ key = "dealAirStrike", kind = "product", name = "Deal: Air Strike", price = 209, desc = "Today's deal: unlock Air Strike for good, 40% off." },
-	{ key = "dealRailgun", kind = "product", name = "Deal: Railgun", price = 599, desc = "Today's deal: unlock Railgun for good, 40% off." },
+	{ key = "dealScatter", kind = "product", name = "Deal: Scattershot", price = 77, desc = "Today's deal: unlock Scattershot for good, 40% off." },
+	{ key = "dealArtillery", kind = "product", name = "Deal: Artillery", price = 47, desc = "Today's deal: unlock Artillery for good, 40% off." },
+	{ key = "dealAirStrike", kind = "product", name = "Deal: Air Strike", price = 119, desc = "Today's deal: unlock Air Strike for good, 40% off." },
+	{ key = "dealRailgun", kind = "product", name = "Deal: Railgun", price = 209, desc = "Today's deal: unlock Railgun for good, 40% off." },
 	{ key = "dealRapidReload", kind = "product", name = "Deal: Rapid Reload", price = 77, desc = "Today's deal: unlock Rapid Reload for good, 40% off." },
-	{ key = "dealCoastal", kind = "product", name = "Deal: Coastal Battery", price = 89, desc = "Today's deal: unlock Coastal Battery for good, 40% off." },
-	{ key = "dealSabotage", kind = "product", name = "Deal: Sabotage", price = 119, desc = "Today's deal: unlock Sabotage for good, 40% off." },
-	{ key = "dealFieldWorks", kind = "product", name = "Deal: Field Works", price = 47, desc = "Today's deal: unlock Field Works for good, 40% off." },
-	{ key = "dealParatroopers", kind = "product", name = "Deal: Paratroopers", price = 149, desc = "Today's deal: unlock Paratroopers for good, 40% off." },
+	{ key = "dealCoastal", kind = "product", name = "Deal: Coastal Battery", price = 29, desc = "Today's deal: unlock Coastal Battery for good, 40% off." },
+	{ key = "dealSabotage", kind = "product", name = "Deal: Sabotage", price = 47, desc = "Today's deal: unlock Sabotage for good, 40% off." },
+	{ key = "dealFieldWorks", kind = "product", name = "Deal: Field Works", price = 29, desc = "Today's deal: unlock Field Works for good, 40% off." },
+	{ key = "dealParatroopers", kind = "product", name = "Deal: Paratroopers", price = 77, desc = "Today's deal: unlock Paratroopers for good, 40% off." },
 	-- Star packs (Bruno, 2026-11-16; Catalog.STAR_PACKS).
 	{ key = "stars10k", kind = "product", name = "10,000 Stars", price = 29, desc = "10,000 stars to spend in the Arsenal and the Locker." },
 	{ key = "stars35k", kind = "product", name = "35,000 Stars", price = 89, desc = "35,000 stars to spend in the Arsenal and the Locker." },
@@ -273,7 +312,7 @@ Catalog.STARTER = table.freeze({
 	items = table.freeze({ "w_mega", "w_scatter", "b_double" }),
 	durationS = 48 * 3600,
 	graceS = 15 * 60,
-	regular = 129 + 67 + 199,
+	regular = 129 + 129 + 199, -- Mega Nuke, Scattershot, 2x Stars (2026-11-23 prices)
 })
 
 -- The launch event (Bruno, 2026-11-13): for 7 days everyone who plays may

@@ -65,7 +65,8 @@ return function(): any
 				return roblox.Vector2.new((env.textWidths and env.textWidths[text] or #text*.5)*size,size)
 			end} end
 			if name=='EncodingService' then return luau.load(fs.readFile('tests/OpenFrontEncodingHarness.luau'))() end
-			if name=='RunService' then return {RenderStepped=env.render} end
+			if name=='RunService' then return {RenderStepped=env.render,IsStudio=function() return env.studio==true end} end
+			if name=='Players' then env.player=env.player or instance('Player');return {LocalPlayer=env.player} end
 			if name=='UserInputService' then return env.uis end
 			assert(name=='AssetService')
 			return {CreateEditableImage=function(_,options)
@@ -100,7 +101,7 @@ return function(): any
 	local loaded={}
 	local function load(node: any): any
 		if node~=root.EditableRenderer and node~=root.SceneOverlay and node~=root.EffectOverlay and node~=root.MapInput
-			and node~=root.BuildPreviewController and node~=root.NameStatusOverlay and node~=root.SabotageReachOverlay then return Harness.require(node) end
+			and node~=root.BuildPreviewController and node~=root.NameStatusOverlay and node~=root.SabotageReachOverlay and node~=root.TitleOverlay then return Harness.require(node) end
 		if loaded[node] then return loaded[node] end
 		local globals=table.clone(native); globals.script,globals.require=node,load
 		if node==root.BuildPreviewController then globals.task=previewTask end

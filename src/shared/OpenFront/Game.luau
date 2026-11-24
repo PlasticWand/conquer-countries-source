@@ -631,6 +631,11 @@ function Game.conquerPlayer(self: Game, conqueror: Player.Player, conquered: Pla
 	end
 	self._stats:recordDeathPosition(conquered, alive + 1)
 	self:addUpdate({ type = "ConquestEvent", conquerorId = conqueror:id(), conqueredId = conquered:id(), gold = goldCaptured })
+	-- Conquest: the Runner adds the public cosmetic mark (it knows the names).
+	local hook = (self :: any).onConquest
+	if hook then
+		hook(conqueror, conquered)
+	end
 end
 
 -- Units ------------------------------------------------------------------------

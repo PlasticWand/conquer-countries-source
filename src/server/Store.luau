@@ -172,6 +172,9 @@ local function onShop(player: Player, request: any): any
 	if request.op == "shopOpened" and type(request.where) == "string" then
 		Analytics.shopOpened(player, request.where)
 		return { ok = true }
+	elseif request.op == "shopShelf" and type(request.shelf) == "string" then
+		Analytics.shopShelf(player, request.shelf)
+		return { ok = true }
 	elseif request.op == "shopPrompted" and type(request.product) == "string" then
 		if request.product == "general" or Catalog.product(request.product) ~= nil then
 			Analytics.shopPrompted(player, request.product)
@@ -199,6 +202,22 @@ local function onShop(player: Player, request: any): any
 		result = { ok = item ~= nil or reason == "complete", reason = reason, item = if item then item.id else nil }
 		if result.ok then
 			Analytics.freeCrateOpened(player)
+		end
+	elseif request.op == "giftTargets" then
+		return { ok = true, targets = Store.giftTargets(player) }
+	elseif request.op == "giftPick" and type(request.product) == "string" and type(request.to) == "number" then
+		-- Only someone the player may gift right now.
+		local allowed = false
+		for _, t in Store.giftTargets(player) do
+			allowed = allowed or t.userId == request.to
+		end
+		result = { ok = allowed and Profile.pickGift(e.record, request.product, request.to, os.time()) }
+	elseif request.op == "passClaim" and (request.track == "free" or request.track == "premium") and type(request.tier) == "number" then
+		-- A Campaign Pass tier's reward (Profile.passClaim).
+		local grant, reason = Profile.passClaim(e.record, request.track, request.tier, roll, os.time())
+		result = { ok = grant ~= nil, reason = reason, items = if grant then grant.items else nil, stars = if grant then grant.stars else nil }
+		if grant then
+			Analytics.passClaimed(player, request.track, request.tier)
 		end
 	elseif request.op == "equip" and type(request.kind) == "string" and (request.id == nil or type(request.id) == "string") then
 		result = { ok = Profile.equip(e.record, request.kind, request.id) }
@@ -370,6 +389,112 @@ local function collectReferrals(player: Player)
 	end
 end
 
+-- Gifts (2026-11-23). A bought gift waits in the buyer's saved outbox
+-- (Profile.giftsOut) until it is in the friend's mailbox (a key per
+-- receiver in giftStore); the friend's server opens it on join and every
+-- GIFT_COLLECT_S. Who may be gifted: Store.giftTargets (OpenFrontServer
+-- says who is in the player's party).
+Store.GIFT_COLLECT_S = 60
+local giftStore: any = nil
+local partyOf: ((Player) -> { Player })? = nil
+
+function Store.setPartyLookup(fn: (Player) -> { Player })
+	partyOf = fn
+end
+
+local function giftKey(userId: number): string
+	return `gift_{userId}`
+end
+
+-- Players on this server the player may gift: their party, and Roblox
+-- friends here.
+function Store.giftTargets(player: Player): { { userId: number, name: string } }
+	local out, seen = {}, {}
+	local function add(other: Player)
+		if other ~= player and not seen[other.UserId] then
+			seen[other.UserId] = true
+			table.insert(out, { userId = other.UserId, name = other.DisplayName })
+		end
+	end
+	if partyOf then
+		for _, other in partyOf(player) do
+			add(other)
+		end
+	end
+	for _, other in Players:GetPlayers() do
+		if not seen[other.UserId] and other ~= player then
+			local ok, friend = pcall(function()
+				return (player :: any):IsFriendsWithAsync(other.UserId)
+			end)
+			if ok and friend then
+				add(other)
+			end
+		end
+	end
+	return out
+end
+
+-- Moves the player's outbox into the receivers' mailboxes.
+local function deliverGifts(player: Player)
+	local e = entries[player.UserId]
+	if giftStore == nil or e == nil or not e.saved or #e.record.giftsOut == 0 then
+		return
+	end
+	local fromName = player.DisplayName
+	for _, gift in table.clone(e.record.giftsOut) do
+		local ok = pcall(function()
+			giftStore:UpdateAsync(giftKey(gift.to), function(list: any): any
+				list = if type(list) == "table" then list else {}
+				for _, g in list do
+					if type(g) == "table" and g.id == gift.id then
+						return list -- delivered before
+					end
+				end
+				table.insert(list, { id = gift.id, product = gift.product, from = fromName })
+				return list
+			end)
+		end)
+		if ok and entries[player.UserId] == e then
+			local i = table.find(e.record.giftsOut, gift)
+			if i then
+				table.remove(e.record.giftsOut, i)
+				e.dirty = true
+			end
+		end
+	end
+end
+
+-- Opens the gifts waiting in the player's mailbox (each once).
+local function collectGifts(player: Player)
+	local e = entries[player.UserId]
+	if giftStore == nil or e == nil or not e.saved then
+		return
+	end
+	local taken: { any } = {}
+	local ok = pcall(function()
+		giftStore:UpdateAsync(giftKey(player.UserId), function(list: any): any
+			taken = if type(list) == "table" then list else {}
+			return if #taken > 0 then {} else nil
+		end)
+	end)
+	if not ok or #taken == 0 or entries[player.UserId] ~= e then
+		return
+	end
+	for _, g: any in taken do
+		if type(g) == "table" and type(g.id) == "string" and type(g.product) == "string" then
+			local receipt = "gift:" .. g.id
+			if not table.find(e.record.receipts, receipt) then
+				table.insert(e.record.receipts, receipt)
+				local grant = Profile.receiveGift(e.record, g.product, roll, os.time())
+				e.dirty = true
+				grantedRemote:FireClient(player, { items = grant.items, stars = grant.stars, product = "gift", gift = g.product, from = if type(g.from) == "string" then g.from else "A friend" })
+				Analytics.giftReceived(player, g.product)
+			end
+		end
+	end
+	push(player)
+end
+
 -- MarketplaceService.ProcessReceipt: grant once, save, then confirm.
 local function processReceipt(receipt: any): Enum.ProductPurchaseDecision
 	local player = Players:GetPlayerByUserId(receipt.PlayerId)
@@ -386,8 +511,11 @@ local function processReceipt(receipt: any): Enum.ProductPurchaseDecision
 	if grant then
 		e.dirty = true
 		push(player)
-		grantedRemote:FireClient(player, { items = grant.items, stars = grant.stars, product = key })
+		grantedRemote:FireClient(player, { items = grant.items, stars = grant.stars, product = key, sent = if grant.kind == "giftSent" then true else nil })
 		Analytics.shopPurchased(player, key)
+		if grant.kind == "giftSent" then
+			task.spawn(deliverGifts, player)
+		end
 	end
 	return if confirm then Enum.ProductPurchaseDecision.PurchaseGranted else Enum.ProductPurchaseDecision.NotProcessedYet
 end
@@ -399,6 +527,12 @@ function Store.matchEnded(player: Player, result: Profile.MatchResult): number
 		return 0
 	end
 	local stars = Profile.applyMatch(e.record, result, e.doubleStars or e.record.owned.b_double == true, e.general)
+	-- The Campaign Pass's XP and missions (the client sees the XP change
+	-- in the pushed view).
+	local xp, missions = Profile.passMatch(e.record, result, os.time())
+	if xp > 0 then
+		Analytics.passXp(player, xp, #missions)
+	end
 	e.dirty = true
 	push(player)
 	-- An invited player's first real match: their inviter earns the reward.
@@ -451,6 +585,32 @@ function Store.payTutorial(player: Player, stars: number): number
 		push(player)
 	end
 	return paid
+end
+
+-- In-match boost credits (2026-11-23; Profile.BOOSTS): whether the player
+-- has one, spending one, and putting one back when applying it failed.
+function Store.hasBoost(player: Player, key: string): boolean
+	local e = entries[player.UserId]
+	return e ~= nil and (e.record.boosts[key] or 0) > 0
+end
+
+function Store.spendBoost(player: Player, key: string): boolean
+	local e = entries[player.UserId]
+	if e == nil or not Profile.spendBoost(e.record, key) then
+		return false
+	end
+	e.dirty = true
+	push(player)
+	return true
+end
+
+function Store.refundBoost(player: Player, key: string)
+	local e = entries[player.UserId]
+	if e ~= nil then
+		Profile.refundBoost(e.record, key)
+		e.dirty = true
+		push(player)
+	end
 end
 
 -- Spends one of the player's saved Takeovers (the Arsenal's, 25 R$ a use);
@@ -547,12 +707,13 @@ local function checkGeneral(player: Player)
 end
 
 -- The player's Arsenal weapons and what they wear, for a match.
-function Store.loadout(player: Player): { weapons: { [string]: boolean }, skin: string?, flag: string? }
+function Store.loadout(player: Player): { weapons: { [string]: boolean }, skin: string?, flag: string?, title: string?, nameStyle: string?, conquestFx: string?, blastFx: string? }
 	local e = entries[player.UserId]
 	if e == nil then
 		return { weapons = {} }
 	end
-	return { weapons = Profile.weapons(e.record), skin = e.record.equipped.skin, flag = e.record.equipped.flag }
+	local q = e.record.equipped
+	return { weapons = Profile.weapons(e.record), skin = q.skin, flag = q.flag, title = q.title, nameStyle = q.name, conquestFx = q.conquest, blastFx = q.blast }
 end
 
 function Store.start(remotes: Folder)
@@ -596,6 +757,7 @@ function Store.start(remotes: Folder)
 	else
 		pcall(function()
 			referralStore = DataStoreService:GetDataStore(if RunService:IsStudio() then "ConquestReferrals_Studio" else "ConquestReferrals_v1")
+			giftStore = DataStoreService:GetDataStore(if RunService:IsStudio() then "ConquestGifts_Studio" else "ConquestGifts_v1")
 		end)
 	end
 	MarketplaceService.ProcessReceipt = processReceipt
@@ -670,6 +832,17 @@ function Store.start(remotes: Folder)
 		load(player)
 		task.spawn(noteReferrer, player)
 		task.spawn(collectReferrals, player)
+		task.spawn(function()
+			-- (once the profile is in)
+			for _ = 1, 30 do
+				if entries[player.UserId] or player.Parent == nil then
+					break
+				end
+				task.wait(1)
+			end
+			collectGifts(player)
+			deliverGifts(player)
+		end)
 		checkGeneral(player)
 	end
 	Players.PlayerAdded:Connect(function(player)
@@ -688,7 +861,13 @@ function Store.start(remotes: Folder)
 	task.spawn(function()
 		local collectAt = os.clock() + Store.REFERRAL_COLLECT_S
 		while true do
-			task.wait(60)
+			task.wait(Store.GIFT_COLLECT_S)
+			for _, player in Players:GetPlayers() do
+				task.spawn(function()
+					deliverGifts(player)
+					collectGifts(player)
+				end)
+			end
 			if os.clock() >= collectAt then
 				collectAt = os.clock() + Store.REFERRAL_COLLECT_S
 				for _, player in Players:GetPlayers() do

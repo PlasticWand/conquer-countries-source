@@ -103,6 +103,13 @@ local function rosterEntry(p: any): { [string]: any }
 		-- territory skin id (Store/Skins), if any.
 		flag = info.nationFlag or info.flag,
 		skin = info.skin,
+		-- A human's Campaign Pass cosmetics (2026-11-23; Catalog.EXTRAS ids):
+		-- a title under the name, the name's style, the conquest flash and
+		-- the nuke blast others see.
+		title = info.title,
+		nameStyle = info.nameStyle,
+		conquestFx = info.conquestFx,
+		blastFx = info.blastFx,
 		-- Conquest: a human's Roblox user id (the server keys humans by it),
 		-- for the head shot beside their name (RoWorld's labels, 2026-11-03).
 		-- Bots and nations have none.
@@ -114,7 +121,7 @@ end
 -- (a Takeover: a nation becomes a human, with their name, flag, skin and
 -- user id; the human it replaced loses theirs) is sent again.
 local function rosterSig(e: { [string]: any }): string
-	return `{e.id}|{e.name}|{e.displayName}|{e.type}|{e.team}|{e.flag}|{e.skin}|{e.userId}`
+	return `{e.id}|{e.name}|{e.displayName}|{e.type}|{e.team}|{e.flag}|{e.skin}|{e.userId}|{e.title}|{e.nameStyle}|{e.conquestFx}|{e.blastFx}`
 end
 
 -- Units whose movement clients derive from motion plans: their records are
@@ -436,6 +443,8 @@ local EVENT_TYPES: { [string]: true } = {
 	BonusEvent = true,
 	-- The conquest flag and its gold (FxSpritePass), for the conqueror only.
 	ConquestEvent = true,
+	-- A gold conquest's public mark (no gold), for every viewer.
+	ConquestCosmeticEvent = true,
 	RailroadConstructionEvent = true,
 	RailroadDestructionEvent = true,
 	RailroadSnapEvent = true,

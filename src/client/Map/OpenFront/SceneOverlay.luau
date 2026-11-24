@@ -20,6 +20,8 @@ local NameStatus = require(script.Parent.NameStatusOverlay)
 local Timings = require(script.Parent.RenderTimings)
 local Flag = require(script.Parent.NameFlag)
 local NameLine = require(script.Parent.NameLine)
+local Cosmetics = require(script.Parent.MatchCosmetics)
+local Titles = require(script.Parent.TitleOverlay)
 local LabelPlacement = require(script.Parent.LabelPlacement)
 local StructureCache = require(script.Parent.StructureAtlas)
 local Structure = require(script.Parent.StructureMath)
@@ -139,6 +141,7 @@ function Overlay.new(renderer: any): any
 		unitOrder = {}, knownUnits = {}, nameTransitions = {}, friendly = {}, allianceClusters = {},
 		trails = Trails.new(renderer.core.width,renderer.core.height)}, Overlay) :: any
 	self.effects = Effects.new(renderer, renderer.root,64)
+	self.titles=Titles.new(); self.cosmeticOverrides={}; self.blastStyles={}
 	for _,f in {self.effects.spawn,self.effects.fx,self.effects.text,self.effects.falloutLayer} do
 		f.Size=UDim2.fromOffset(renderer.core.width*64,renderer.core.height*64)
 		local scale=Instance.new("UIScale"); scale.Parent=f
@@ -1221,9 +1224,9 @@ function Overlay.nameScreenRect(self:any,id:number,unshifted:boolean?): LabelPla
 		if not measured then measured=measureText(view.text);self.nameMeasurements[view.text]=measured end
 		lineWidth=measured*p.namePixels/100
 	end
-	local width=math.max(lineWidth,(view.troopMeasure or 0)*p.troopPixels/100)*factor
+	local width=math.max(lineWidth,(view.troopMeasure or 0)*p.troopPixels/100,if view.titleLabel then view.titleWidth or 0 else 0)*factor
 	local top=y-p.namePixels*factor*.525
-	local bottom=y+(p.lineOffset+p.troopPixels/2)*factor
+	local bottom=y+(p.lineOffset+(view.titleShift or 0)+p.troopPixels/2)*factor
 	local left,right=x-width/2,x+width/2
 	local function include(obj:any)
 		if not obj or not obj.Visible then return end
@@ -1242,9 +1245,10 @@ end
 function Overlay.layoutLabels(self:any)
 	if not self.labelLayoutDirty then return end
 	self.labelLayoutDirty=false
+	self.titles:reset(true)
 	local c=self.renderer.camera
 	local obstacles=self.renderer.labelOccluders or {}
-	if #obstacles==0 and not self.hadLabelOccluders then return end
+	if #obstacles==0 and not self.hadLabelOccluders and #self.titles.players==0 then self.titles:finish();return end
 	self.hadLabelOccluders=#obstacles>0
 	local bounds={x=c.left+6,y=c.top+6,w=math.max(0,c.viewportWidth-12),h=math.max(0,c.viewportHeight-12)}
 	for id,view in self.nameViews do
@@ -1267,6 +1271,7 @@ function Overlay.layoutLabels(self:any)
 		view.labelWorldDx,view.labelWorldDy=dx*64/c.scale,dy*64/c.scale
 		view.labelDx,view.labelDy=dx,dy
 	end
+	self.titles:draw(self)
 end
 
 local function placeBuildCost(self:any)
@@ -1644,6 +1649,7 @@ local function drawNames(self: any)
 	local statuses = self.statuses
 	self.nameStatus:beginFrame(self.newUnitBudget)
 	local function drawName(index: number,p: any)
+		local cosmetic=self.cosmeticOverrides[p.smallID] or p
 		self.nameVisits=(self.nameVisits or 0)+1
 		local transition=self.nameTransitions[p.smallID]
 		local view = self.nameViews[p.smallID]
@@ -1669,6 +1675,7 @@ local function drawNames(self: any)
 			if cached and not capDirty and not sourceLodDirty and view.sourceVisible and view.anchorSize==anchorSize and view.targeted==status.target
 				and view.viewportWidth==camera.viewportWidth and (not maintenance or (view.zoom==camera.scale and view.strokeZoom==camera.scale))
 				and view.palette==palette and view.playerType==p.type and view.sourceText==sourceText and view.flagValue==p.flag
+				and view.titleText==Cosmetics.title(cosmetic) and view.goldName==Cosmetics.goldName(cosmetic)
 				and view.headUserId==NameLine.userId(p) and not view.headPending
 				and not (p.flag and not view.flag) and not statusChanged and not view.statusPending and view.statusContent==self.nameStatus.content
 				and view.statusConfig==self.renderConfig then
@@ -1761,15 +1768,20 @@ local function drawNames(self: any)
 				if textChanged then view.text, view.name.Text = text, text end
 				view.sourceText=sourceText
 				local styleChanged=view.palette~=palette or view.playerType~=p.type
+				local goldName=Cosmetics.goldName(cosmetic)
+				styleChanged=styleChanged or view.goldName~=goldName
+				view.titleText=Cosmetics.title(cosmetic)
 				if styleChanged then
 					local owner = ownerColor(self.renderer.core, p.smallID, false)
 					local colors = Labels.colors(if p.type == "NATION" then 2 elseif p.type == "BOT" then 1 else 0,
 						{r = owner.R, g = owner.G, b = owner.B})
 					local fill, outline = colors.fill, colors.outline
-					view.name.TextColor3 = Color3.new(fill.r, fill.g, fill.b)
-					view.troops.TextColor3 = view.name.TextColor3
+					view.name.TextColor3 = if goldName then Color3.new(Cosmetics.gold.r,Cosmetics.gold.g,Cosmetics.gold.b) else Color3.new(fill.r, fill.g, fill.b)
+					view.troops.TextColor3 = Color3.new(fill.r, fill.g, fill.b)
 					local color=Color3.new(outline.r,outline.g,outline.b)
 					for _,stroke in view.strokes do stroke.Color=color end
+					if goldName then view.strokes[1].Color=Color3.new(Cosmetics.outline.r,Cosmetics.outline.g,Cosmetics.outline.b) end
+					view.goldName=goldName
 					view.palette,view.playerType,view.outlineWidth=palette,p.type,colors.outlineWidth
 				end
 				if styleChanged or geometry or (maintenance and view.strokeZoom~=camera.scale) then
@@ -1833,6 +1845,7 @@ local function drawNames(self: any)
 				or (maintenance and view.zoom~=camera.scale and anchor and anchor.x>x0 and anchor.x<x1 and anchor.y>y0 and anchor.y<y1)
 				or (view.sourceVisible and (p.alive==false or not anchor or view.statusPending or statusChanged
 					or view.sourceText~=(p.displayName or p.name) or view.flagValue~=p.flag or (p.flag and not view.flag)
+					or view.titleText~=Cosmetics.title(self.cosmeticOverrides[p.smallID] or p) or view.goldName~=Cosmetics.goldName(self.cosmeticOverrides[p.smallID] or p)
 					or view.headUserId~=NameLine.userId(p) or view.headPending
 					or view.palette~=self.renderer.core.palette[id] or view.playerType~=p.type
 					or view.statusContent~=self.nameStatus.content or view.statusConfig~=self.renderConfig
@@ -1898,6 +1911,13 @@ function Overlay.setRoster(self: any, players: {any})
 	self.unitsDirty, self.statusDirty = true, true
 	self.unitCameraDirty=true
 	self.roster = players; self.namesDirty, self.railsDirty = true, true; seedSpawnNames(self); syncSpawn(self,true)
+	table.clear(self.blastStyles);table.clear(self.titles.players)
+	for _,p in players do
+		local cosmetic=self.cosmeticOverrides[p.smallID] or p
+		if cosmetic.type=='HUMAN' and Cosmetics.blast(cosmetic.blastFx) then self.blastStyles[p.smallID]=cosmetic.blastFx end
+		if Cosmetics.title(cosmetic) then table.insert(self.titles.players,p.smallID) end
+	end
+	self.cameraDirty,self.labelLayoutDirty=true,true
 end
 function Overlay.setStats(self: any, players: {any})
 	self.statusDirty = true
@@ -1991,10 +2011,16 @@ function Overlay.unitUpdates(self: any, updates: {any}, removed: {number})
 			if Policy.smoothShips then self.shipArt.needed=true end
 		end
 	end
-	self.effects.state:unitUpdates(updates,removed,os.clock()*1000,headings)
+	self.effects.state:unitUpdates(updates,removed,os.clock()*1000,headings,self.blastStyles)
 end
 function Overlay.bonuses(self: any, events: {any}) self.effects.state:bonuses(events,os.clock()*1000) end
 function Overlay.conquests(self: any, events: {any}) self.effects.state:conquests(events,os.clock()*1000) end
+function Overlay.publicConquests(self:any,events:{any}) self.effects.state:publicConquests(events,os.clock()*1000) end
+function Overlay.setCosmeticPreview(self:any,id:number?,data:any?)
+	if id then self.cosmeticOverrides[id]=if data then {type='HUMAN',title=data.title,nameStyle=data.nameStyle,conquestFx=data.conquestFx,blastFx=data.blastFx} else nil
+	else table.clear(self.cosmeticOverrides) end
+	Overlay.setRoster(self,self.roster)
+end
 function Overlay.setDiplomacy(self: any, diplomacy: any)
 	self.diplomacy = diplomacy; self.cameraDirty, self.statusDirty = true, true
 end
@@ -2400,6 +2426,7 @@ function Overlay.metrics(self: any): {[string]: number}
 	for _,f in self.rangeViews do rangeViews+=1; if f.Visible then visibleRanges+=1 end end
 	local maskCount=0; for _ in self.effects.masks.slots do maskCount+=1 end
 	return {unitViews = n, railSegments = #self.railLines, visibleRailSegments = self.visibleRails or 0,
+		cosmeticTitleSlots=#self.titles.slots,cosmeticTitlesVisible=self.titles.visible or 0,cosmeticTitleChecks=self.titles.checks or 0,
 		defenseProbeTiles=self.defense.visits,defensePending=math.max(0,#self.defense.queue-self.defense.head+1),
 		falloutMasks=maskCount,falloutMaskBufferBytes=maskCount*Policy.falloutMaskSize^2*7,
 		falloutMaskUploads=self.effects.maskUploads,falloutMaskVisits=self.effects.masks.visits,
@@ -2434,6 +2461,7 @@ end
 function Overlay.destroy(self: any)
 	if self.destroyed then return end
 	self.destroyed = true
+	self.titles:destroy();table.clear(self.cosmeticOverrides);table.clear(self.blastStyles)
 	self.sabotageReach:destroy()
 	self.feel:destroy()
 	self.artillery:destroy()

@@ -118,4 +118,25 @@ function Art.card(id: string, props: { [string]: any }): ImageLabel
 	return cellImage(StoreArt.ARSENAL, cell[1] * StoreArt.cardW, cell[2] * StoreArt.cardH, StoreArt.cardW, StoreArt.cardH, props)
 end
 
+-- A title, match effect or the gold name (Catalog.EXTRAS) has no picture
+-- of its own yet: its kind's icon in its rarity's colour.
+local EXTRA_GLYPH = { title = "crown", conquest = "flag", blast = "explosion", name = "star" }
+local EXTRA_INK = { rare = Color3.fromHex("#3D8BEA"), epic = Color3.fromHex("#9B5CF0"), legendary = Color3.fromHex("#E3A82A"), common = Color3.fromHex("#8C8A7C") }
+function Art.extra(kind: string, rarity: string, props: { [string]: any }): ImageLabel
+	local merged = table.clone(props)
+	merged.ImageColor3 = merged.ImageColor3 or EXTRA_INK[rarity] or EXTRA_INK.common
+	merged.ScaleType = Enum.ScaleType.Fit
+	return Kit.glyph(EXTRA_GLYPH[kind] or "star", merged)
+end
+
+-- Any cosmetic's picture: a skin's pattern, a flag, or an extra's icon.
+function Art.cosmetic(item: { id: string, kind: string, rarity: string }, props: { [string]: any }): ImageLabel
+	if item.kind == "skin" then
+		return Art.skin(item.id, props)
+	elseif item.kind == "flag" then
+		return Art.flag(item.id, props)
+	end
+	return Art.extra(item.kind, item.rarity, props)
+end
+
 return Art

@@ -99,19 +99,50 @@ end
 local merge = Dossier.merge
 
 -- Heavy condensed caps in ink.
+-- Whether `parent` is a dark window's own header or body (2026-11-23): ink
+-- placed straight on it turns light, and the paper props (clips, stamps,
+-- pins, tape) stay off it. Light tiles inside keep their ink.
+local function onDarkSurface(parent: any): boolean
+	if typeof(parent) ~= "Instance" or not parent:IsA("GuiObject") then
+		return false
+	end
+	local up = parent.Parent
+	return up ~= nil and up:GetAttribute("DarkStyle") == true and (parent.Name == "Header" or parent.Name == "Body" or parent.Name == "Board")
+end
+Dossier.onDarkSurface = onDarkSurface
+local DARK_INK = Color3.fromHex("#F4ECD8")
+local DARK_FADED = Color3.fromHex("#C9C2AE")
+
 function Dossier.stencil(props: { [string]: any }): TextLabel
-	return Kit.label(merge({ FontFace = F.stencil, TextColor3 = C.inkBlack, TextSize = 40 }, props))
+	local label = Kit.label(merge({ FontFace = F.stencil, TextColor3 = C.inkBlack, TextSize = 40 }, props))
+	if onDarkSurface(props.Parent) and (props.TextColor3 == nil or props.TextColor3 == C.inkBlack or props.TextColor3 == C.inkFaded) then
+		label.TextColor3 = DARK_INK
+	end
+	return label
 end
 local stencil = Dossier.stencil
 
 -- Typewriter text on paper.
 function Dossier.typed(props: { [string]: any }): TextLabel
-	return Kit.label(merge({ FontFace = F.typewriter, TextColor3 = C.inkFaded, TextSize = 18 }, props))
+	local label = Kit.label(merge({ FontFace = F.typewriter, TextColor3 = C.inkFaded, TextSize = 18 }, props))
+	if onDarkSurface(props.Parent) then
+		if props.TextColor3 == nil or props.TextColor3 == C.inkBlack or props.TextColor3 == C.inkFaded then
+			label.TextColor3 = DARK_FADED
+		elseif props.TextColor3 == C.stamp then
+			label.TextColor3 = Color3.fromHex("#FFD75E")
+		end
+	end
+	return label
 end
+
+local PAPER_PROPS = { stamp_secret = true, star_stamp = true, paperclip = true, pin = true }
 
 -- A piece of dossier art, or nil when it isn't uploaded.
 function Dossier.art(name: string, props: { [string]: any }): ImageLabel?
 	if (A[name] or "") == "" then
+		return nil
+	end
+	if (PAPER_PROPS[name] or string.sub(name, 1, 4) == "tape") and onDarkSurface(props.Parent) then
 		return nil
 	end
 	return Kit.new("ImageLabel", merge({ BackgroundTransparency = 1, Image = A[name], ScaleType = Enum.ScaleType.Fit }, props))
@@ -344,21 +375,17 @@ function Dossier.window(host: Instance, refW: number, refH: number, height: numb
 		return UDim2.fromOffset(math.round(w * k), math.round(h * k))
 	end
 	local root = Kit.new("Frame", { Name = "Modal", BackgroundTransparency = 1, Size = UDim2.fromScale(1, 1), ZIndex = 50, Parent = host }) :: Frame
-	Kit.new("TextButton", { Name = "Scrim", Text = "", AutoButtonColor = false, BackgroundColor3 = C.desk, BackgroundTransparency = 0.3, BorderSizePixel = 0, Size = UDim2.fromScale(1, 1), Parent = root })
-	local window = Kit.new("Frame", { Name = "Window", BackgroundTransparency = 1, AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromScale(0.5, 0.5), Size = sz(refW, refH), Parent = root }) :: Frame
-	-- A drop shadow, the folder, its tab, and the board.
-	Dossier.shadow(window, { Position = at(0, 18), Size = sz(refW, refH - 18) }, 1)
-	local tab = surface("ImageLabel", "tex_manila", C.manila, { Name = "FolderTab", Position = UDim2.fromOffset(0, 0), Size = sz(refW * 0.38, 60), ZIndex = 1, Parent = window })
-	Kit.corner(10).Parent = tab
-	local folder = surface("ImageLabel", "tex_manila", C.manila, { Name = "Folder", Position = at(0, 22), Size = sz(refW, refH - 22), ZIndex = 1, Parent = window })
-	Kit.corner(10).Parent = folder
-	Kit.stroke(C.manilaLine, 2, 0.2).Parent = folder
-	local board = Dossier.sheet("ImageLabel", "board", "tex_board", C.board, { Name = "Board", Position = at(14, boardTop), Size = sz(refW - 28, refH - boardTop - 14), ZIndex = 1, Parent = window })
-	Kit.stroke(C.boardDark, 2, 0.3).Parent = board
-	-- The top band above the board shows the board too (the reference has the
-	-- stained board behind its header papers).
-	local top = Dossier.sheet("ImageLabel", "board", "tex_board", C.board, { Name = "BoardTop", Position = at(14, 36), Size = sz(refW - 28, boardTop - 36), ImageTransparency = 0.1, ZIndex = 1, Parent = window })
-	top.Visible = boardTop > 60
+	Kit.new("TextButton", { Name = "Scrim", Text = "", AutoButtonColor = false, BackgroundColor3 = C.desk, BackgroundTransparency = 0.25, BorderSizePixel = 0, Size = UDim2.fromScale(1, 1), Parent = root })
+	-- The dark style (Bruno, 2026-11-23: every window like the Campaign
+	-- Pass): a dark body, a banner washed in the window's colour over its
+	-- header (Dossier.style, set by the caller before opening), a soft rim.
+	local style: { [string]: any } = Dossier.style or {}
+	Dossier.style = nil
+	local window = Kit.new("Frame", { Name = "Window", BackgroundColor3 = Dossier.DARK, BorderSizePixel = 0, ClipsDescendants = false, AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromScale(0.5, 0.5), Size = sz(refW, refH), Parent = root }) :: Frame
+	window:SetAttribute("DarkStyle", true)
+	Kit.corner(math.round(16 * k)).Parent = window
+	Kit.stroke(Color3.fromHex("#0B1218"), math.max(3, math.round(6 * k)), 0).Parent = window
+	Dossier.banner(window, sz(refW, style.bannerH or math.max(boardTop, 200)), style, math.round(16 * k))
 	local header = Kit.new("Frame", { Name = "Header", BackgroundTransparency = 1, Size = UDim2.fromScale(1, 1), ZIndex = 3, Parent = window }) :: Frame
 	local body = Kit.new("Frame", { Name = "Body", BackgroundTransparency = 1, Size = UDim2.fromScale(1, 1), ZIndex = 2, Parent = window }) :: Frame
 	local closed = false
@@ -374,6 +401,56 @@ function Dossier.window(host: Instance, refW: number, refH: number, height: numb
 		end
 	end
 	return { root = root, window = window, header = header, body = body, close = close, at = at, sz = sz, k = k, width = refW, height = refH }
+end
+
+-- The dark style (2026-11-23) ---------------------------------------------------------------
+Dossier.DARK = Color3.fromHex("#0F1A14")
+-- Set just before opening a window: { wash: Color3?, art: string?, bannerH: number? }
+-- (bannerH in the window's reference pixels).
+Dossier.style = nil :: { [string]: any }?
+
+-- A banner: the picture (a banner_* art, or any photo), washed in `wash`
+-- toward the right and dark toward the left, fading into the body.
+function Dossier.banner(parent: Instance, size: UDim2, style: { [string]: any }, radius: number): Frame
+	local wash: Color3 = style.wash or Color3.fromHex("#C9902A")
+	local band = Kit.new("Frame", { Name = "Banner", BackgroundColor3 = wash:Lerp(Color3.new(0, 0, 0), 0.75), BorderSizePixel = 0, ClipsDescendants = true, Size = size, ZIndex = 1, Parent = parent }) :: Frame
+	Kit.corner(radius).Parent = band
+	local image = if style.art then A[style.art] else nil
+	if image and image ~= "" then
+		Kit.new("ImageLabel", { BackgroundTransparency = 1, Image = image, ScaleType = Enum.ScaleType.Crop, Size = UDim2.fromScale(1, 1), ZIndex = 1, Parent = band })
+	end
+	local tint = Kit.new("Frame", { BackgroundColor3 = wash, BorderSizePixel = 0, Size = UDim2.fromScale(1, 1), ZIndex = 1, Parent = band })
+	Kit.new("UIGradient", { Transparency = NumberSequence.new({ NumberSequenceKeypoint.new(0, 0.85), NumberSequenceKeypoint.new(0.5, 0.45), NumberSequenceKeypoint.new(1, 0.35) }), Parent = tint })
+	local shade = Kit.new("Frame", { BackgroundColor3 = wash:Lerp(Color3.new(0, 0, 0), 0.9), BorderSizePixel = 0, Size = UDim2.fromScale(1, 1), ZIndex = 1, Parent = band })
+	Kit.new("UIGradient", { Transparency = NumberSequence.new({ NumberSequenceKeypoint.new(0, 0.1), NumberSequenceKeypoint.new(0.5, 0.6), NumberSequenceKeypoint.new(1, 1) }), Parent = shade })
+	local foot = Kit.new("Frame", { BackgroundColor3 = Dossier.DARK, BorderSizePixel = 0, Size = UDim2.fromScale(1, 1), ZIndex = 1, Parent = band })
+	Kit.new("UIGradient", { Rotation = 90, Transparency = NumberSequence.new({ NumberSequenceKeypoint.new(0, 1), NumberSequenceKeypoint.new(0.6, 1), NumberSequenceKeypoint.new(1, 0) }), Parent = foot })
+	-- Clipping doesn't follow a rounded corner, so each layer rounds its own
+	-- (the strong wash showed a square top-right corner; Bruno, 2026-11-24).
+	for _, layer in band:GetChildren() do
+		if layer:IsA("GuiObject") then
+			Kit.corner(radius).Parent = layer
+		end
+	end
+	return band
+end
+
+-- Whether `inst` is inside a dark-style window.
+function Dossier.inDark(inst: Instance?): boolean
+	local node = inst
+	while node do
+		if node:GetAttribute("DarkStyle") then
+			return true
+		end
+		node = node.Parent
+	end
+	return false
+end
+
+-- A soft dark outline that keeps white text readable on any colour.
+function Dossier.outline(label: TextLabel): TextLabel
+	Kit.new("UIStroke", { Color = Color3.new(0, 0, 0), Thickness = 1.5, Transparency = 0.45, Parent = label })
+	return label
 end
 
 -- A phone's windows fill the screen (Bruno, 2026-10-27).
@@ -414,10 +491,14 @@ function Dossier.phoneWindow(host: Instance, title: string, onClose: (() -> ())?
 	end
 	local root = Kit.new("Frame", { Name = "Modal", BackgroundTransparency = 1, Size = UDim2.fromScale(1, 1), ZIndex = 50, Parent = host }) :: Frame
 	Kit.new("TextButton", { Name = "Scrim", Text = "", AutoButtonColor = false, BackgroundColor3 = C.desk, BackgroundTransparency = 0, BorderSizePixel = 0, Size = UDim2.fromScale(1, 1), Parent = root })
+	local style: { [string]: any } = Dossier.style or {}
+	Dossier.style = nil
 	local window = Kit.new("Frame", { Name = "Window", BackgroundTransparency = 1, Size = UDim2.fromScale(1, 1), Parent = root }) :: Frame
-	local board = Dossier.sheet("ImageLabel", "board", "tex_board", C.board, { Name = "Board", Position = at(4, 4), Size = sz(W - 8, H - 8), ZIndex = 1, Parent = window })
-	Kit.corner(6).Parent = board
-	Kit.stroke(C.boardDark, 2, 0.3).Parent = board
+	window:SetAttribute("DarkStyle", true)
+	local board = Kit.new("Frame", { Name = "Board", BackgroundColor3 = Dossier.DARK, BorderSizePixel = 0, Position = at(4, 4), Size = sz(W - 8, H - 8), ZIndex = 1, Parent = window })
+	Kit.corner(10).Parent = board
+	Kit.stroke(Color3.fromHex("#0B1218"), 3, 0).Parent = board
+	Dossier.banner(board, sz(W - 8, Dossier.PHONE_HEADER + 10), style, 10)
 	local header = Kit.new("Frame", { Name = "Header", BackgroundTransparency = 1, Size = sz(W, Dossier.PHONE_HEADER), ZIndex = 3, Parent = window }) :: Frame
 	local body = Kit.new("Frame", { Name = "Body", BackgroundTransparency = 1, Position = at(0, Dossier.PHONE_HEADER), Size = sz(W, H - Dossier.PHONE_HEADER), ZIndex = 2, Parent = window }) :: Frame
 	local closed = false
@@ -434,9 +515,10 @@ function Dossier.phoneWindow(host: Instance, title: string, onClose: (() -> ())?
 	end
 	-- The title on a torn paper strip, clear of Roblox's buttons.
 	local left = math.max(12, r.topLeft - 4)
-	local strip = Dossier.sheet("ImageLabel", "header_paper", "tex_paper", C.sheet, { Name = "Title", Position = at(left, 8), Size = sz(0, 62), AutomaticSize = Enum.AutomaticSize.X, Parent = header })
-	Kit.padding(0, 18).Parent = strip
-	stencil({ Text = title, TextSize = 56, AnchorPoint = Vector2.new(0, 0.5), Position = UDim2.fromScale(0, 0.5), Parent = strip })
+	local strip = Kit.new("Frame", { Name = "Title", BackgroundTransparency = 1, Position = at(left, 8), Size = sz(0, 62), AutomaticSize = Enum.AutomaticSize.X, Parent = header })
+	Kit.padding(0, 6).Parent = strip
+	local t = stencil({ Text = title, TextSize = 56, TextColor3 = Color3.new(1, 1, 1), AnchorPoint = Vector2.new(0, 0.5), Position = UDim2.fromScale(0, 0.5), Parent = strip })
+	Kit.new("UIStroke", { Color = Color3.new(0, 0, 0), Thickness = 2, Transparency = 0.45, Parent = t })
 	Kit.new("UIListLayout", { FillDirection = Enum.FillDirection.Horizontal, VerticalAlignment = Enum.VerticalAlignment.Center, Parent = strip })
 	Dossier.closeRed(header, at(W - 42, 39), sz(62, 62), close)
 	return { root = root, window = window, header = header, body = body, close = close, at = at, sz = sz, k = 1, width = W, height = H - Dossier.PHONE_HEADER }
@@ -451,7 +533,14 @@ end
 -- A window title, whose caps need more than TextSize 100: drawn at 100 and
 -- scaled up.
 function Dossier.bigCaps(w: Window, cap: number, props: { [string]: any }): TextLabel
+	local dark = onDarkSurface(props.Parent)
 	local label = stencil(merge({ TextSize = 100 }, props))
+	if dark then
+		label.TextColor3 = Color3.new(1, 1, 1)
+	end
+	if dark then
+		Kit.new("UIStroke", { Color = Color3.new(0, 0, 0), Thickness = 2, Transparency = 0.45, Parent = label })
+	end
 	Kit.new("UIScale", { Scale = cap / 0.5 * w.k / 100, Parent = label })
 	return label
 end
@@ -465,6 +554,15 @@ end
 
 -- A card or folder picture filling `props`' box: the art, else manila.
 function Dossier.cardArt(className: string, artName: string, props: { [string]: any }): any
+	-- In a dark window a card is a clean rounded tile, light so its ink
+	-- text still reads, with a soft glow edge.
+	if Dossier.inDark(props.Parent) then
+		local tile = Kit.new(className, merge({ BackgroundColor3 = Color3.new(1, 1, 1), BorderSizePixel = 0, Image = "", AutoButtonColor = if className == "ImageButton" then false else nil }, props))
+		Kit.corner(10).Parent = tile
+		Kit.new("UIGradient", { Rotation = 90, Color = ColorSequence.new(Color3.fromHex("#FBF4E4"), Color3.fromHex("#E2D2AC")), Parent = tile })
+		Kit.stroke(Color3.fromHex("#FFE9A8"), 2, 0.35).Parent = tile
+		return tile
+	end
 	if (A[artName] or "") ~= "" then
 		return Kit.new(className, merge({ BackgroundTransparency = 1, Image = A[artName], ScaleType = Enum.ScaleType.Stretch, AutoButtonColor = if className == "ImageButton" then false else nil }, props))
 	end
@@ -476,6 +574,10 @@ end
 
 -- The torn paper strip a window's title sits on.
 function Dossier.headerPaper(w: Window, x: number, y: number, ww: number, hh: number, rot: number): ImageLabel
+	-- (A dark window's title sits right on its banner.)
+	if Dossier.inDark(w.window) then
+		return Kit.new("ImageLabel", { Name = "HeaderPaper", BackgroundTransparency = 1, Image = "", Position = w.at(x, y), Size = w.sz(ww, hh), Parent = w.header }) :: ImageLabel
+	end
 	local paper = Dossier.sheet("ImageLabel", "header_paper", "tex_paper", C.sheet, { Name = "HeaderPaper", Position = w.at(x, y), Size = w.sz(ww, hh), Rotation = rot, Parent = w.header })
 	if A.header_paper == "" then
 		Kit.stroke(C.sheetLine, 1, 0.2).Parent = paper
@@ -650,6 +752,11 @@ end
 
 -- A manila close button with a black X (centre at `pos`).
 function Dossier.closeManila(parent: Instance, pos: UDim2, size: UDim2, onClose: () -> ()): ImageButton
+	-- (A dark window uses the red X everywhere.)
+	if onDarkSurface(parent) then
+		local side = math.max(size.X.Offset, size.Y.Offset)
+		return Dossier.closeRed(parent, pos, UDim2.fromOffset(side, side), onClose)
+	end
 	local b = surface("ImageButton", "tex_manila", C.manila, { Name = "Close", AnchorPoint = Vector2.new(0.5, 0.5), Position = pos, Size = size, Parent = parent })
 	Kit.corner(6).Parent = b
 	Kit.stroke(C.manilaLine, 2, 0).Parent = b
