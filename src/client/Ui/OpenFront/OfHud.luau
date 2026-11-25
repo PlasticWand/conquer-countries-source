@@ -135,6 +135,7 @@ local DANGER_SECONDS = 14
 local MAX_NOTES = 3
 local NOTE_LIFE = 20 -- seconds a repeating line may stay at most
 local SPAWN_SEGMENTS = 16 -- the deploying dial's ring
+local EXPAND_NOTE_TICKS = 150 -- how long EXPAND NOW waits for a first expansion (10 a second)
 local BAR_W = 1910
 local BAR_H = 144
 local TOP_H = 126 -- the top bar's panels
@@ -323,6 +324,24 @@ function OfHud.new(state: any, host: Frame, root: any, actions: Actions)
 	typed({ Text = `{if Kit.touch() then "Tap" else "Click"} the play button to resume.`, TextColor3 = Color3.fromHex("#D7E3F2"), TextSize = 19, LayoutOrder = 2, Parent = pausedNote })
 	self.pausedNote = pausedNote
 
+	-- EXPAND NOW (Bruno, 2026-11-25: keep OpenFront's rule, teach it). Land
+	-- ringed by one neighbour goes to that neighbour as soon as it changes
+	-- (PlayerExecution's clusters), and tribes ring a start that waits within
+	-- seconds; its first attack then loses it all. So the first seconds after
+	-- deploying ask for an expansion. It goes once your land grows, after
+	-- EXPAND_NOTE_TICKS, or while the tutorial's card has the spot.
+	local expandNote = HudStyle.panel("Frame", { Name = "ExpandNote", AnchorPoint = Vector2.new(0.5, 0), Position = UDim2.new(0.5, 0, 0, 160), Size = UDim2.fromOffset(0, 70), AutomaticSize = Enum.AutomaticSize.X, Visible = false, Parent = match }, 14)
+	HudStyle.wash(expandNote, W.green, 0, 0.75, { { 0.35, 0 } })
+	Kit.padding(11, 26).Parent = expandNote
+	Kit.list(Enum.FillDirection.Vertical, 2, Enum.HorizontalAlignment.Left, Enum.VerticalAlignment.Center).Parent = expandNote
+	stencil({ Text = "EXPAND NOW", TextSize = 22, LayoutOrder = 1, Parent = expandNote })
+	typed({ Text = `{if Kit.touch() then "Tap" else "Click"} empty land next to you before tribes box you in.`, TextColor3 = Color3.fromHex("#D6EBD9"), TextSize = 19, LayoutOrder = 2, Parent = expandNote })
+	self.expandNote = expandNote
+	self.expandFrom = nil :: number? -- your land when the match started
+	self.expandDone = false
+	-- Set by OpenFrontClient: true while the tutorial or a coach tip shows its card there.
+	self.expandBlocked = nil :: (() -> boolean)?
+
 	-- Top right: rank tag / leaderboard, then attacks ------------------------------
 	local right = Kit.new("Frame", { Name = "Right", BackgroundTransparency = 1, AnchorPoint = Vector2.new(1, 0), Position = UDim2.new(1, -14, 0, 10), Size = UDim2.fromOffset(410, 900), Parent = match })
 	Kit.list(Enum.FillDirection.Vertical, 10, Enum.HorizontalAlignment.Right, Enum.VerticalAlignment.Top).Parent = right
@@ -481,6 +500,7 @@ function OfHud.new(state: any, host: Frame, root: any, actions: Actions)
 		if not root.compact then
 			hover.Position = UDim2.new(1, -20, 1, -math.round(BAR_H * k + 80))
 			pausedNote.Position = UDim2.new(0.5, 0, 0, math.round(6 + TOP_H * k + 12))
+			expandNote.Position = pausedNote.Position
 			-- OfActions keeps its cards above the bar and its build banner under
 			-- the top rail from these (2026-11-10 review).
 			match:SetAttribute("BarTop", math.round(6 + BAR_H * k))
@@ -747,6 +767,7 @@ function OfHud.new(state: any, host: Frame, root: any, actions: Actions)
 		self:_refreshClock()
 		self:_checkDeath()
 		self:_refreshReinforce()
+		self:_refreshExpandNote()
 	end))
 	hold(state.Messages:Connect(function(messages)
 		for _, m in messages do
@@ -881,13 +902,24 @@ function OfHud._phone(self: any, match: Frame)
 		local gap = (rightPx - leftPx) / s - 24
 		local ox = root.gui.AbsolutePosition.X
 		local scale = math.min(PHONE_HUD, gap / RACE_W)
+		local raceBottom
 		if scale >= RACE_MIN then
 			raceScale.Scale = scale
-			race.Position = UDim2.fromOffset(((leftPx + rightPx) / 2 - ox) / s, 12 + (44 * iconScale - RACE_H * scale) / 2)
+			local y = 12 + (44 * iconScale - RACE_H * scale) / 2
+			race.Position = UDim2.fromOffset(((leftPx + rightPx) / 2 - ox) / s, y)
+			raceBottom = y + RACE_H * scale
 		else
+			-- A gap under the icons, centred between Roblox's own buttons and
+			-- the rank pill so it clears both (Bruno, 2026-11-25).
 			raceScale.Scale = PHONE_HUD
-			race.Position = UDim2.new(0.5, 0, 0, 20 + 44 * iconScale)
+			local robloxRight = GuiService.TopbarInset.Min.X
+			local fromPx = if robloxRight > 0 then robloxRight else self.icons.AbsolutePosition.X
+			local y = 32 + 44 * iconScale
+			race.Position = UDim2.fromOffset(((fromPx + rightPx) / 2 - ox) / s, y)
+			raceBottom = y + RACE_H * PHONE_HUD
 		end
+		-- EXPAND NOW sits under the race bar.
+		self.expandNote.Position = UDim2.new(0.5, 0, 0, math.round(raceBottom + 12))
 	end
 	for _, signal in { pill:GetPropertyChangedSignal("AbsolutePosition"), iconsList:GetPropertyChangedSignal("AbsoluteContentSize"), root.Changed.Event } do
 		table.insert(self.connections, (signal :: any):Connect(placeRace))
@@ -897,7 +929,9 @@ function OfHud._phone(self: any, match: Frame)
 	-- The stats bar: every plaque two lines, all inside the rail's ends (its
 	-- riveted caps are 24 wide), shrunk only when the screen is too narrow.
 	local PAD, GAP, H = 26, 8, 78
-	local widths = { troops = 236, gold = 172, chips = 5 * 58 + 4 * 4, sends = 112, build = 112 }
+	-- The share chips are 68 wide, 78 tall (Bruno, 2026-11-25: as big as the rest).
+	local CHIP_W, CHIP_H = 68, 78
+	local widths = { troops = 236, gold = 172, chips = 5 * CHIP_W + 4 * 4, sends = 112, build = 112 }
 	local need = 2 * PAD + 4 * GAP + widths.troops + widths.gold + widths.chips + widths.sends + widths.build
 	local fit = math.min(1, (screenW - 24) / need) * PHONE_HUD
 	local bar = Kit.new("Frame", { Name = "PhoneBar", BackgroundTransparency = 1, AnchorPoint = Vector2.new(0.5, 1), Position = UDim2.new(0.5, 0, 1, -6), Size = UDim2.fromOffset(need, H + 16), Parent = match })
@@ -929,14 +963,14 @@ function OfHud._phone(self: any, match: Frame)
 	local chips = Kit.new("Frame", { Name = "Attack", BackgroundTransparency = 1, Size = UDim2.fromOffset(widths.chips, H), LayoutOrder = 3, Parent = bar })
 	self.ratioChips, self.ratioSet = {}, {}
 	for i, r in CHIPS do
-		local chip, set = HudStyle.chip(chips, `{math.floor(r * 100 + 0.5)}%`, 26, false, { Name = `Share{i}`, Position = UDim2.fromOffset(29 + (i - 1) * 62, H / 2), Size = UDim2.fromOffset(58, 62), Parent = chips })
+		local chip, set = HudStyle.chip(chips, `{math.floor(r * 100 + 0.5)}%`, 26, false, { Name = `Share{i}`, Position = UDim2.fromOffset(CHIP_W / 2 + (i - 1) * (CHIP_W + 4), H / 2), Size = UDim2.fromOffset(CHIP_W, CHIP_H), Parent = chips })
 		local function pick()
 			cue(self, "ui.slider")
 			self:setRatio(r)
 		end
 		chip.Activated:Connect(pick)
-		-- A taller tap area; side by side they touch, 62 apart (audit F12).
-		Dossier.hitPad(chip, pick, 62, nil)
+		-- A taller tap area; side by side they touch, CHIP_W + 4 apart (audit F12).
+		Dossier.hitPad(chip, pick, CHIP_W + 4, nil)
 		self.ratioChips[r] = chip
 		self.ratioSet[r] = set
 	end
@@ -1025,6 +1059,7 @@ function OfHud._phone(self: any, match: Frame)
 	-- The spawn prompt and the notes under the icons; the attacks list narrower.
 	self.spawn.Position = UDim2.new(0.5, 0, 0, 84)
 	self.pausedNote.Position = UDim2.new(0.5, 0, 0, 84)
+	self.expandNote.Position = UDim2.new(0.5, 0, 0, 84)
 	self.notesHost.Position = UDim2.fromOffset(12, 104)
 	self.notesHost.Size = UDim2.fromOffset(340, 120)
 	local noteList = self.notesHost:FindFirstChildOfClass("UIListLayout") :: UIListLayout
@@ -1747,6 +1782,31 @@ function OfHud._refreshPhase(self: any)
 		self:_showWin()
 	end
 	self:_refreshPanel()
+end
+
+-- EXPAND NOW: from the match's start until your land first grows, for at most
+-- EXPAND_NOTE_TICKS.
+function OfHud._refreshExpandNote(self: any)
+	local state = self.state
+	local me = state:me()
+	local ticks = if state.startTick ~= nil then (state.tick or 0) - state.startTick else nil
+	if ticks ~= nil and me ~= nil and me.alive and not state:inSpawnPhase() then
+		if self.expandFrom == nil then
+			self.expandFrom = me.tiles
+		elseif me.tiles > self.expandFrom then
+			self.expandDone = true
+		end
+	end
+	local blocked = self.expandBlocked ~= nil and self.expandBlocked()
+	self.expandNote.Visible = ticks ~= nil
+		and ticks < EXPAND_NOTE_TICKS
+		and not self.expandDone
+		and me ~= nil
+		and me.alive
+		and not state:inSpawnPhase()
+		and not state.paused
+		and state.winner == nil
+		and not blocked
 end
 
 -- WinModal.tick: "You died", once, after you had spawned.

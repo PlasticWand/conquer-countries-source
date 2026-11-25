@@ -903,6 +903,10 @@ function OpenFrontClient.start()
 		hud.profileOf = function()
 			return menu.view
 		end
+		-- EXPAND NOW gives way to the tutorial's card and the coach's tips.
+		hud.expandBlocked = function(): boolean
+			return tutorial ~= nil and tutorial.card ~= nil and tutorial.card.Visible
+		end
 		hud:setMusicOn(menu.settings.music)
 		actionsUi = OfActions.new(state, hud.match, actionsActions, hud.slotsHost)
 		builtCompact, builtWidth = root.compact, root.width
